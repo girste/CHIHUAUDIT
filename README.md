@@ -1,322 +1,136 @@
 # 🐕 MCP Cybersec Watchdog
 
-> Cybersecurity monitoring and analysis for Linux servers via MCP
+**Complete Linux security audit in 30 seconds** via Claude MCP. Analyzes firewall, SSH, threats, fail2ban, Docker, kernel hardening and more. Zero configuration required.
 
-Get a **complete security audit in 30 seconds**. Analyzes firewall, SSH, threats, fail2ban, Docker, kernel hardening and more. Returns actionable recommendations with zero configuration.
-
-**🚀 NEW: Live Monitoring Mode (Beta)** - Continuous security monitoring with baseline tracking, anomaly detection, and AI-powered alerts. Set it and forget it.
+**🚀 Live Monitoring (Beta)**: Continuous background monitoring with anomaly detection and AI alerts.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Tests](https://github.com/girste/mcp-cybersec-watchdog/actions/workflows/test.yml/badge.svg)](https://github.com/girste/mcp-cybersec-watchdog/actions/workflows/test.yml)
-[![PyPI](https://img.shields.io/badge/PyPI-ready-green.svg)](https://pypi.org)
 
-## Why?
+## What It Does
 
-Security audits are tedious. This tool gives you:
-- **Complete security report in 30 seconds**
-- **Factual analysis** - no subjective scoring, just data
-- **AI-friendly JSON output** for integration with LLMs
-- **Privacy-first** approach (data masking by default)
-- **Actionable recommendations** with specific commands
-- **Zero configuration** - works out of the box
+**Security Audit:**
+- Firewall (ufw/iptables/firewalld), SSH config, network services
+- Failed login attempts, attack patterns, fail2ban status
+- Docker security, kernel hardening (16+ params), MAC (AppArmor/SELinux)
+- Returns actionable recommendations with specific commands
 
-## Features
+**Live Monitoring:**
+- Background daemon checks server every 5min-24h (default: 1 hour)
+- Detects: firewall changes, new open ports, SSH config changes, attack spikes
+- AI analysis only when anomalies detected (token-efficient!)
+- Auto-cleanup prevents disk fill
 
-### Security Auditing
-✅ **Firewall Analysis** - Detects and analyzes ufw, iptables, or firewalld
-✅ **SSH Hardening Check** - Validates sshd_config security settings
-✅ **Threat Intelligence** - Analyzes failed login attempts and patterns
-✅ **Fail2ban Integration** - Reports jail status and banned IPs
-✅ **Docker Security** - Container analysis and rootless mode detection
-✅ **Kernel Hardening** - Validates 16+ sysctl parameters
-✅ **MAC (AppArmor/SELinux)** - Mandatory Access Control status
-
-### Live Monitoring (Beta)
-🆕 **Baseline Tracking** - Automatic security state baseline on first run
-🆕 **Anomaly Detection** - Detects firewall changes, new ports, SSH config changes, attack spikes
-🆕 **Smart Alerts** - AI analysis triggered ONLY when anomalies detected (saves tokens!)
-🆕 **Auto-cleanup** - Automatic log rotation to prevent disk fill
-🆕 **Daemon Mode** - Runs in background, checks every 5min-24h (configurable)
-
-### General
-✅ **Privacy Masking** - Automatically masks sensitive data
-✅ **Cross-distro** - Works on Debian, Ubuntu, RHEL, CentOS
-✅ **Zero Configuration** - Works out of the box
-
-## Quick Start
-
-### Installation
+## Installation
 
 ```bash
 pip install mcp-cybersec-watchdog
 
-# Setup passwordless sudo (one-time, required for full analysis)
+# Setup passwordless sudo (required for full analysis)
 bash <(curl -s https://raw.githubusercontent.com/girste/mcp-cybersec-watchdog/main/setup-sudo.sh)
 ```
 
-Or manual install:
-```bash
-git clone https://github.com/girste/mcp-cybersec-watchdog
-cd mcp-cybersec-watchdog
-pip install -e .
-./setup-sudo.sh
-```
+## Usage
 
-### Standalone Usage
+### Standalone
 
 ```bash
-# Run one-time security audit
+# One-time security audit
 mcp-watchdog test
 
-# Run continuous monitoring (default: checks every hour)
+# Live monitoring (checks every hour)
 mcp-watchdog monitor
 
-# Run single monitoring check (useful for testing)
-mcp-watchdog monitor-once
-
-# Custom monitoring interval (check every 30 minutes)
+# Custom interval (e.g., every 30 minutes)
 mcp-watchdog monitor --interval 1800
 ```
 
-### Live Monitoring
+### With Claude Desktop
 
-The monitoring mode provides:
-- **Baseline tracking**: First run creates security baseline
-- **Anomaly detection**: Detects configuration changes, new open ports, attack spikes
-- **Smart alerting**: AI analysis triggered ONLY when anomalies detected (saves tokens!)
-- **Bulletins**: Human-readable reports written to log directory
-
-**Example workflow**:
-```bash
-# Start monitoring
-mcp-watchdog monitor --interval 3600
-
-# Output every hour:
-# ✓ ALL OK → Simple bulletin (no AI needed)
-# ⚠ ANOMALY DETECTED → AI analysis recommended
-```
-
-When anomalies are detected, the tool writes detailed JSON reports that can be analyzed via the MCP `analyze_anomaly` tool (AI-powered deep analysis).
-
-### MCP Integration
-
-Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS or `%APPDATA%\Claude\claude_desktop_config.json` on Windows):
+Add to Claude config (`~/Library/Application Support/Claude/claude_desktop_config.json`):
 
 ```json
 {
   "mcpServers": {
     "cybersec-watchdog": {
-      "command": "/path/to/venv/bin/mcp-watchdog",
-      "env": {}
+      "command": "/path/to/venv/bin/mcp-watchdog"
     }
   }
 }
 ```
 
-Or use the included config file:
-```bash
-cp claude_desktop_config.json ~/Library/Application\ Support/Claude/
-```
+**MCP Tools Available:**
 
-Then from Claude Desktop:
+| Tool | Description |
+|------|-------------|
+| `security_audit` | One-time comprehensive audit |
+| `start_monitoring` | Start background monitoring (default: 1h interval) |
+| `stop_monitoring` | Stop monitoring daemon |
+| `monitoring_status` | Check daemon status and recent bulletins |
+| `analyze_anomaly` | AI analysis of detected anomalies |
 
+**Example prompts:**
 ```
 Run a security audit on this server
+Start monitoring with 30 minute intervals
+Show monitoring status
 ```
 
-The tool will return a comprehensive JSON report with all security findings.
-
-### MCP Tools
-
-The server exposes these tools to Claude:
-
-**1. `security_audit`** - One-time comprehensive security audit
-```
-Run a security audit on this server
-```
-
-**2. `start_monitoring`** - Start live monitoring daemon (Beta)
-```
-Start security monitoring with 1 hour interval
-```
-Parameters: `interval_seconds` (300-86400, default: 3600)
-
-**3. `stop_monitoring`** - Stop live monitoring daemon
-```
-Stop the security monitoring daemon
-```
-
-**4. `monitoring_status`** - Check monitoring status
-```
-Show monitoring status and recent alerts
-```
-
-**5. `analyze_anomaly`** - AI-powered anomaly analysis (token-efficient!)
-```
-Analyze the latest security anomaly
-```
-
-The monitoring tools run in background and only trigger AI analysis when anomalies are detected, saving tokens during normal operations.
-
-## Example Output
+## Output Example
 
 ```json
 {
-  "timestamp": "2025-12-27T13:20:39Z",
-  "hostname": "srv-pr**",
-  "os": "Linux (debian)",
-  "kernel": "6.8.0-87-generic",
-  "firewall": {
-    "type": "ufw",
-    "active": true,
-    "default_policy": "deny",
-    "rules_count": 8,
-    "open_ports": [80, 443, 2244]
-  },
-  "ssh": {
-    "port": 2244,
-    "permit_root_login": "no",
-    "password_auth": "no",
-    "pubkey_auth": "yes",
-    "issues": []
-  },
-  "threats": {
-    "period_days": 7,
-    "total_attempts": 342,
-    "unique_ips": 89,
-    "top_attackers": [
-      {"ip": "45.142.***.***", "attempts": 67}
-    ],
-    "patterns": ["ssh_brute_force"]
-  },
-  "fail2ban": {
-    "installed": true,
-    "active": true,
-    "total_banned": 12
-  },
-  "recommendations": []
+  "firewall": {"type": "ufw", "active": true, "open_ports": [80, 443, 2244]},
+  "ssh": {"port": 2244, "permit_root_login": "no", "password_auth": "no"},
+  "threats": {"total_attempts": 342, "unique_ips": 89},
+  "fail2ban": {"active": true, "total_banned": 12},
+  "docker": {"running_containers": 1, "rootless": false},
+  "kernel_hardening": {"hardening_percentage": 100.0},
+  "recommendations": [...]
 }
 ```
 
-## Configuration
+**Privacy**: IPs and hostnames are masked by default (`91.99.***.***`, `srv-ab**`). Disable with `{"mask_data": false}`.
 
-Optional config file (`.mcp-security.json` in current dir or home):
+## Configuration (Optional)
+
+Create `.mcp-security.json` to customize:
 
 ```json
 {
-  "checks": {
-    "docker": false,
-    "updates": false
-  },
+  "checks": {"docker": false, "updates": false},
   "threat_analysis_days": 14,
   "mask_data": false
 }
 ```
 
-Disable specific checks or customize analysis period. All checks enabled by default.
-
-## Privacy
-
-By default, the tool **masks sensitive data**:
-- IP addresses: `91.99.***.***`
-- Hostnames: `srv-ab**`
-
-Disable masking via config file or MCP parameter `{"mask_data": false}`
-
-## Requirements
-
-- Python 3.10+
-- Linux (Debian/Ubuntu/RHEL/CentOS)
-- sudo access (passwordless sudo for automated operation)
-
-### Sudo Configuration
-
-The tool auto-detects missing permissions and warns you with setup instructions. It needs sudo access for:
-- **Firewall analysis**: `ufw`, `iptables`, `firewalld`
-- **Fail2ban status**: `fail2ban-client`
-- **Log analysis**: `/var/log/auth.log`
-
-Setup passwordless sudo for these specific commands:
-
-```bash
-./setup-sudo.sh
-```
-
-Creates `/etc/sudoers.d/mcp-security` with minimal permissions. The tool continues with limited analysis if sudo is not configured.
-
-## What Gets Analyzed
-
-### Firewall
-- Active status
-- Default policy (allow/deny)
-- Number of rules
-- Open ports
-
-### SSH Configuration
-- Port number
-- Root login status
-- Password authentication
-- Pubkey authentication
-
-### Threats
-- Failed SSH login attempts (7 days)
-- Unique attacker IPs
-- Attack patterns (brute force, distributed)
-- Top 10 attackers
-
-### Fail2ban
-- Installation status
-- Active jails
-- Banned IPs count
-
 ## Development
 
 ```bash
-# Clone repo
 git clone https://github.com/girste/mcp-cybersec-watchdog
 cd mcp-cybersec-watchdog
-
-# Install with dev dependencies
 pip install -e ".[dev]"
-
-# Run tests
 pytest tests/ -v
-
-# Test standalone
-mcp-watchdog test
 ```
 
-CI runs automatically on push via GitHub Actions (Python 3.10/3.11/3.12).
-
-## Contributing
-
-Contributions welcome! Please:
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes (keep code clean and concise)
-4. Add tests if applicable
-5. Submit a pull request
-
-## License
-
-MIT License - see [LICENSE](LICENSE) file for details
+CI: Python 3.10/3.11/3.12 via GitHub Actions.
 
 ## Roadmap
 
-- [x] **Continuous monitoring mode** ✅ (Beta - available now!)
-- [ ] CVE scanning for installed packages
-- [ ] SSL certificate expiration checks
-- [ ] HTML/PDF report export
-- [ ] CIS benchmark compliance checks
-- [ ] Historical trend analysis and graphs
+- [x] Live monitoring mode ✅
+- [ ] CVE scanning
+- [ ] SSL certificate checks
+- [ ] CIS benchmark compliance
 
-## Author
+## Contributing
 
-Created by [Girste](https://girste.com)
+PRs welcome! Fork, create feature branch, add tests, submit PR.
 
-## Support
+## License
 
-- 🐛 [Report bugs](https://github.com/girste/mcp-cybersec-watchdog/issues)
-- 💡 [Request features](https://github.com/girste/mcp-cybersec-watchdog/issues)
-- ⭐ Star this repo if you find it useful!
+MIT - see [LICENSE](LICENSE)
+
+---
+
+Created by [Girste](https://girste.com) • [Report issues](https://github.com/girste/mcp-cybersec-watchdog/issues)
