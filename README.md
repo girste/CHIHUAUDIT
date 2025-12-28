@@ -50,9 +50,38 @@ pip install -e .
 ### Standalone Usage
 
 ```bash
-# Run security audit (automatic sudo for privileged commands)
+# Run one-time security audit
 mcp-watchdog test
+
+# Run continuous monitoring (default: checks every hour)
+mcp-watchdog monitor
+
+# Run single monitoring check (useful for testing)
+mcp-watchdog monitor-once
+
+# Custom monitoring interval (check every 30 minutes)
+mcp-watchdog monitor --interval 1800
 ```
+
+### Live Monitoring
+
+The monitoring mode provides:
+- **Baseline tracking**: First run creates security baseline
+- **Anomaly detection**: Detects configuration changes, new open ports, attack spikes
+- **Smart alerting**: AI analysis triggered ONLY when anomalies detected (saves tokens!)
+- **Bulletins**: Human-readable reports written to log directory
+
+**Example workflow**:
+```bash
+# Start monitoring
+mcp-watchdog monitor --interval 3600
+
+# Output every hour:
+# ✓ ALL OK → Simple bulletin (no AI needed)
+# ⚠ ANOMALY DETECTED → AI analysis recommended
+```
+
+When anomalies are detected, the tool writes detailed JSON reports that can be analyzed via the MCP `analyze_anomaly` tool (AI-powered deep analysis).
 
 ### MCP Integration
 
@@ -81,6 +110,22 @@ Run a security audit on this server
 ```
 
 The tool will return a comprehensive JSON report with all security findings.
+
+### MCP Tools
+
+The server exposes two tools to Claude:
+
+**1. `security_audit`** - One-time comprehensive security audit
+```
+Run a security audit on this server
+```
+
+**2. `analyze_anomaly`** - AI-powered anomaly analysis (token-efficient!)
+```
+Analyze the anomaly in /var/log/mcp-watchdog/anomaly_20251228_123456.json
+```
+
+This tool is automatically suggested when monitoring detects anomalies. It provides deep AI insights only when needed, saving tokens during normal operations.
 
 ## Example Output
 

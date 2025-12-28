@@ -1,3 +1,4 @@
 include setup-sudo.sh
 include README.md
 include LICENSE
+include MONITORING.md
