@@ -50,9 +50,9 @@ def analyze_iptables():
         lines = output.split("\n")
         rules_count = len(
             [
-                l
-                for l in lines
-                if l.strip() and not l.startswith("Chain") and not l.startswith("target")
+                line
+                for line in lines
+                if line.strip() and not line.startswith("Chain") and not line.startswith("target")
             ]
         )
 

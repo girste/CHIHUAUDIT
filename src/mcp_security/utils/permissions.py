@@ -54,7 +54,7 @@ def check_and_warn():
 
     if not ok:
         print("⚠️  Warning: Some security checks require sudo permissions")
-        print(f"\nMissing permissions for:")
+        print("\nMissing permissions for:")
         for item in missing:
             print(f"  - {item}")
         print(f"\n{get_setup_hint()}")

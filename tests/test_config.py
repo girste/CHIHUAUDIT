@@ -37,7 +37,7 @@ def test_custom_config():
         config = load_config()
 
         assert config["threat_analysis_days"] == 14
-        assert config["checks"]["ssh"] == False
+        assert not config["checks"]["ssh"]
 
     finally:
         os.chdir(old_cwd)

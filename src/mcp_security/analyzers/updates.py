@@ -6,7 +6,7 @@ from ..utils.detect import run_with_sudo, get_distro
 def check_apt_updates():
     """Check for available security updates on Debian/Ubuntu."""
     # Update package cache (non-invasive, just downloads metadata)
-    update_result = run_with_sudo(["apt-get", "update", "-qq"])
+    run_with_sudo(["apt-get", "update", "-qq"])
 
     # Get upgradable packages
     result = run_with_sudo(["apt", "list", "--upgradable"])
