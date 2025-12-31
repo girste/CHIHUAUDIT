@@ -42,7 +42,7 @@ Overall: GOOD
 Issues: 0 critical, 0 high priority
 Good practices: 8
 Firewall: ACTIVE (ufw) - 8 rules, 3 open ports
-SSH: Port 2244 - Root=no, Password=no
+SSH: Port 22 - Root=no, Password=no
 Threats: 0 failed login attempts from 0 IPs (7 days)
 Fail2ban: ACTIVE - 0 IPs banned
 Docker: 1 containers running
@@ -301,7 +301,7 @@ Status: ⚠ HIGH SEVERITY ANOMALY DETECTED
 ```
 Status: ⚠ ANOMALIES DETECTED
 
-[MEDIUM] ssh: SSH port changed: 22 → 2244
+[MEDIUM] ssh: SSH port changed: 22 → 2222
 [LOW] firewall: Firewall rules changed: 8 → 9
 
 # Expected change after hardening

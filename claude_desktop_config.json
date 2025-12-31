@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "cybersec-watchdog": {
-      "command": "/home/girste/.local/share/mcp-watchdog-venv/bin/mcp-watchdog",
+      "command": "mcp-watchdog",
       "env": {}
     }
   }

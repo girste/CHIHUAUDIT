@@ -3,6 +3,14 @@
 import re
 from ..utils.detect import run_with_sudo
 
+CRITICAL_SERVICES = [
+    "ssh", "sshd", "caddy", "nginx", "apache2",
+    "docker", "mysql", "mariadb", "postgresql", "redis",
+    "fail2ban", "ufw", "firewalld",
+]
+
+UNKNOWN_SERVICES_THRESHOLD = 3
+
 
 def parse_listening_ports():
     """Parse listening ports and services using ss command."""
@@ -70,7 +78,6 @@ def categorize_services(services):
     # Well-known safe services
     safe_services = {
         22: "ssh",
-        2244: "ssh-custom",
         80: "http",
         443: "https",
     }
@@ -99,55 +106,104 @@ def categorize_services(services):
     return categorized
 
 
+def check_systemd_failed():
+    """Check for failed systemd units."""
+    result = run_with_sudo(["systemctl", "list-units", "--failed", "--no-pager", "--plain"])
+
+    if not result:
+        return []
+
+    failed_units = []
+    for line in result.stdout.split("\n"):
+        line = line.strip()
+        if not line or "UNIT" in line or "0 loaded units listed" in line:
+            continue
+
+        parts = line.split()
+        if len(parts) >= 1:
+            unit = parts[0]
+            failed_units.append(unit)
+
+    return failed_units
+
+
+def check_critical_services():
+    """Check status of critical system services."""
+    services_status = []
+    installed_states = {"active", "failed", "degraded", "activating"}
+
+    for service in CRITICAL_SERVICES:
+        result = run_with_sudo(["systemctl", "is-active", f"{service}.service"])
+        if not result:
+            continue
+
+        status = result.stdout.strip()
+        if status in installed_states:
+            services_status.append({
+                "name": service,
+                "status": status,
+                "active": status == "active"
+            })
+
+    return services_status
+
+
 def analyze_services():
-    """Analyze network services and open ports."""
+    """Analyze network services, open ports, and systemd service health."""
     services = parse_listening_ports()
+    categorized = categorize_services(services) if services else {"safe": [], "risky": [], "unknown": []}
 
-    if not services:
-        return {
-            "total_services": 0,
-            "exposed_services": 0,
-            "internal_only": 0,
-            "by_category": {"safe": [], "risky": [], "unknown": []},
-            "issues": [],
-        }
-
-    # Categorize services
-    categorized = categorize_services(services)
-
-    # Count exposed services
-    exposed_count = sum(1 for s in services if s["exposed"])
-    internal_count = len(services) - exposed_count
-
-    # Identify security issues
-    issues = []
-
-    # Check for exposed risky services
-    for service in categorized["risky"]:
-        if service["exposed"]:
-            issues.append(
-                {
-                    "severity": "high",
-                    "message": f"Database service {service['name']} exposed on port {service['port']}",
-                    "recommendation": f"Bind {service['name']} to localhost only or use firewall to restrict access",
-                }
-            )
-
-    # Check for unknown exposed services
-    exposed_unknown = [s for s in categorized["unknown"] if s["exposed"]]
-    if len(exposed_unknown) > 3:
-        issues.append(
-            {
-                "severity": "medium",
-                "message": f"{len(exposed_unknown)} unknown services exposed to network",
-                "recommendation": "Review and identify all exposed services, close unnecessary ports",
-            }
-        )
-
-    return {
+    exposed_count = sum(1 for s in services if s["exposed"]) if services else 0
+    network_data = {
         "total_services": len(services),
         "exposed_services": exposed_count,
-        "internal_only": internal_count,
+        "internal_only": len(services) - exposed_count,
         "by_category": categorized,
+    }
+
+    failed_units = check_systemd_failed()
+    critical_services = check_critical_services()
+
+    issues = []
+
+    for service in categorized.get("risky", []):
+        if service["exposed"]:
+            issues.append({
+                "severity": "high",
+                "message": f"Database service {service['name']} exposed on port {service['port']}",
+                "recommendation": f"Bind {service['name']} to localhost only or use firewall to restrict access",
+            })
+
+    exposed_unknown = [s for s in categorized.get("unknown", []) if s["exposed"]]
+    if len(exposed_unknown) > UNKNOWN_SERVICES_THRESHOLD:
+        issues.append({
+            "severity": "medium",
+            "message": f"{len(exposed_unknown)} unknown services exposed to network",
+            "recommendation": "Review and identify all exposed services, close unnecessary ports",
+        })
+
+    if failed_units:
+        issues.append({
+            "severity": "high",
+            "message": f"{len(failed_units)} systemd unit(s) in failed state",
+            "recommendation": f"Check and fix failed units: {', '.join(failed_units[:3])}",
+        })
+
+    failed_critical = [s for s in critical_services if s["status"] in ("failed", "degraded")]
+    for svc in failed_critical:
+        issues.append({
+            "severity": "critical",
+            "message": f"Critical service {svc['name']} is {svc['status']}",
+            "recommendation": f"Restart/fix {svc['name']} immediately: sudo systemctl restart {svc['name']}",
+        })
+
+    return {
+        **network_data,
+        "systemd": {
+            "failed_units": failed_units,
+            "failed_count": len(failed_units),
+            "critical_services": critical_services,
+            "critical_down": len(failed_critical),
+        },
         "issues": issues,
     }
