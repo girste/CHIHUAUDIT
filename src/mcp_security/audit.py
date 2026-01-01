@@ -150,12 +150,51 @@ def run_audit(mask_data=None, verbose=False):
 
     # Generate recommendations
     recommendations = generate_recommendations(
-        firewall, ssh, fail2ban, threats, services, docker, updates, mac, kernel, ssl, disk, cve, cis, containers, nist, pci, webheaders, filesystem, network, users
+        firewall,
+        ssh,
+        fail2ban,
+        threats,
+        services,
+        docker,
+        updates,
+        mac,
+        kernel,
+        ssl,
+        disk,
+        cve,
+        cis,
+        containers,
+        nist,
+        pci,
+        webheaders,
+        filesystem,
+        network,
+        users,
     )
 
     # Generate security analysis summary
     analysis = generate_security_analysis(
-        firewall, ssh, fail2ban, threats, services, docker, updates, mac, kernel, ssl, disk, cve, cis, containers, nist, pci, webheaders, filesystem, network, users, recommendations
+        firewall,
+        ssh,
+        fail2ban,
+        threats,
+        services,
+        docker,
+        updates,
+        mac,
+        kernel,
+        ssl,
+        disk,
+        cve,
+        cis,
+        containers,
+        nist,
+        pci,
+        webheaders,
+        filesystem,
+        network,
+        users,
+        recommendations,
     )
 
     # Build report
@@ -192,7 +231,27 @@ def run_audit(mask_data=None, verbose=False):
 
 
 def generate_security_analysis(
-    firewall, ssh, fail2ban, threats, services, docker, updates, mac, kernel, ssl, disk, cve, cis, containers, nist, pci, webheaders, filesystem, network, users, recommendations
+    firewall,
+    ssh,
+    fail2ban,
+    threats,
+    services,
+    docker,
+    updates,
+    mac,
+    kernel,
+    ssl,
+    disk,
+    cve,
+    cis,
+    containers,
+    nist,
+    pci,
+    webheaders,
+    filesystem,
+    network,
+    users,
+    recommendations,
 ):
     """Generate human-readable security analysis summary."""
     issues = []
@@ -316,7 +375,9 @@ def generate_security_analysis(
                     f"{disk['critical_count']} filesystem(s) critically low on space (>90% full)"
                 )
             elif disk["warning_count"] > 0:
-                warnings.append(f"{disk['warning_count']} filesystem(s) running low on space (>70% full)")
+                warnings.append(
+                    f"{disk['warning_count']} filesystem(s) running low on space (>70% full)"
+                )
             else:
                 good_practices.append("All filesystems have adequate free space")
 
@@ -327,7 +388,9 @@ def generate_security_analysis(
                     f"{cve['critical_vulnerabilities']} CRITICAL CVE vulnerabilities detected - patch immediately"
                 )
             elif cve["high_vulnerabilities"] > 0:
-                warnings.append(f"{cve['high_vulnerabilities']} high-severity CVE vulnerabilities found")
+                warnings.append(
+                    f"{cve['high_vulnerabilities']} high-severity CVE vulnerabilities found"
+                )
             elif cve["vulnerabilities_found"] > 0:
                 warnings.append(f"{cve['vulnerabilities_found']} known vulnerabilities detected")
 
@@ -337,23 +400,35 @@ def generate_security_analysis(
                 f"{services['systemd']['critical_down']} critical service(s) are down or degraded"
             )
         elif services.get("systemd", {}).get("failed_count", 0) > 0:
-            warnings.append(f"{services['systemd']['failed_count']} systemd unit(s) in failed state")
+            warnings.append(
+                f"{services['systemd']['failed_count']} systemd unit(s) in failed state"
+            )
 
     if cis:
         if cis["checked"]:
             if cis["compliance_percentage"] >= 90:
-                good_practices.append(f"Excellent CIS Benchmark compliance ({cis['compliance_percentage']}%)")
+                good_practices.append(
+                    f"Excellent CIS Benchmark compliance ({cis['compliance_percentage']}%)"
+                )
             elif cis["compliance_percentage"] >= 70:
-                warnings.append(f"Moderate CIS compliance ({cis['compliance_percentage']}%) - {cis['failed']} controls failing")
+                warnings.append(
+                    f"Moderate CIS compliance ({cis['compliance_percentage']}%) - {cis['failed']} controls failing"
+                )
             else:
-                issues.append(f"Poor CIS compliance ({cis['compliance_percentage']}%) - {cis['failed']} controls failing")
+                issues.append(
+                    f"Poor CIS compliance ({cis['compliance_percentage']}%) - {cis['failed']} controls failing"
+                )
 
     if containers:
         if containers["checked"]:
             if containers["critical_vulnerabilities"] > 0:
-                issues.append(f"{containers['critical_vulnerabilities']} CRITICAL vulnerabilities in container images")
+                issues.append(
+                    f"{containers['critical_vulnerabilities']} CRITICAL vulnerabilities in container images"
+                )
             elif containers["high_vulnerabilities"] > 0:
-                warnings.append(f"{containers['high_vulnerabilities']} HIGH vulnerabilities in container images")
+                warnings.append(
+                    f"{containers['high_vulnerabilities']} HIGH vulnerabilities in container images"
+                )
 
     if nist:
         if nist["checked"] and nist["compliance_percentage"] >= 80:
@@ -363,37 +438,55 @@ def generate_security_analysis(
 
     if pci:
         if pci["checked"] and pci["compliance_percentage"] < 100:
-            issues.append(f"PCI-DSS compliance at {pci['compliance_percentage']}% - {pci['failed']} controls failing")
+            issues.append(
+                f"PCI-DSS compliance at {pci['compliance_percentage']}% - {pci['failed']} controls failing"
+            )
         elif pci["checked"]:
             good_practices.append("Full PCI-DSS technical baseline compliance")
 
     if webheaders:
         if webheaders["checked"]:
             if webheaders["total_missing_high"] > 0:
-                issues.append(f"{webheaders['total_missing_high']} critical security headers missing from web server")
+                issues.append(
+                    f"{webheaders['total_missing_high']} critical security headers missing from web server"
+                )
             elif webheaders["total_missing_medium"] > 0:
-                warnings.append(f"{webheaders['total_missing_medium']} security headers missing - consider adding")
+                warnings.append(
+                    f"{webheaders['total_missing_medium']} security headers missing - consider adding"
+                )
 
     if filesystem:
         if filesystem["checked"]:
             if filesystem["world_writable_files"] > 0:
-                issues.append(f"{filesystem['world_writable_files']} world-writable files found - permission issue")
+                issues.append(
+                    f"{filesystem['world_writable_files']} world-writable files found - permission issue"
+                )
             if filesystem["suid_sgid_suspicious"] > 5:
-                warnings.append(f"{filesystem['suid_sgid_suspicious']} non-standard SUID binaries - potential risk")
+                warnings.append(
+                    f"{filesystem['suid_sgid_suspicious']} non-standard SUID binaries - potential risk"
+                )
 
     if network:
         if network["checked"]:
             if network["suspicious_connections"] > 0:
-                suspicious.append(f"{network['suspicious_connections']} suspicious network connections detected")
+                suspicious.append(
+                    f"{network['suspicious_connections']} suspicious network connections detected"
+                )
             if network["listening_services"] > 20:
-                warnings.append(f"{network['listening_services']} services listening - large attack surface")
+                warnings.append(
+                    f"{network['listening_services']} services listening - large attack surface"
+                )
 
     if users:
         if users["checked"]:
             if users["uid_zero_users"] > 0:
-                issues.append(f"{users['uid_zero_users']} unauthorized users with root privileges (UID 0)")
+                issues.append(
+                    f"{users['uid_zero_users']} unauthorized users with root privileges (UID 0)"
+                )
             if users["users_without_password"] > 0:
-                warnings.append(f"{users['users_without_password']} user accounts without password set")
+                warnings.append(
+                    f"{users['users_without_password']} user accounts without password set"
+                )
 
     # Overall assessment
     critical_count = len([r for r in recommendations if r["priority"] == "critical"])
@@ -440,7 +533,26 @@ def generate_security_analysis(
 
 
 def generate_recommendations(
-    firewall, ssh, fail2ban, threats, services, docker, updates, mac, kernel, ssl, disk, cve, cis, containers, nist, pci, webheaders, filesystem, network, users
+    firewall,
+    ssh,
+    fail2ban,
+    threats,
+    services,
+    docker,
+    updates,
+    mac,
+    kernel,
+    ssl,
+    disk,
+    cve,
+    cis,
+    containers,
+    nist,
+    pci,
+    webheaders,
+    filesystem,
+    network,
+    users,
 ):
     """Generate prioritized security recommendations."""
     recommendations = []
@@ -593,74 +705,93 @@ def generate_recommendations(
 
     if cis:
         for issue in cis.get("issues", []):
-            recommendations.append({
-                "priority": issue["severity"],
-                "title": issue["message"],
-                "description": issue["recommendation"],
-                "command": None,
-            })
+            recommendations.append(
+                {
+                    "priority": issue["severity"],
+                    "title": issue["message"],
+                    "description": issue["recommendation"],
+                    "command": None,
+                }
+            )
 
     if containers:
         for issue in containers.get("issues", []):
-            recommendations.insert(0, {
-                "priority": issue["severity"],
-                "title": issue["message"],
-                "description": issue["recommendation"],
-                "command": None,
-            })
+            recommendations.insert(
+                0,
+                {
+                    "priority": issue["severity"],
+                    "title": issue["message"],
+                    "description": issue["recommendation"],
+                    "command": None,
+                },
+            )
 
     if nist:
         for issue in nist.get("issues", []):
-            recommendations.append({
-                "priority": issue["severity"],
-                "title": issue["message"],
-                "description": issue["recommendation"],
-                "command": None,
-            })
+            recommendations.append(
+                {
+                    "priority": issue["severity"],
+                    "title": issue["message"],
+                    "description": issue["recommendation"],
+                    "command": None,
+                }
+            )
 
     if pci:
         for issue in pci.get("issues", []):
-            recommendations.insert(0, {
-                "priority": issue["severity"],
-                "title": issue["message"],
-                "description": issue["recommendation"],
-                "command": None,
-            })
+            recommendations.insert(
+                0,
+                {
+                    "priority": issue["severity"],
+                    "title": issue["message"],
+                    "description": issue["recommendation"],
+                    "command": None,
+                },
+            )
 
     if webheaders:
         for issue in webheaders.get("issues", []):
-            recommendations.append({
-                "priority": issue["severity"],
-                "title": issue["message"],
-                "description": issue["recommendation"],
-                "command": None,
-            })
+            recommendations.append(
+                {
+                    "priority": issue["severity"],
+                    "title": issue["message"],
+                    "description": issue["recommendation"],
+                    "command": None,
+                }
+            )
 
     if filesystem:
         for issue in filesystem.get("issues", []):
-            recommendations.append({
-                "priority": issue["severity"],
-                "title": issue["message"],
-                "description": issue["recommendation"],
-                "command": None,
-            })
+            recommendations.append(
+                {
+                    "priority": issue["severity"],
+                    "title": issue["message"],
+                    "description": issue["recommendation"],
+                    "command": None,
+                }
+            )
 
     if network:
         for issue in network.get("issues", []):
-            recommendations.append({
-                "priority": issue["severity"],
-                "title": issue["message"],
-                "description": issue["recommendation"],
-                "command": None,
-            })
+            recommendations.append(
+                {
+                    "priority": issue["severity"],
+                    "title": issue["message"],
+                    "description": issue["recommendation"],
+                    "command": None,
+                }
+            )
 
     if users:
         for issue in users.get("issues", []):
-            recommendations.insert(0, {
-                "priority": issue["severity"],
-                "title": issue["message"],
-                "description": issue["recommendation"],
-                "command": None,
-            })
+            recommendations.insert(
+                0,
+                {
+                    "priority": issue["severity"],
+                    "title": issue["message"],
+                    "description": issue["recommendation"],
+                    "command": None,
+                },
+            )
 
     return recommendations

@@ -132,22 +132,26 @@ def check_requirement_2():
     controls = []
 
     passed, detail = _check_default_passwords()
-    controls.append({
-        "id": "2.1",
-        "requirement": "2",
-        "description": "Change vendor-supplied defaults before installing system",
-        "passed": passed,
-        "detail": detail,
-    })
+    controls.append(
+        {
+            "id": "2.1",
+            "requirement": "2",
+            "description": "Change vendor-supplied defaults before installing system",
+            "passed": passed,
+            "detail": detail,
+        }
+    )
 
     passed, detail = _check_unnecessary_services()
-    controls.append({
-        "id": "2.2.2",
-        "requirement": "2",
-        "description": "Disable unnecessary services and protocols",
-        "passed": passed,
-        "detail": detail,
-    })
+    controls.append(
+        {
+            "id": "2.2.2",
+            "requirement": "2",
+            "description": "Disable unnecessary services and protocols",
+            "passed": passed,
+            "detail": detail,
+        }
+    )
 
     return controls
 
@@ -157,13 +161,15 @@ def check_requirement_8():
     controls = []
 
     passed, detail = _check_password_policy()
-    controls.append({
-        "id": "8.3.6",
-        "requirement": "8",
-        "description": "Strong password requirements (12+ characters)",
-        "passed": passed,
-        "detail": detail,
-    })
+    controls.append(
+        {
+            "id": "8.3.6",
+            "requirement": "8",
+            "description": "Strong password requirements (12+ characters)",
+            "passed": passed,
+            "detail": detail,
+        }
+    )
 
     return controls
 
@@ -173,22 +179,26 @@ def check_requirement_10():
     controls = []
 
     passed, detail = _check_logging_enabled()
-    controls.append({
-        "id": "10.2",
-        "requirement": "10",
-        "description": "Implement audit logging for all system components",
-        "passed": passed,
-        "detail": detail,
-    })
+    controls.append(
+        {
+            "id": "10.2",
+            "requirement": "10",
+            "description": "Implement audit logging for all system components",
+            "passed": passed,
+            "detail": detail,
+        }
+    )
 
     passed, detail = _check_time_sync()
-    controls.append({
-        "id": "10.4",
-        "requirement": "10",
-        "description": "Synchronize all critical system clocks",
-        "passed": passed,
-        "detail": detail,
-    })
+    controls.append(
+        {
+            "id": "10.4",
+            "requirement": "10",
+            "description": "Synchronize all critical system clocks",
+            "passed": passed,
+            "detail": detail,
+        }
+    )
 
     return controls
 
@@ -207,11 +217,13 @@ def analyze_pci():
     issues = []
     for control in all_controls:
         if not control["passed"]:
-            issues.append({
-                "severity": "critical",
-                "message": f"PCI-DSS Req {control['id']}: {control['description']} - FAILED",
-                "recommendation": f"Review and fix: {control['detail']}",
-            })
+            issues.append(
+                {
+                    "severity": "critical",
+                    "message": f"PCI-DSS Req {control['id']}: {control['description']} - FAILED",
+                    "recommendation": f"Review and fix: {control['detail']}",
+                }
+            )
 
     return {
         "checked": True,

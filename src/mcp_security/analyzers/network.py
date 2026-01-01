@@ -6,11 +6,21 @@ suspicious network activity or unexpected connections.
 
 import subprocess
 import re
-from typing import List, Dict, Optional
+from typing import List, Dict
 
 KNOWN_SAFE_PROCESSES = {
-    "sshd", "systemd", "caddy", "nginx", "apache2", "mysqld", "postgres",
-    "redis-server", "docker", "containerd", "chronyd", "systemd-resolved",
+    "sshd",
+    "systemd",
+    "caddy",
+    "nginx",
+    "apache2",
+    "mysqld",
+    "postgres",
+    "redis-server",
+    "docker",
+    "containerd",
+    "chronyd",
+    "systemd-resolved",
 }
 
 SUSPICIOUS_PORTS = {
@@ -22,10 +32,25 @@ SUSPICIOUS_PORTS = {
 }
 
 PRIVATE_IP_RANGES = [
-    "127.", "10.", "172.16.", "172.17.", "172.18.", "172.19.",
-    "172.20.", "172.21.", "172.22.", "172.23.", "172.24.",
-    "172.25.", "172.26.", "172.27.", "172.28.", "172.29.",
-    "172.30.", "172.31.", "192.168.",
+    "127.",
+    "10.",
+    "172.16.",
+    "172.17.",
+    "172.18.",
+    "172.19.",
+    "172.20.",
+    "172.21.",
+    "172.22.",
+    "172.23.",
+    "172.24.",
+    "172.25.",
+    "172.26.",
+    "172.27.",
+    "172.28.",
+    "172.29.",
+    "172.30.",
+    "172.31.",
+    "192.168.",
 ]
 
 
@@ -73,14 +98,16 @@ def _parse_ss_output() -> List[Dict]:
             local_ip, local_port = _parse_address(local_addr)
             remote_ip, remote_port = _parse_address(remote_addr)
 
-            connections.append({
-                "state": state,
-                "local_ip": local_ip,
-                "local_port": local_port,
-                "remote_ip": remote_ip,
-                "remote_port": remote_port,
-                "process": process_info,
-            })
+            connections.append(
+                {
+                    "state": state,
+                    "local_ip": local_ip,
+                    "local_port": local_port,
+                    "remote_ip": remote_ip,
+                    "remote_port": remote_port,
+                    "process": process_info,
+                }
+            )
 
         return connections
 
@@ -156,13 +183,15 @@ def _detect_suspicious_connections(connections: List[Dict]) -> List[Dict]:
         try:
             port_num = int(remote_port)
             if port_num in SUSPICIOUS_PORTS:
-                suspicious.append({
-                    "reason": f"Connection to suspicious port {port_num} ({SUSPICIOUS_PORTS[port_num]})",
-                    "remote_ip": remote_ip,
-                    "remote_port": remote_port,
-                    "process": process,
-                    "severity": "high",
-                })
+                suspicious.append(
+                    {
+                        "reason": f"Connection to suspicious port {port_num} ({SUSPICIOUS_PORTS[port_num]})",
+                        "remote_ip": remote_ip,
+                        "remote_port": remote_port,
+                        "process": process,
+                        "severity": "high",
+                    }
+                )
                 continue
         except ValueError:
             pass
@@ -173,13 +202,15 @@ def _detect_suspicious_connections(connections: List[Dict]) -> List[Dict]:
             try:
                 port_num = int(remote_port)
                 if port_num not in [80, 443, 53, 123]:
-                    suspicious.append({
-                        "reason": f"Unknown process '{process}' with external connection",
-                        "remote_ip": remote_ip,
-                        "remote_port": remote_port,
-                        "process": process,
-                        "severity": "medium",
-                    })
+                    suspicious.append(
+                        {
+                            "reason": f"Unknown process '{process}' with external connection",
+                            "remote_ip": remote_ip,
+                            "remote_port": remote_port,
+                            "process": process,
+                            "severity": "medium",
+                        }
+                    )
             except ValueError:
                 pass
 
@@ -208,19 +239,23 @@ def analyze_network():
     issues = []
 
     for susp in suspicious:
-        issues.append({
-            "severity": susp["severity"],
-            "message": f"{susp['reason']}: {susp['remote_ip']}:{susp['remote_port']}",
-            "recommendation": f"Investigate process '{susp['process']}' and connection legitimacy",
-        })
+        issues.append(
+            {
+                "severity": susp["severity"],
+                "message": f"{susp['reason']}: {susp['remote_ip']}:{susp['remote_port']}",
+                "recommendation": f"Investigate process '{susp['process']}' and connection legitimacy",
+            }
+        )
 
     # Check for too many listening services
     if len(services) > 20:
-        issues.append({
-            "severity": "low",
-            "message": f"{len(services)} services listening on network ports",
-            "recommendation": "Review listening services and disable unnecessary ones",
-        })
+        issues.append(
+            {
+                "severity": "low",
+                "message": f"{len(services)} services listening on network ports",
+                "recommendation": "Review listening services and disable unnecessary ones",
+            }
+        )
 
     return {
         "checked": True,

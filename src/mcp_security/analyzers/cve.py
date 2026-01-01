@@ -5,10 +5,17 @@ import subprocess
 from typing import Optional
 
 CRITICAL_PACKAGES = [
-    "openssl", "libssl3", "libssl1.1",
-    "openssh-server", "openssh-client",
-    "sudo", "glibc", "libc6",
-    "systemd", "docker.io", "containerd",
+    "openssl",
+    "libssl3",
+    "libssl1.1",
+    "openssh-server",
+    "openssh-client",
+    "sudo",
+    "glibc",
+    "libc6",
+    "systemd",
+    "docker.io",
+    "containerd",
 ]
 
 KNOWN_VULNERABILITIES = [
@@ -48,12 +55,7 @@ def _parse_version(version_str):
         return None
 
     major, minor, patch, letter = match.groups()
-    return (
-        int(major),
-        int(minor),
-        int(patch) if patch else 0,
-        letter if letter else ""
-    )
+    return (int(major), int(minor), int(patch) if patch else 0, letter if letter else "")
 
 
 def _is_vulnerable(current_version, max_safe_version):
@@ -128,14 +130,16 @@ def check_package_vulnerabilities(packages):
 
         for vuln in KNOWN_VULNERABILITIES:
             if pkg_name in vuln["packages"] and _is_vulnerable(pkg_version, vuln["max_version"]):
-                vulnerabilities.append({
-                    "package": pkg_name,
-                    "version": pkg_version_str,
-                    "cve": vuln["cve"],
-                    "name": vuln["name"],
-                    "severity": vuln["severity"],
-                    "description": vuln["description"],
-                })
+                vulnerabilities.append(
+                    {
+                        "package": pkg_name,
+                        "version": pkg_version_str,
+                        "cve": vuln["cve"],
+                        "name": vuln["name"],
+                        "severity": vuln["severity"],
+                        "description": vuln["description"],
+                    }
+                )
 
     return vulnerabilities
 
@@ -152,14 +156,16 @@ def check_kernel_vulnerabilities(kernel_version_str):
     vulnerabilities = []
     for vuln in KERNEL_VULNERABILITIES:
         if _is_vulnerable(kernel_version, vuln["max_version"]):
-            vulnerabilities.append({
-                "package": "kernel",
-                "version": kernel_version_str,
-                "cve": vuln["cve"],
-                "name": vuln["name"],
-                "severity": vuln["severity"],
-                "description": vuln["description"],
-            })
+            vulnerabilities.append(
+                {
+                    "package": "kernel",
+                    "version": kernel_version_str,
+                    "cve": vuln["cve"],
+                    "name": vuln["name"],
+                    "severity": vuln["severity"],
+                    "description": vuln["description"],
+                }
+            )
 
     return vulnerabilities
 

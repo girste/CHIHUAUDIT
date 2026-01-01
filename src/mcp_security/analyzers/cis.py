@@ -102,31 +102,37 @@ def check_filesystem_controls():
     controls = []
 
     passed, detail = _check_kernel_param("kernel.modules_disabled", 0)
-    controls.append({
-        "id": "1.1.1.1",
-        "description": "Ensure mounting of cramfs filesystems is disabled",
-        "level": 1,
-        "passed": passed,
-        "detail": detail,
-    })
+    controls.append(
+        {
+            "id": "1.1.1.1",
+            "description": "Ensure mounting of cramfs filesystems is disabled",
+            "level": 1,
+            "passed": passed,
+            "detail": detail,
+        }
+    )
 
     passed, detail = _check_service_disabled("aide.service")
-    controls.append({
-        "id": "1.3.1",
-        "description": "Ensure AIDE is installed",
-        "level": 1,
-        "passed": passed,
-        "detail": detail,
-    })
+    controls.append(
+        {
+            "id": "1.3.1",
+            "description": "Ensure AIDE is installed",
+            "level": 1,
+            "passed": passed,
+            "detail": detail,
+        }
+    )
 
     passed, detail = _check_grub_config()
-    controls.append({
-        "id": "1.4.1",
-        "description": "Ensure permissions on bootloader config are configured",
-        "level": 1,
-        "passed": passed,
-        "detail": detail,
-    })
+    controls.append(
+        {
+            "id": "1.4.1",
+            "description": "Ensure permissions on bootloader config are configured",
+            "level": 1,
+            "passed": passed,
+            "detail": detail,
+        }
+    )
 
     return controls
 
@@ -143,18 +149,24 @@ def check_services_controls():
         ("2.2.7", "Ensure NFS is not installed", "nfs-server.service"),
         ("2.2.9", "Ensure FTP Server is not installed", "vsftpd.service"),
         ("2.2.12", "Ensure Samba is not installed", "smbd.service"),
-        ("2.2.15", "Ensure mail transfer agent is configured for local-only mode", "postfix.service"),
+        (
+            "2.2.15",
+            "Ensure mail transfer agent is configured for local-only mode",
+            "postfix.service",
+        ),
     ]
 
     for cis_id, desc, service in unnecessary_services:
         passed, detail = _check_service_disabled(service)
-        controls.append({
-            "id": cis_id,
-            "description": desc,
-            "level": 1,
-            "passed": passed,
-            "detail": detail,
-        })
+        controls.append(
+            {
+                "id": cis_id,
+                "description": desc,
+                "level": 1,
+                "passed": passed,
+                "detail": detail,
+            }
+        )
 
     return controls
 
@@ -165,25 +177,52 @@ def check_network_controls():
 
     network_params = [
         ("3.2.1", "Ensure IP forwarding is disabled", "net.ipv4.ip_forward", 0),
-        ("3.2.2", "Ensure packet redirect sending is disabled", "net.ipv4.conf.all.send_redirects", 0),
-        ("3.3.1", "Ensure source routed packets are not accepted", "net.ipv4.conf.all.accept_source_route", 0),
-        ("3.3.2", "Ensure ICMP redirects are not accepted", "net.ipv4.conf.all.accept_redirects", 0),
-        ("3.3.3", "Ensure secure ICMP redirects are not accepted", "net.ipv4.conf.all.secure_redirects", 0),
+        (
+            "3.2.2",
+            "Ensure packet redirect sending is disabled",
+            "net.ipv4.conf.all.send_redirects",
+            0,
+        ),
+        (
+            "3.3.1",
+            "Ensure source routed packets are not accepted",
+            "net.ipv4.conf.all.accept_source_route",
+            0,
+        ),
+        (
+            "3.3.2",
+            "Ensure ICMP redirects are not accepted",
+            "net.ipv4.conf.all.accept_redirects",
+            0,
+        ),
+        (
+            "3.3.3",
+            "Ensure secure ICMP redirects are not accepted",
+            "net.ipv4.conf.all.secure_redirects",
+            0,
+        ),
         ("3.3.4", "Ensure suspicious packets are logged", "net.ipv4.conf.all.log_martians", 1),
-        ("3.3.5", "Ensure broadcast ICMP requests are ignored", "net.ipv4.icmp_echo_ignore_broadcasts", 1),
+        (
+            "3.3.5",
+            "Ensure broadcast ICMP requests are ignored",
+            "net.ipv4.icmp_echo_ignore_broadcasts",
+            1,
+        ),
         ("3.3.7", "Ensure Reverse Path Filtering is enabled", "net.ipv4.conf.all.rp_filter", 1),
         ("3.3.8", "Ensure TCP SYN Cookies is enabled", "net.ipv4.tcp_syncookies", 1),
     ]
 
     for cis_id, desc, param, expected in network_params:
         passed, detail = _check_kernel_param(param, expected)
-        controls.append({
-            "id": cis_id,
-            "description": desc,
-            "level": 1,
-            "passed": passed,
-            "detail": detail,
-        })
+        controls.append(
+            {
+                "id": cis_id,
+                "description": desc,
+                "level": 1,
+                "passed": passed,
+                "detail": detail,
+            }
+        )
 
     return controls
 
@@ -193,30 +232,36 @@ def check_access_controls():
     controls = []
 
     passed, detail = _check_file_permissions("/etc/ssh/sshd_config", "600", "root", "root")
-    controls.append({
-        "id": "5.2.1",
-        "description": "Ensure permissions on /etc/ssh/sshd_config are configured",
-        "level": 1,
-        "passed": passed,
-        "detail": detail,
-    })
+    controls.append(
+        {
+            "id": "5.2.1",
+            "description": "Ensure permissions on /etc/ssh/sshd_config are configured",
+            "level": 1,
+            "passed": passed,
+            "detail": detail,
+        }
+    )
 
     passed, detail = _check_file_permissions("/etc/security/pwquality.conf", "644", "root", "root")
-    controls.append({
-        "id": "5.3.1",
-        "description": "Ensure password creation requirements are configured",
-        "level": 1,
-        "passed": passed,
-        "detail": detail,
-    })
+    controls.append(
+        {
+            "id": "5.3.1",
+            "description": "Ensure password creation requirements are configured",
+            "level": 1,
+            "passed": passed,
+            "detail": detail,
+        }
+    )
 
-    controls.append({
-        "id": "5.4.1",
-        "description": "Ensure password expiration is 365 days or less",
-        "level": 1,
-        "passed": True,
-        "detail": "Skipped - requires /etc/login.defs parsing",
-    })
+    controls.append(
+        {
+            "id": "5.4.1",
+            "description": "Ensure password expiration is 365 days or less",
+            "level": 1,
+            "passed": True,
+            "detail": "Skipped - requires /etc/login.defs parsing",
+        }
+    )
 
     return controls
 
@@ -237,11 +282,13 @@ def analyze_cis():
     for control in all_controls:
         if not control["passed"]:
             severity = "high" if control["level"] == 1 else "medium"
-            issues.append({
-                "severity": severity,
-                "message": f"CIS {control['id']}: {control['description']} - FAILED",
-                "recommendation": f"Review and fix: {control['detail']}",
-            })
+            issues.append(
+                {
+                    "severity": severity,
+                    "message": f"CIS {control['id']}: {control['description']} - FAILED",
+                    "recommendation": f"Review and fix: {control['detail']}",
+                }
+            )
 
     return {
         "checked": True,

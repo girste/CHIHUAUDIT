@@ -70,7 +70,21 @@ def _find_suid_files() -> List[Dict[str, str]]:
 
     try:
         result = subprocess.run(
-            ["find", "/", *exclude_args, "-type", "f", "(", "-perm", "-4000", "-o", "-perm", "-2000", ")", "-print"],
+            [
+                "find",
+                "/",
+                *exclude_args,
+                "-type",
+                "f",
+                "(",
+                "-perm",
+                "-4000",
+                "-o",
+                "-perm",
+                "-2000",
+                ")",
+                "-print",
+            ],
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             text=True,
@@ -86,10 +100,12 @@ def _find_suid_files() -> List[Dict[str, str]]:
                 path = line.strip()
                 is_whitelisted = path in SUID_WHITELIST
 
-                files.append({
-                    "path": path,
-                    "whitelisted": is_whitelisted,
-                })
+                files.append(
+                    {
+                        "path": path,
+                        "whitelisted": is_whitelisted,
+                    }
+                )
 
         return files[:100]  # Limit to 100 files
 
@@ -127,13 +143,7 @@ def _check_tmp_permissions() -> Dict:
 
 def _check_suspicious_files() -> List[str]:
     """Look for suspicious files in common locations."""
-    suspicious_patterns = [
-        "/tmp/.*\\.so$",
-        "/tmp/.*\\.sh$",
-        "/var/tmp/.*\\.so$",
-        "/dev/shm/.*",
-    ]
-
+    # TODO: Implement pattern-based filtering for more targeted detection
     suspicious_files = []
 
     for location in ["/tmp", "/var/tmp", "/dev/shm"]:
@@ -165,11 +175,13 @@ def analyze_filesystem():
     writable_count = len(writable_files)
 
     if writable_count > 0:
-        issues.append({
-            "severity": "high",
-            "message": f"{writable_count} world-writable files found outside /tmp",
-            "recommendation": "Review and restrict permissions: chmod o-w <file>",
-        })
+        issues.append(
+            {
+                "severity": "high",
+                "message": f"{writable_count} world-writable files found outside /tmp",
+                "recommendation": "Review and restrict permissions: chmod o-w <file>",
+            }
+        )
 
     # Check SUID/SGID files
     suid_files = _find_suid_files()
@@ -177,29 +189,35 @@ def analyze_filesystem():
     suid_count = len(suspicious_suid)
 
     if suid_count > 0:
-        issues.append({
-            "severity": "medium",
-            "message": f"{suid_count} non-standard SUID/SGID binaries found",
-            "recommendation": "Review SUID binaries for potential privilege escalation risks",
-        })
+        issues.append(
+            {
+                "severity": "medium",
+                "message": f"{suid_count} non-standard SUID/SGID binaries found",
+                "recommendation": "Review SUID binaries for potential privilege escalation risks",
+            }
+        )
 
     # Check /tmp permissions
     tmp_check = _check_tmp_permissions()
     if tmp_check["checked"] and not tmp_check["secure"]:
-        issues.append({
-            "severity": "medium",
-            "message": f"/tmp has insecure permissions: {tmp_check['permissions']} (should be 1777)",
-            "recommendation": "Fix /tmp permissions: chmod 1777 /tmp",
-        })
+        issues.append(
+            {
+                "severity": "medium",
+                "message": f"/tmp has insecure permissions: {tmp_check['permissions']} (should be 1777)",
+                "recommendation": "Fix /tmp permissions: chmod 1777 /tmp",
+            }
+        )
 
     # Check suspicious files
     suspicious = _check_suspicious_files()
     if len(suspicious) > 10:
-        issues.append({
-            "severity": "low",
-            "message": f"{len(suspicious)} recently modified files in /tmp, /var/tmp, /dev/shm",
-            "recommendation": "Review temporary files for suspicious activity",
-        })
+        issues.append(
+            {
+                "severity": "low",
+                "message": f"{len(suspicious)} recently modified files in /tmp, /var/tmp, /dev/shm",
+                "recommendation": "Review temporary files for suspicious activity",
+            }
+        )
 
     return {
         "checked": True,

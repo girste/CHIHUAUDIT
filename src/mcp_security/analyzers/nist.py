@@ -36,7 +36,12 @@ def _check_password_complexity():
     """Check if password complexity requirements are enforced."""
     try:
         result = subprocess.run(
-            ["grep", "-E", "^(minlen|dcredit|ucredit|lcredit|ocredit)", "/etc/security/pwquality.conf"],
+            [
+                "grep",
+                "-E",
+                "^(minlen|dcredit|ucredit|lcredit|ocredit)",
+                "/etc/security/pwquality.conf",
+            ],
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             text=True,
@@ -91,24 +96,28 @@ def check_access_control():
     controls = []
 
     passed, detail = _check_session_timeout()
-    controls.append({
-        "id": "AC-11",
-        "name": "Session Lock",
-        "description": "Ensure idle sessions are automatically terminated",
-        "family": "AC",
-        "passed": passed,
-        "detail": detail,
-    })
+    controls.append(
+        {
+            "id": "AC-11",
+            "name": "Session Lock",
+            "description": "Ensure idle sessions are automatically terminated",
+            "family": "AC",
+            "passed": passed,
+            "detail": detail,
+        }
+    )
 
     passed, detail = _check_password_complexity()
-    controls.append({
-        "id": "AC-7",
-        "name": "Unsuccessful Logon Attempts",
-        "description": "Enforce account lockout after failed login attempts",
-        "family": "AC",
-        "passed": passed,
-        "detail": detail,
-    })
+    controls.append(
+        {
+            "id": "AC-7",
+            "name": "Unsuccessful Logon Attempts",
+            "description": "Enforce account lockout after failed login attempts",
+            "family": "AC",
+            "passed": passed,
+            "detail": detail,
+        }
+    )
 
     return controls
 
@@ -118,14 +127,16 @@ def check_audit_accountability():
     controls = []
 
     passed, detail = _check_audit_logging()
-    controls.append({
-        "id": "AU-2",
-        "name": "Event Logging",
-        "description": "Ensure comprehensive system auditing is enabled",
-        "family": "AU",
-        "passed": passed,
-        "detail": detail,
-    })
+    controls.append(
+        {
+            "id": "AU-2",
+            "name": "Event Logging",
+            "description": "Ensure comprehensive system auditing is enabled",
+            "family": "AU",
+            "passed": passed,
+            "detail": detail,
+        }
+    )
 
     return controls
 
@@ -152,14 +163,16 @@ def check_system_protection():
         passed = False
         detail = "Unable to check ASLR"
 
-    controls.append({
-        "id": "SC-39",
-        "name": "Process Isolation",
-        "description": "Ensure ASLR (Address Space Layout Randomization) is enabled",
-        "family": "SC",
-        "passed": passed,
-        "detail": detail,
-    })
+    controls.append(
+        {
+            "id": "SC-39",
+            "name": "Process Isolation",
+            "description": "Ensure ASLR (Address Space Layout Randomization) is enabled",
+            "family": "SC",
+            "passed": passed,
+            "detail": detail,
+        }
+    )
 
     return controls
 
@@ -169,14 +182,16 @@ def check_system_integrity():
     controls = []
 
     passed, detail = _check_automatic_updates()
-    controls.append({
-        "id": "SI-2",
-        "name": "Flaw Remediation",
-        "description": "Ensure automatic security updates are configured",
-        "family": "SI",
-        "passed": passed,
-        "detail": detail,
-    })
+    controls.append(
+        {
+            "id": "SI-2",
+            "name": "Flaw Remediation",
+            "description": "Ensure automatic security updates are configured",
+            "family": "SI",
+            "passed": passed,
+            "detail": detail,
+        }
+    )
 
     return controls
 
@@ -196,11 +211,13 @@ def analyze_nist():
     issues = []
     for control in all_controls:
         if not control["passed"]:
-            issues.append({
-                "severity": "high",
-                "message": f"NIST {control['id']} ({control['name']}): {control['description']} - FAILED",
-                "recommendation": f"Review and fix: {control['detail']}",
-            })
+            issues.append(
+                {
+                    "severity": "high",
+                    "message": f"NIST {control['id']} ({control['name']}): {control['description']} - FAILED",
+                    "recommendation": f"Review and fix: {control['detail']}",
+                }
+            )
 
     return {
         "checked": True,

@@ -57,21 +57,21 @@ def _extract_domains_from_caddyfile(caddyfile_path: str = "/etc/caddy/Caddyfile"
         if not Path(caddyfile_path).exists():
             return []
 
-        with open(caddyfile_path, 'r') as f:
+        with open(caddyfile_path, "r") as f:
             content = f.read()
 
         # Match domain blocks: "domain.com" or "domain.com subdomain.domain.com"
         # Ignore wildcards (*.domain.com), localhost, IP addresses
-        for line in content.split('\n'):
+        for line in content.split("\n"):
             line = line.strip()
 
             # Skip comments, empty lines, config lines
-            if not line or line.startswith('#') or line.startswith('{') or line.startswith('}'):
+            if not line or line.startswith("#") or line.startswith("{") or line.startswith("}"):
                 continue
 
             # Match lines that look like domain blocks
             # Format: "domain.com www.domain.com {" or just "domain.com {"
-            domain_pattern = r'^([a-zA-Z0-9][a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,}(?:\s+[a-zA-Z0-9][a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,})*)\s*\{'
+            domain_pattern = r"^([a-zA-Z0-9][a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,}(?:\s+[a-zA-Z0-9][a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,})*)\s*\{"
             match = re.match(domain_pattern, line)
 
             if match:
@@ -79,7 +79,7 @@ def _extract_domains_from_caddyfile(caddyfile_path: str = "/etc/caddy/Caddyfile"
                 domain_list = match.group(1).split()
                 for domain in domain_list:
                     # Skip wildcards and ensure it's a valid domain
-                    if not domain.startswith('*') and '.' in domain:
+                    if not domain.startswith("*") and "." in domain:
                         domains.append(domain)
 
         # Deduplicate and return primary domains (prefer non-www)
@@ -88,11 +88,11 @@ def _extract_domains_from_caddyfile(caddyfile_path: str = "/etc/caddy/Caddyfile"
 
         for domain in domains:
             # Normalize: prefer example.com over www.example.com
-            normalized = domain.replace('www.', '')
+            normalized = domain.replace("www.", "")
             if normalized not in seen:
                 seen.add(normalized)
                 # Use the non-www version
-                unique_domains.append(domain if not domain.startswith('www.') else normalized)
+                unique_domains.append(domain if not domain.startswith("www.") else normalized)
 
         return unique_domains[:5]  # Limit to 5 domains for performance
 
@@ -111,15 +111,15 @@ def _extract_domains_from_nginx() -> List[str]:
                 continue
 
             for conf_file in Path(config_path).glob("*.conf"):
-                with open(conf_file, 'r') as f:
+                with open(conf_file, "r") as f:
                     content = f.read()
 
                 # Match server_name directives
-                for match in re.finditer(r'server_name\s+([^;]+);', content):
+                for match in re.finditer(r"server_name\s+([^;]+);", content):
                     server_names = match.group(1).split()
                     for name in server_names:
-                        if not name.startswith('*') and '.' in name and name != '_':
-                            domains.append(name.replace('www.', ''))
+                        if not name.startswith("*") and "." in name and name != "_":
+                            domains.append(name.replace("www.", ""))
 
         return list(set(domains))[:5]
 
@@ -189,7 +189,7 @@ def _check_headers_for_url(url: str) -> Optional[Dict[str, str]]:
 
         # Parse headers from the LAST response (after redirects)
         # Split by blank lines to get each response in redirect chain
-        responses = result.stdout.split('\r\n\r\n')
+        responses = result.stdout.split("\r\n\r\n")
 
         # Get the last non-empty response
         final_response = None
@@ -219,7 +219,7 @@ def _check_headers_for_url(url: str) -> Optional[Dict[str, str]]:
 
         # Add status code to headers for analysis
         if status_code:
-            headers['_status_code'] = status_code
+            headers["_status_code"] = status_code
 
         return headers
 
@@ -234,16 +234,20 @@ def _analyze_headers(headers: Dict[str, str]) -> Dict:
 
     for header_key, header_info in SECURITY_HEADERS.items():
         if header_key in headers:
-            present.append({
-                "header": header_info["name"],
-                "value": headers[header_key][:100],  # Truncate long values
-            })
+            present.append(
+                {
+                    "header": header_info["name"],
+                    "value": headers[header_key][:100],  # Truncate long values
+                }
+            )
         else:
-            missing.append({
-                "header": header_info["name"],
-                "severity": header_info["severity"],
-                "description": header_info["description"],
-            })
+            missing.append(
+                {
+                    "header": header_info["name"],
+                    "severity": header_info["severity"],
+                    "description": header_info["description"],
+                }
+            )
 
     return {"present": present, "missing": missing}
 
@@ -315,17 +319,19 @@ def analyze_webheaders():
             headers = _check_headers_for_url(url)
             if headers:
                 # Remove internal status code from headers before analysis
-                status_code = headers.pop('_status_code', 200)
+                status_code = headers.pop("_status_code", 200)
 
                 analysis = _analyze_headers(headers)
 
-                tested_urls.append({
-                    "url": url,
-                    "status_code": status_code,
-                    "present_headers": len(analysis["present"]),
-                    "missing_headers": len(analysis["missing"]),
-                    "headers": analysis["present"],
-                })
+                tested_urls.append(
+                    {
+                        "url": url,
+                        "status_code": status_code,
+                        "present_headers": len(analysis["present"]),
+                        "missing_headers": len(analysis["missing"]),
+                        "headers": analysis["present"],
+                    }
+                )
 
                 # Only report issues for successful responses (200-299)
                 if 200 <= status_code < 300:
@@ -333,11 +339,13 @@ def analyze_webheaders():
                     for missing in analysis["missing"]:
                         if missing["severity"] in ["high", "critical"]:
                             total_missing_high += 1
-                            issues.append({
-                                "severity": "high",
-                                "message": f"{domain}: Missing {missing['header']} header",
-                                "recommendation": f"Add {missing['header']} header: {missing['description']}",
-                            })
+                            issues.append(
+                                {
+                                    "severity": "high",
+                                    "message": f"{domain}: Missing {missing['header']} header",
+                                    "recommendation": f"Add {missing['header']} header: {missing['description']}",
+                                }
+                            )
                         elif missing["severity"] == "medium":
                             total_missing_medium += 1
 
@@ -349,51 +357,63 @@ def analyze_webheaders():
 
             headers = _check_headers_for_url(url)
             if headers:
-                status_code = headers.pop('_status_code', 200)
+                status_code = headers.pop("_status_code", 200)
                 analysis = _analyze_headers(headers)
 
-                tested_urls.append({
-                    "url": url,
-                    "status_code": status_code,
-                    "present_headers": len(analysis["present"]),
-                    "missing_headers": len(analysis["missing"]),
-                    "headers": analysis["present"],
-                })
+                tested_urls.append(
+                    {
+                        "url": url,
+                        "status_code": status_code,
+                        "present_headers": len(analysis["present"]),
+                        "missing_headers": len(analysis["missing"]),
+                        "headers": analysis["present"],
+                    }
+                )
 
                 # Only report issues for successful responses
                 if 200 <= status_code < 300:
                     for missing in analysis["missing"]:
                         if missing["severity"] in ["high", "critical"]:
                             total_missing_high += 1
-                            issues.append({
-                                "severity": "high",
-                                "message": f"{url}: Missing {missing['header']} header",
-                                "recommendation": f"Add {missing['header']} header: {missing['description']}",
-                            })
+                            issues.append(
+                                {
+                                    "severity": "high",
+                                    "message": f"{url}: Missing {missing['header']} header",
+                                    "recommendation": f"Add {missing['header']} header: {missing['description']}",
+                                }
+                            )
                         elif missing["severity"] == "medium":
                             total_missing_medium += 1
 
         # Add warning about localhost testing
         if not tested_urls or all(url["status_code"] >= 300 for url in tested_urls):
-            issues.append({
-                "severity": "info",
-                "message": "Could not extract real domains from config - tested localhost only",
-                "recommendation": "Headers checked on localhost. Real domains may have different configurations.",
-            })
+            issues.append(
+                {
+                    "severity": "info",
+                    "message": "Could not extract real domains from config - tested localhost only",
+                    "recommendation": "Headers checked on localhost. Real domains may have different configurations.",
+                }
+            )
 
     # Summary issue (only if real issues found on successful responses)
     if total_missing_high > 0:
-        issues.insert(0, {
-            "severity": "high",
-            "message": f"{total_missing_high} critical security headers missing",
-            "recommendation": "Configure security headers in web server config",
-        })
+        issues.insert(
+            0,
+            {
+                "severity": "high",
+                "message": f"{total_missing_high} critical security headers missing",
+                "recommendation": "Configure security headers in web server config",
+            },
+        )
     elif total_missing_medium > 0:
-        issues.insert(0, {
-            "severity": "medium",
-            "message": f"{total_missing_medium} recommended security headers missing",
-            "recommendation": "Consider adding additional security headers for defense in depth",
-        })
+        issues.insert(
+            0,
+            {
+                "severity": "medium",
+                "message": f"{total_missing_medium} recommended security headers missing",
+                "recommendation": "Consider adding additional security headers for defense in depth",
+            },
+        )
 
     return {
         "checked": True,

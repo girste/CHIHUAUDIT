@@ -4,9 +4,19 @@ import re
 from ..utils.detect import run_with_sudo
 
 CRITICAL_SERVICES = [
-    "ssh", "sshd", "caddy", "nginx", "apache2",
-    "docker", "mysql", "mariadb", "postgresql", "redis",
-    "fail2ban", "ufw", "firewalld",
+    "ssh",
+    "sshd",
+    "caddy",
+    "nginx",
+    "apache2",
+    "docker",
+    "mysql",
+    "mariadb",
+    "postgresql",
+    "redis",
+    "fail2ban",
+    "ufw",
+    "firewalld",
 ]
 
 UNKNOWN_SERVICES_THRESHOLD = 3
@@ -139,11 +149,9 @@ def check_critical_services():
 
         status = result.stdout.strip()
         if status in installed_states:
-            services_status.append({
-                "name": service,
-                "status": status,
-                "active": status == "active"
-            })
+            services_status.append(
+                {"name": service, "status": status, "active": status == "active"}
+            )
 
     return services_status
 
@@ -151,7 +159,9 @@ def check_critical_services():
 def analyze_services():
     """Analyze network services, open ports, and systemd service health."""
     services = parse_listening_ports()
-    categorized = categorize_services(services) if services else {"safe": [], "risky": [], "unknown": []}
+    categorized = (
+        categorize_services(services) if services else {"safe": [], "risky": [], "unknown": []}
+    )
 
     exposed_count = sum(1 for s in services if s["exposed"]) if services else 0
     network_data = {
@@ -168,34 +178,42 @@ def analyze_services():
 
     for service in categorized.get("risky", []):
         if service["exposed"]:
-            issues.append({
-                "severity": "high",
-                "message": f"Database service {service['name']} exposed on port {service['port']}",
-                "recommendation": f"Bind {service['name']} to localhost only or use firewall to restrict access",
-            })
+            issues.append(
+                {
+                    "severity": "high",
+                    "message": f"Database service {service['name']} exposed on port {service['port']}",
+                    "recommendation": f"Bind {service['name']} to localhost only or use firewall to restrict access",
+                }
+            )
 
     exposed_unknown = [s for s in categorized.get("unknown", []) if s["exposed"]]
     if len(exposed_unknown) > UNKNOWN_SERVICES_THRESHOLD:
-        issues.append({
-            "severity": "medium",
-            "message": f"{len(exposed_unknown)} unknown services exposed to network",
-            "recommendation": "Review and identify all exposed services, close unnecessary ports",
-        })
+        issues.append(
+            {
+                "severity": "medium",
+                "message": f"{len(exposed_unknown)} unknown services exposed to network",
+                "recommendation": "Review and identify all exposed services, close unnecessary ports",
+            }
+        )
 
     if failed_units:
-        issues.append({
-            "severity": "high",
-            "message": f"{len(failed_units)} systemd unit(s) in failed state",
-            "recommendation": f"Check and fix failed units: {', '.join(failed_units[:3])}",
-        })
+        issues.append(
+            {
+                "severity": "high",
+                "message": f"{len(failed_units)} systemd unit(s) in failed state",
+                "recommendation": f"Check and fix failed units: {', '.join(failed_units[:3])}",
+            }
+        )
 
     failed_critical = [s for s in critical_services if s["status"] in ("failed", "degraded")]
     for svc in failed_critical:
-        issues.append({
-            "severity": "critical",
-            "message": f"Critical service {svc['name']} is {svc['status']}",
-            "recommendation": f"Restart/fix {svc['name']} immediately: sudo systemctl restart {svc['name']}",
-        })
+        issues.append(
+            {
+                "severity": "critical",
+                "message": f"Critical service {svc['name']} is {svc['status']}",
+                "recommendation": f"Restart/fix {svc['name']} immediately: sudo systemctl restart {svc['name']}",
+            }
+        )
 
     return {
         **network_data,

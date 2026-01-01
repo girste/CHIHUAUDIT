@@ -2,7 +2,6 @@
 
 import json
 import subprocess
-from typing import Optional
 
 CRITICAL_CVE_SCORE = 9.0
 HIGH_CVE_SCORE = 7.0
@@ -82,7 +81,12 @@ def scan_image_with_trivy(image_name):
         if result.returncode == 0:
             return json.loads(result.stdout)
 
-    except (subprocess.SubprocessError, subprocess.TimeoutExpired, json.JSONDecodeError, FileNotFoundError):
+    except (
+        subprocess.SubprocessError,
+        subprocess.TimeoutExpired,
+        json.JSONDecodeError,
+        FileNotFoundError,
+    ):
         pass
 
     return None
@@ -97,12 +101,14 @@ def analyze_image_metadata(image_data):
     # Check if running as root
     user = config.get("User", "")
     if not user or user == "0" or user == "root":
-        issues.append({
-            "severity": "medium",
-            "type": "privilege",
-            "message": "Container runs as root user",
-            "recommendation": "Use USER directive in Dockerfile to run as non-root",
-        })
+        issues.append(
+            {
+                "severity": "medium",
+                "type": "privilege",
+                "message": "Container runs as root user",
+                "recommendation": "Use USER directive in Dockerfile to run as non-root",
+            }
+        )
 
     # Check for exposed sensitive ports
     exposed_ports = config.get("ExposedPorts", {})
@@ -110,12 +116,14 @@ def analyze_image_metadata(image_data):
 
     for port in exposed_ports.keys():
         if port in sensitive_ports:
-            issues.append({
-                "severity": "high",
-                "type": "exposure",
-                "message": f"Sensitive port {port} is exposed",
-                "recommendation": f"Avoid exposing {port} unless absolutely necessary",
-            })
+            issues.append(
+                {
+                    "severity": "high",
+                    "type": "exposure",
+                    "message": f"Sensitive port {port} is exposed",
+                    "recommendation": f"Avoid exposing {port} unless absolutely necessary",
+                }
+            )
 
     return issues
 
@@ -142,11 +150,14 @@ def analyze_containers():
     issues = []
 
     # Check if trivy is available
-    trivy_available = subprocess.run(
-        ["which", "trivy"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    ).returncode == 0
+    trivy_available = (
+        subprocess.run(
+            ["which", "trivy"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        ).returncode
+        == 0
+    )
 
     for image in running_images[:5]:  # Limit to 5 images for performance
         image_info = {
@@ -165,13 +176,15 @@ def analyze_containers():
                     for vuln in vulns:
                         severity = vuln.get("Severity", "").upper()
                         if severity in ("CRITICAL", "HIGH"):
-                            image_info["vulnerabilities"].append({
-                                "cve": vuln.get("VulnerabilityID", "N/A"),
-                                "severity": severity.lower(),
-                                "package": vuln.get("PkgName", "N/A"),
-                                "installed_version": vuln.get("InstalledVersion", "N/A"),
-                                "fixed_version": vuln.get("FixedVersion", "N/A"),
-                            })
+                            image_info["vulnerabilities"].append(
+                                {
+                                    "cve": vuln.get("VulnerabilityID", "N/A"),
+                                    "severity": severity.lower(),
+                                    "package": vuln.get("PkgName", "N/A"),
+                                    "installed_version": vuln.get("InstalledVersion", "N/A"),
+                                    "fixed_version": vuln.get("FixedVersion", "N/A"),
+                                }
+                            )
                             total_vulns += 1
                             if severity == "CRITICAL":
                                 critical_vulns += 1
@@ -185,27 +198,35 @@ def analyze_containers():
             image_info["metadata_issues"] = metadata_issues
 
             for issue in metadata_issues:
-                issues.append({
-                    "severity": issue["severity"],
-                    "message": f"{image}: {issue['message']}",
-                    "recommendation": issue["recommendation"],
-                })
+                issues.append(
+                    {
+                        "severity": issue["severity"],
+                        "message": f"{image}: {issue['message']}",
+                        "recommendation": issue["recommendation"],
+                    }
+                )
 
         scanned_images.append(image_info)
 
     # Generate overall issues
     if critical_vulns > 0:
-        issues.insert(0, {
-            "severity": "critical",
-            "message": f"{critical_vulns} CRITICAL vulnerabilities found in container images",
-            "recommendation": "Update base images and rebuild containers immediately",
-        })
+        issues.insert(
+            0,
+            {
+                "severity": "critical",
+                "message": f"{critical_vulns} CRITICAL vulnerabilities found in container images",
+                "recommendation": "Update base images and rebuild containers immediately",
+            },
+        )
     elif high_vulns > 0:
-        issues.insert(0, {
-            "severity": "high",
-            "message": f"{high_vulns} HIGH vulnerabilities found in container images",
-            "recommendation": "Update base images and rebuild containers soon",
-        })
+        issues.insert(
+            0,
+            {
+                "severity": "high",
+                "message": f"{high_vulns} HIGH vulnerabilities found in container images",
+                "recommendation": "Update base images and rebuild containers soon",
+            },
+        )
 
     return {
         "checked": True,
@@ -218,5 +239,9 @@ def analyze_containers():
         "high_vulnerabilities": high_vulns,
         "images": scanned_images,
         "issues": issues,
-        "note": "Install trivy for comprehensive vulnerability scanning: apt install trivy" if not trivy_available else None,
+        "note": (
+            "Install trivy for comprehensive vulnerability scanning: apt install trivy"
+            if not trivy_available
+            else None
+        ),
     }

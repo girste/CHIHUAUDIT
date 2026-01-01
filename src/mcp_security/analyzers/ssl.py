@@ -13,7 +13,7 @@ def _parse_cert_field(output, field_prefix):
     """Extract field value from openssl output."""
     for line in output.split("\n"):
         if line.startswith(field_prefix):
-            return line[len(field_prefix):].strip()
+            return line[len(field_prefix) :].strip()
     return None
 
 
@@ -152,18 +152,26 @@ def analyze_ssl(domains=None):
 
         severity, status, urgency = _assess_certificate_expiry(cert_info["days_remaining"])
         if severity:
-            recommendation = f"Renew certificate {urgency} for {domain}" if urgency else f"Plan certificate renewal for {domain}"
-            issues.append({
-                "severity": severity,
-                "message": f"SSL certificate for {domain} {status}",
-                "recommendation": recommendation,
-            })
+            recommendation = (
+                f"Renew certificate {urgency} for {domain}"
+                if urgency
+                else f"Plan certificate renewal for {domain}"
+            )
+            issues.append(
+                {
+                    "severity": severity,
+                    "message": f"SSL certificate for {domain} {status}",
+                    "recommendation": recommendation,
+                }
+            )
 
     return {
         "checked": True,
         "total_certificates": len(certificates),
         "expired": sum(1 for c in certificates if not c["valid"]),
-        "expiring_soon_30days": sum(1 for c in certificates if c["valid"] and c["days_remaining"] < CERT_EXPIRY_WARNING_DAYS),
+        "expiring_soon_30days": sum(
+            1 for c in certificates if c["valid"] and c["days_remaining"] < CERT_EXPIRY_WARNING_DAYS
+        ),
         "certificates": certificates,
         "issues": issues,
     }
