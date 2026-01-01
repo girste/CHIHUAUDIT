@@ -9,6 +9,9 @@ import subprocess
 import re
 from typing import Optional, Dict, List
 from pathlib import Path
+from ..utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 SECURITY_HEADERS = {
     "strict-transport-security": {
@@ -96,7 +99,14 @@ def _extract_domains_from_caddyfile(caddyfile_path: str = "/etc/caddy/Caddyfile"
 
         return unique_domains[:5]  # Limit to 5 domains for performance
 
-    except Exception:
+    except (FileNotFoundError, PermissionError, IOError) as e:
+        logger.debug(f"Cannot read Caddyfile at {caddyfile_path}: {e}")
+        return []
+    except (UnicodeDecodeError, re.error) as e:
+        logger.warning(f"Error parsing Caddyfile at {caddyfile_path}: {e}")
+        return []
+    except Exception as e:
+        logger.error(f"Unexpected error parsing Caddyfile: {e}", exc_info=True)
         return []
 
 
@@ -123,7 +133,14 @@ def _extract_domains_from_nginx() -> List[str]:
 
         return list(set(domains))[:5]
 
-    except Exception:
+    except (FileNotFoundError, PermissionError, IOError) as e:
+        logger.debug(f"Cannot read nginx config: {e}")
+        return []
+    except (UnicodeDecodeError, re.error) as e:
+        logger.warning(f"Error parsing nginx config: {e}")
+        return []
+    except Exception as e:
+        logger.error(f"Unexpected error parsing nginx config: {e}", exc_info=True)
         return []
 
 

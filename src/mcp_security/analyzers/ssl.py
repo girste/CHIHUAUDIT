@@ -3,6 +3,9 @@
 import re
 import subprocess
 from datetime import datetime
+from ..utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 CERT_EXPIRY_CRITICAL_DAYS = 7
 CERT_EXPIRY_WARNING_DAYS = 30
@@ -87,7 +90,11 @@ def get_certificate_info(domain, port=443):
             "valid": days_remaining > 0,
         }
 
-    except (subprocess.TimeoutExpired, subprocess.SubprocessError):
+    except subprocess.TimeoutExpired:
+        logger.debug(f"SSL certificate check timed out for {domain}")
+        return None
+    except subprocess.SubprocessError as e:
+        logger.debug(f"Cannot retrieve SSL certificate for {domain}: {e}")
         return None
 
 

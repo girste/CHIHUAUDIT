@@ -1,6 +1,9 @@
 """Privacy utilities for sanitizing sensitive data."""
 
 import socket
+from .logger import get_logger
+
+logger = get_logger(__name__)
 
 
 def mask_ip(ip):
@@ -33,5 +36,9 @@ def get_masked_hostname():
     try:
         hostname = socket.gethostname()
         return mask_hostname(hostname)
-    except Exception:
+    except OSError as e:
+        logger.debug(f"Cannot get hostname: {e}, using fallback")
+        return "srv-****"
+    except Exception as e:
+        logger.warning(f"Unexpected error getting hostname: {e}")
         return "srv-****"

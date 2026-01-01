@@ -3,6 +3,9 @@
 import re
 from collections import Counter
 from ..utils.detect import run_with_sudo
+from ..utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 def parse_failed_ssh_attempts(log_path, days=7):
@@ -26,6 +29,7 @@ def parse_failed_ssh_attempts(log_path, days=7):
         return attempts
 
     except PermissionError:
+        logger.debug(f"Permission denied reading {log_path}, trying with sudo")
         # Try with sudo
         result = run_with_sudo(["cat", log_path])
         if result:
@@ -34,9 +38,11 @@ def parse_failed_ssh_attempts(log_path, days=7):
                 if match:
                     ip = match.group(1)
                     attempts.append(ip)
+        else:
+            logger.debug(f"Cannot read {log_path} even with sudo")
 
     except FileNotFoundError:
-        pass
+        logger.debug(f"Auth log not found at {log_path}")
 
     return attempts
 
