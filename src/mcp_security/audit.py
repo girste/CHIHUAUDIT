@@ -39,6 +39,57 @@ def _collect_issues_from_analyzer(
     return analyzer_result.get("issues", [])
 
 
+def _evaluate_condition(analyzer: Optional[Dict[str, Any]], condition: Dict[str, Any]) -> bool:
+    """Evaluate a condition against analyzer data."""
+    if not analyzer:
+        return False
+
+    field = condition.get("field")
+    operator = condition.get("op")
+    value = condition.get("value")
+
+    # Handle nested fields (e.g., "systemd.critical_down")
+    data = analyzer
+    for key in field.split("."):
+        data = data.get(key, {}) if isinstance(data, dict) else data
+
+    # Evaluate based on operator
+    if operator == ">":
+        return data > value if isinstance(data, (int, float)) else False
+    elif operator == ">=":
+        return data >= value if isinstance(data, (int, float)) else False
+    elif operator == "<":
+        return data < value if isinstance(data, (int, float)) else False
+    elif operator == "<=":
+        return data <= value if isinstance(data, (int, float)) else False
+    elif operator == "==":
+        return data == value
+    elif operator == "!=":
+        return data != value
+    elif operator == "in":
+        return value in data if isinstance(data, (list, str)) else False
+
+    return False
+
+
+def _format_message(template: str, analyzer: Optional[Dict[str, Any]]) -> str:
+    """Format message template with analyzer data."""
+    if not analyzer or not template:
+        return template
+
+    # Simple template variable replacement {field}
+    import re
+
+    def replace_var(match):
+        field = match.group(1)
+        data = analyzer
+        for key in field.split("."):
+            data = data.get(key) if isinstance(data, dict) else data
+        return str(data) if data is not None else ""
+
+    return re.sub(r"\{([^}]+)\}", replace_var, template)
+
+
 def _add_issues_to_recommendations(
     recommendations: List[Dict[str, Any]], issues: List[Dict[str, str]]
 ) -> None:
@@ -299,240 +350,459 @@ def generate_security_analysis(
     users,
     recommendations,
 ):
-    """Generate human-readable security analysis summary."""
+    """Generate human-readable security analysis summary using rule-based evaluation."""
     issues = []
     warnings = []
     good_practices = []
     suspicious = []
 
-    if firewall:
-        if not firewall["active"]:
-            issues.append("No active firewall detected - server is completely exposed")
-        elif firewall["default_policy"] == "deny":
-            good_practices.append("Firewall follows best practice with default deny policy")
-        else:
-            warnings.append("Firewall default policy is not restrictive enough")
+    # Data-driven analysis rules configuration
+    # Each rule: (analyzer_data, conditions, message, category)
+    analysis_rules = [
+        # Firewall
+        (
+            firewall,
+            {"field": "active", "op": "==", "value": False},
+            "No active firewall detected - server is completely exposed",
+            "issues",
+        ),
+        (
+            firewall,
+            {"field": "default_policy", "op": "==", "value": "deny"},
+            "Firewall follows best practice with default deny policy",
+            "good",
+        ),
+        (
+            firewall,
+            [
+                {"field": "active", "op": "==", "value": True},
+                {"field": "default_policy", "op": "!=", "value": "deny"},
+            ],
+            "Firewall default policy is not restrictive enough",
+            "warnings",
+        ),
+        # SSH
+        (
+            ssh,
+            {"field": "permit_root_login", "op": "==", "value": "no"},
+            "Root login via SSH is properly disabled",
+            "good",
+        ),
+        (
+            ssh,
+            {"field": "permit_root_login", "op": "!=", "value": "no"},
+            "Root login is enabled - major security risk",
+            "issues",
+        ),
+        (
+            ssh,
+            {"field": "password_auth", "op": "==", "value": "no"},
+            "Password authentication disabled, key-based auth only",
+            "good",
+        ),
+        (
+            ssh,
+            {"field": "password_auth", "op": "==", "value": "yes"},
+            "Password authentication enabled - brute force attacks possible",
+            "warnings",
+        ),
+        (
+            ssh,
+            {"field": "port", "op": "!=", "value": 22},
+            "SSH running on non-standard port {port} reduces automated attacks",
+            "good",
+        ),
+        # Threats
+        (
+            threats,
+            {"field": "total_attempts", "op": ">", "value": 100},
+            "High number of failed login attempts ({total_attempts}) detected",
+            "warnings",
+        ),
+        (
+            threats,
+            {"field": "total_attempts", "op": ">", "value": 1000},
+            "Unusually high attack volume: {total_attempts} attempts in {period_days} days",
+            "suspicious",
+        ),
+        # Services
+        (
+            services,
+            {"field": "exposed_services", "op": ">", "value": 10},
+            "{exposed_services} services exposed to internet - large attack surface",
+            "warnings",
+        ),
+        (
+            services,
+            {"field": "systemd.critical_down", "op": ">", "value": 0},
+            "{systemd.critical_down} critical service(s) are down or degraded",
+            "issues",
+        ),
+        (
+            services,
+            {"field": "systemd.failed_count", "op": ">", "value": 0},
+            "{systemd.failed_count} systemd unit(s) in failed state",
+            "warnings",
+        ),
+        # Docker
+        (
+            docker,
+            [
+                {"field": "installed", "op": "==", "value": True},
+                {"field": "running_containers", "op": ">", "value": 0},
+                {"field": "rootless", "op": "==", "value": True},
+            ],
+            "Docker running in rootless mode for better isolation",
+            "good",
+        ),
+        (
+            docker,
+            [
+                {"field": "installed", "op": "==", "value": True},
+                {"field": "running_containers", "op": ">", "value": 0},
+                {"field": "rootless", "op": "==", "value": False},
+            ],
+            "Docker running as root - consider rootless mode for production",
+            "warnings",
+        ),
+        # Updates
+        (
+            updates,
+            {"field": "security_updates", "op": ">", "value": 10},
+            "{security_updates} critical security updates pending - apply immediately",
+            "issues",
+        ),
+        (
+            updates,
+            [
+                {"field": "security_updates", "op": ">", "value": 0},
+                {"field": "security_updates", "op": "<=", "value": 10},
+            ],
+            "{security_updates} security updates available",
+            "warnings",
+        ),
+        (
+            updates,
+            {"field": "security_updates", "op": "==", "value": 0},
+            "System is up to date with security patches",
+            "good",
+        ),
+        # MAC
+        (
+            mac,
+            {"field": "enabled", "op": "==", "value": True},
+            "Mandatory Access Control ({type}) is enabled and active",
+            "good",
+        ),
+        (
+            mac,
+            {"field": "enabled", "op": "==", "value": False},
+            "No MAC system (AppArmor/SELinux) detected - missing additional security layer",
+            "warnings",
+        ),
+        # Kernel
+        (
+            kernel,
+            {"field": "hardening_percentage", "op": ">=", "value": 80},
+            "Excellent kernel hardening ({hardening_percentage}%)",
+            "good",
+        ),
+        (
+            kernel,
+            [
+                {"field": "hardening_percentage", "op": ">=", "value": 60},
+                {"field": "hardening_percentage", "op": "<", "value": 80},
+            ],
+            "Moderate kernel hardening ({hardening_percentage}%) - room for improvement",
+            "warnings",
+        ),
+        (
+            kernel,
+            {"field": "hardening_percentage", "op": "<", "value": 60},
+            "Poor kernel hardening ({hardening_percentage}%) - critical parameters not configured",
+            "issues",
+        ),
+        # Fail2ban
+        (
+            fail2ban,
+            [
+                {"field": "installed", "op": "==", "value": True},
+                {"field": "active", "op": "==", "value": True},
+            ],
+            "Fail2ban active for automated intrusion prevention",
+            "good",
+        ),
+        # SSL
+        (
+            ssl,
+            [
+                {"field": "checked", "op": "==", "value": True},
+                {"field": "expired", "op": ">", "value": 0},
+            ],
+            "{expired} SSL certificate(s) have EXPIRED - critical issue",
+            "issues",
+        ),
+        (
+            ssl,
+            [
+                {"field": "checked", "op": "==", "value": True},
+                {"field": "expiring_soon_30days", "op": ">", "value": 0},
+            ],
+            "{expiring_soon_30days} SSL certificate(s) expiring in less than 30 days",
+            "warnings",
+        ),
+        (
+            ssl,
+            [
+                {"field": "checked", "op": "==", "value": True},
+                {"field": "total_certificates", "op": ">", "value": 0},
+                {"field": "expired", "op": "==", "value": 0},
+                {"field": "expiring_soon_30days", "op": "==", "value": 0},
+            ],
+            "All {total_certificates} SSL certificates are valid and not expiring soon",
+            "good",
+        ),
+        # Disk
+        (
+            disk,
+            [
+                {"field": "checked", "op": "==", "value": True},
+                {"field": "critical_count", "op": ">", "value": 0},
+            ],
+            "{critical_count} filesystem(s) critically low on space (>90% full)",
+            "issues",
+        ),
+        (
+            disk,
+            [
+                {"field": "checked", "op": "==", "value": True},
+                {"field": "warning_count", "op": ">", "value": 0},
+                {"field": "critical_count", "op": "==", "value": 0},
+            ],
+            "{warning_count} filesystem(s) running low on space (>70% full)",
+            "warnings",
+        ),
+        (
+            disk,
+            [
+                {"field": "checked", "op": "==", "value": True},
+                {"field": "critical_count", "op": "==", "value": 0},
+                {"field": "warning_count", "op": "==", "value": 0},
+            ],
+            "All filesystems have adequate free space",
+            "good",
+        ),
+        # CVE
+        (
+            cve,
+            [
+                {"field": "checked", "op": "==", "value": True},
+                {"field": "critical_vulnerabilities", "op": ">", "value": 0},
+            ],
+            "{critical_vulnerabilities} CRITICAL CVE vulnerabilities detected - patch immediately",
+            "issues",
+        ),
+        (
+            cve,
+            [
+                {"field": "checked", "op": "==", "value": True},
+                {"field": "high_vulnerabilities", "op": ">", "value": 0},
+            ],
+            "{high_vulnerabilities} high-severity CVE vulnerabilities found",
+            "warnings",
+        ),
+        (
+            cve,
+            [
+                {"field": "checked", "op": "==", "value": True},
+                {"field": "vulnerabilities_found", "op": ">", "value": 0},
+            ],
+            "{vulnerabilities_found} known vulnerabilities detected",
+            "warnings",
+        ),
+        # CIS
+        (
+            cis,
+            [
+                {"field": "checked", "op": "==", "value": True},
+                {"field": "compliance_percentage", "op": ">=", "value": 90},
+            ],
+            "Excellent CIS Benchmark compliance ({compliance_percentage}%)",
+            "good",
+        ),
+        (
+            cis,
+            [
+                {"field": "checked", "op": "==", "value": True},
+                {"field": "compliance_percentage", "op": ">=", "value": 70},
+                {"field": "compliance_percentage", "op": "<", "value": 90},
+            ],
+            "Moderate CIS compliance ({compliance_percentage}%) - {failed} controls failing",
+            "warnings",
+        ),
+        (
+            cis,
+            [
+                {"field": "checked", "op": "==", "value": True},
+                {"field": "compliance_percentage", "op": "<", "value": 70},
+            ],
+            "Poor CIS compliance ({compliance_percentage}%) - {failed} controls failing",
+            "issues",
+        ),
+        # Containers
+        (
+            containers,
+            [
+                {"field": "checked", "op": "==", "value": True},
+                {"field": "critical_vulnerabilities", "op": ">", "value": 0},
+            ],
+            "{critical_vulnerabilities} CRITICAL vulnerabilities in container images",
+            "issues",
+        ),
+        (
+            containers,
+            [
+                {"field": "checked", "op": "==", "value": True},
+                {"field": "high_vulnerabilities", "op": ">", "value": 0},
+            ],
+            "{high_vulnerabilities} HIGH vulnerabilities in container images",
+            "warnings",
+        ),
+        # NIST
+        (
+            nist,
+            [
+                {"field": "checked", "op": "==", "value": True},
+                {"field": "compliance_percentage", "op": ">=", "value": 80},
+            ],
+            "Good NIST 800-53 compliance ({compliance_percentage}%)",
+            "good",
+        ),
+        (
+            nist,
+            [
+                {"field": "checked", "op": "==", "value": True},
+                {"field": "failed", "op": ">", "value": 0},
+            ],
+            "NIST 800-53: {failed} controls failing",
+            "warnings",
+        ),
+        # PCI
+        (
+            pci,
+            [
+                {"field": "checked", "op": "==", "value": True},
+                {"field": "compliance_percentage", "op": "<", "value": 100},
+            ],
+            "PCI-DSS compliance at {compliance_percentage}% - {failed} controls failing",
+            "issues",
+        ),
+        (
+            pci,
+            [
+                {"field": "checked", "op": "==", "value": True},
+                {"field": "compliance_percentage", "op": "==", "value": 100},
+            ],
+            "Full PCI-DSS technical baseline compliance",
+            "good",
+        ),
+        # Web Headers
+        (
+            webheaders,
+            [
+                {"field": "checked", "op": "==", "value": True},
+                {"field": "total_missing_high", "op": ">", "value": 0},
+            ],
+            "{total_missing_high} critical security headers missing from web server",
+            "issues",
+        ),
+        (
+            webheaders,
+            [
+                {"field": "checked", "op": "==", "value": True},
+                {"field": "total_missing_medium", "op": ">", "value": 0},
+            ],
+            "{total_missing_medium} security headers missing - consider adding",
+            "warnings",
+        ),
+        # Filesystem
+        (
+            filesystem,
+            [
+                {"field": "checked", "op": "==", "value": True},
+                {"field": "world_writable_files", "op": ">", "value": 0},
+            ],
+            "{world_writable_files} world-writable files found - permission issue",
+            "issues",
+        ),
+        (
+            filesystem,
+            [
+                {"field": "checked", "op": "==", "value": True},
+                {"field": "suid_sgid_suspicious", "op": ">", "value": 5},
+            ],
+            "{suid_sgid_suspicious} non-standard SUID binaries - potential risk",
+            "warnings",
+        ),
+        # Network
+        (
+            network,
+            [
+                {"field": "checked", "op": "==", "value": True},
+                {"field": "suspicious_connections", "op": ">", "value": 0},
+            ],
+            "{suspicious_connections} suspicious network connections detected",
+            "suspicious",
+        ),
+        (
+            network,
+            [
+                {"field": "checked", "op": "==", "value": True},
+                {"field": "listening_services", "op": ">", "value": 20},
+            ],
+            "{listening_services} services listening - large attack surface",
+            "warnings",
+        ),
+        # Users
+        (
+            users,
+            [
+                {"field": "checked", "op": "==", "value": True},
+                {"field": "uid_zero_users", "op": ">", "value": 0},
+            ],
+            "{uid_zero_users} unauthorized users with root privileges (UID 0)",
+            "issues",
+        ),
+        (
+            users,
+            [
+                {"field": "checked", "op": "==", "value": True},
+                {"field": "users_without_password", "op": ">", "value": 0},
+            ],
+            "{users_without_password} user accounts without password set",
+            "warnings",
+        ),
+    ]
 
-    if ssh:
-        if ssh["permit_root_login"] == "no":
-            good_practices.append("Root login via SSH is properly disabled")
-        else:
-            issues.append("Root login is enabled - major security risk")
+    # Process rules
+    for rule in analysis_rules:
+        analyzer_data, conditions, message, category = rule
 
-        if ssh["password_auth"] == "no":
-            good_practices.append("Password authentication disabled, key-based auth only")
-        elif ssh["password_auth"] == "yes":
-            warnings.append("Password authentication enabled - brute force attacks possible")
+        # Handle both single condition dict and list of conditions (AND logic)
+        condition_list = conditions if isinstance(conditions, list) else [conditions]
 
-        if ssh["port"] != 22:
-            good_practices.append(
-                f"SSH running on non-standard port {ssh['port']} reduces automated attacks"
-            )
+        # Evaluate all conditions (AND logic)
+        if all(_evaluate_condition(analyzer_data, cond) for cond in condition_list):
+            formatted_msg = _format_message(message, analyzer_data)
 
-    if threats:
-        if threats["total_attempts"] > 100:
-            warnings.append(
-                f"High number of failed login attempts ({threats['total_attempts']}) detected"
-            )
-        if threats["total_attempts"] > 1000:
-            suspicious.append(
-                f"Unusually high attack volume: {threats['total_attempts']} attempts in {threats['period_days']} days"
-            )
-        if "ssh_brute_force" in threats.get("patterns", []):
-            suspicious.append("SSH brute force attack pattern detected")
-        if "distributed_attack" in threats.get("patterns", []):
-            suspicious.append("Distributed attack from multiple IPs detected")
-
-    if services:
-        if services["exposed_services"] > 10:
-            warnings.append(
-                f"{services['exposed_services']} services exposed to internet - large attack surface"
-            )
-        if len(services["by_category"]["risky"]) > 0:
-            issues.append(
-                f"Database or sensitive services exposed: {', '.join([s['name'] for s in services['by_category']['risky']])}"
-            )
-
-    if docker:
-        if docker["installed"] and docker["running_containers"] > 0:
-            if docker["rootless"]:
-                good_practices.append("Docker running in rootless mode for better isolation")
-            else:
-                warnings.append("Docker running as root - consider rootless mode for production")
-
-            if docker["privileged_containers"]:
-                issues.append(
-                    f"Privileged containers detected: {', '.join(docker['privileged_containers'])} - security risk"
-                )
-
-    if updates:
-        if updates["security_updates"] > 10:
-            issues.append(
-                f"{updates['security_updates']} critical security updates pending - apply immediately"
-            )
-        elif updates["security_updates"] > 0:
-            warnings.append(f"{updates['security_updates']} security updates available")
-        else:
-            good_practices.append("System is up to date with security patches")
-
-    if mac:
-        if mac["enabled"]:
-            good_practices.append(f"Mandatory Access Control ({mac['type']}) is enabled and active")
-        else:
-            warnings.append(
-                "No MAC system (AppArmor/SELinux) detected - missing additional security layer"
-            )
-
-    if kernel:
-        if kernel["hardening_percentage"] >= 80:
-            good_practices.append(f"Excellent kernel hardening ({kernel['hardening_percentage']}%)")
-        elif kernel["hardening_percentage"] >= 60:
-            warnings.append(
-                f"Moderate kernel hardening ({kernel['hardening_percentage']}%) - room for improvement"
-            )
-        else:
-            issues.append(
-                f"Poor kernel hardening ({kernel['hardening_percentage']}%) - critical parameters not configured"
-            )
-
-    if fail2ban:
-        if fail2ban["installed"] and fail2ban["active"]:
-            good_practices.append("Fail2ban active for automated intrusion prevention")
-        elif not fail2ban["installed"] and threats and threats["total_attempts"] > 50:
-            warnings.append("Fail2ban not installed despite active attacks")
-
-    if ssl:
-        if ssl["checked"]:
-            if ssl["expired"] > 0:
-                issues.append(f"{ssl['expired']} SSL certificate(s) have EXPIRED - critical issue")
-            elif ssl["expiring_soon_30days"] > 0:
-                warnings.append(
-                    f"{ssl['expiring_soon_30days']} SSL certificate(s) expiring in less than 30 days"
-                )
-            elif ssl["total_certificates"] > 0:
-                good_practices.append(
-                    f"All {ssl['total_certificates']} SSL certificates are valid and not expiring soon"
-                )
-
-    if disk:
-        if disk["checked"]:
-            if disk["critical_count"] > 0:
-                issues.append(
-                    f"{disk['critical_count']} filesystem(s) critically low on space (>90% full)"
-                )
-            elif disk["warning_count"] > 0:
-                warnings.append(
-                    f"{disk['warning_count']} filesystem(s) running low on space (>70% full)"
-                )
-            else:
-                good_practices.append("All filesystems have adequate free space")
-
-    if cve:
-        if cve["checked"]:
-            if cve["critical_vulnerabilities"] > 0:
-                issues.append(
-                    f"{cve['critical_vulnerabilities']} CRITICAL CVE vulnerabilities detected - patch immediately"
-                )
-            elif cve["high_vulnerabilities"] > 0:
-                warnings.append(
-                    f"{cve['high_vulnerabilities']} high-severity CVE vulnerabilities found"
-                )
-            elif cve["vulnerabilities_found"] > 0:
-                warnings.append(f"{cve['vulnerabilities_found']} known vulnerabilities detected")
-
-    if services:
-        if services.get("systemd", {}).get("critical_down", 0) > 0:
-            issues.append(
-                f"{services['systemd']['critical_down']} critical service(s) are down or degraded"
-            )
-        elif services.get("systemd", {}).get("failed_count", 0) > 0:
-            warnings.append(
-                f"{services['systemd']['failed_count']} systemd unit(s) in failed state"
-            )
-
-    if cis:
-        if cis["checked"]:
-            if cis["compliance_percentage"] >= 90:
-                good_practices.append(
-                    f"Excellent CIS Benchmark compliance ({cis['compliance_percentage']}%)"
-                )
-            elif cis["compliance_percentage"] >= 70:
-                warnings.append(
-                    f"Moderate CIS compliance ({cis['compliance_percentage']}%) - {cis['failed']} controls failing"
-                )
-            else:
-                issues.append(
-                    f"Poor CIS compliance ({cis['compliance_percentage']}%) - {cis['failed']} controls failing"
-                )
-
-    if containers:
-        if containers["checked"]:
-            if containers["critical_vulnerabilities"] > 0:
-                issues.append(
-                    f"{containers['critical_vulnerabilities']} CRITICAL vulnerabilities in container images"
-                )
-            elif containers["high_vulnerabilities"] > 0:
-                warnings.append(
-                    f"{containers['high_vulnerabilities']} HIGH vulnerabilities in container images"
-                )
-
-    if nist:
-        if nist["checked"] and nist["compliance_percentage"] >= 80:
-            good_practices.append(f"Good NIST 800-53 compliance ({nist['compliance_percentage']}%)")
-        elif nist["checked"] and nist["failed"] > 0:
-            warnings.append(f"NIST 800-53: {nist['failed']} controls failing")
-
-    if pci:
-        if pci["checked"] and pci["compliance_percentage"] < 100:
-            issues.append(
-                f"PCI-DSS compliance at {pci['compliance_percentage']}% - {pci['failed']} controls failing"
-            )
-        elif pci["checked"]:
-            good_practices.append("Full PCI-DSS technical baseline compliance")
-
-    if webheaders:
-        if webheaders["checked"]:
-            if webheaders["total_missing_high"] > 0:
-                issues.append(
-                    f"{webheaders['total_missing_high']} critical security headers missing from web server"
-                )
-            elif webheaders["total_missing_medium"] > 0:
-                warnings.append(
-                    f"{webheaders['total_missing_medium']} security headers missing - consider adding"
-                )
-
-    if filesystem:
-        if filesystem["checked"]:
-            if filesystem["world_writable_files"] > 0:
-                issues.append(
-                    f"{filesystem['world_writable_files']} world-writable files found - permission issue"
-                )
-            if filesystem["suid_sgid_suspicious"] > 5:
-                warnings.append(
-                    f"{filesystem['suid_sgid_suspicious']} non-standard SUID binaries - potential risk"
-                )
-
-    if network:
-        if network["checked"]:
-            if network["suspicious_connections"] > 0:
-                suspicious.append(
-                    f"{network['suspicious_connections']} suspicious network connections detected"
-                )
-            if network["listening_services"] > 20:
-                warnings.append(
-                    f"{network['listening_services']} services listening - large attack surface"
-                )
-
-    if users:
-        if users["checked"]:
-            if users["uid_zero_users"] > 0:
-                issues.append(
-                    f"{users['uid_zero_users']} unauthorized users with root privileges (UID 0)"
-                )
-            if users["users_without_password"] > 0:
-                warnings.append(
-                    f"{users['users_without_password']} user accounts without password set"
-                )
+            if category == "issues":
+                issues.append(formatted_msg)
+            elif category == "warnings":
+                warnings.append(formatted_msg)
+            elif category == "good":
+                good_practices.append(formatted_msg)
+            elif category == "suspicious":
+                suspicious.append(formatted_msg)
 
     # Overall assessment
     critical_count = len([r for r in recommendations if r["priority"] == "critical"])
