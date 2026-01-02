@@ -25,6 +25,9 @@ from .analyzers.webheaders import analyze_webheaders
 from .analyzers.filesystem import analyze_filesystem
 from .analyzers.network import analyze_network
 from .analyzers.users import analyze_users
+from .analyzers.rootkit import analyze_rootkit
+from .analyzers.sudoers import analyze_sudoers
+from .analyzers.system_hardening import analyze_system_hardening
 from .utils.detect import get_os_info, get_auth_log_path
 from .utils.privacy import mask_ip, get_masked_hostname
 from .utils.config import load_config
@@ -246,6 +249,24 @@ def _get_analyzer_registry(config: Dict[str, Any]) -> List[Dict[str, Any]]:
             "enabled": checks.get("users", True),
             "kwargs": {},
         },
+        {
+            "name": "rootkit",
+            "func": analyze_rootkit,
+            "enabled": checks.get("rootkit", True),
+            "kwargs": {},
+        },
+        {
+            "name": "sudoers",
+            "func": analyze_sudoers,
+            "enabled": checks.get("sudoers", True),
+            "kwargs": {},
+        },
+        {
+            "name": "system_hardening",
+            "func": analyze_system_hardening,
+            "enabled": checks.get("system_hardening", True),
+            "kwargs": {},
+        },
     ]
 
 
@@ -327,6 +348,9 @@ def run_audit(mask_data=None, verbose=False):
     filesystem = results_map.get("filesystem")
     network = results_map.get("network")
     users = results_map.get("users")
+    rootkit = results_map.get("rootkit")
+    sudoers = results_map.get("sudoers")
+    system_hardening = results_map.get("system_hardening")
 
     # Apply privacy masking to threat analysis results
     if mask_data and threats and threats.get("top_attackers"):
@@ -355,6 +379,9 @@ def run_audit(mask_data=None, verbose=False):
         filesystem,
         network,
         users,
+        rootkit,
+        sudoers,
+        system_hardening,
     )
 
     # Generate security analysis summary
@@ -379,6 +406,9 @@ def run_audit(mask_data=None, verbose=False):
         filesystem,
         network,
         users,
+        rootkit,
+        sudoers,
+        system_hardening,
         recommendations,
     )
 
@@ -409,6 +439,9 @@ def run_audit(mask_data=None, verbose=False):
         "filesystem_security": filesystem,
         "network_connections": network,
         "user_audit": users,
+        "rootkit_detection": rootkit,
+        "sudoers_audit": sudoers,
+        "system_hardening": system_hardening,
         "recommendations": recommendations,
     }
 
@@ -436,6 +469,9 @@ def generate_security_analysis(
     filesystem,
     network,
     users,
+    rootkit,
+    sudoers,
+    system_hardening,
     recommendations,
 ):
     """Generate human-readable security analysis summary using rule-based evaluation."""
@@ -957,6 +993,9 @@ def generate_recommendations(
     filesystem,
     network,
     users,
+    rootkit,
+    sudoers,
+    system_hardening,
 ):
     """Generate prioritized security recommendations."""
     recommendations = []
@@ -1024,6 +1063,9 @@ def generate_recommendations(
         webheaders,
         filesystem,
         network,
+        rootkit,
+        sudoers,
+        system_hardening,
     ]
     for analyzer in standard_analyzers:
         issues = _collect_issues_from_analyzer(analyzer)

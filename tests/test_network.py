@@ -1,6 +1,6 @@
 """Test network analyzer."""
 
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 from mcp_security.analyzers.network import _is_private_ip, analyze_network
 
 

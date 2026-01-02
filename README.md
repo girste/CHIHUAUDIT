@@ -10,15 +10,16 @@
 
 ## What It Does
 
-**Security Audit:**
+**Security Audit (23 analyzers, 89 CIS controls):**
 - **Infrastructure**: Firewall, SSH config, network services, systemd health, disk usage
 - **Vulnerabilities**: CVE scanning (critical packages), container image scanning (with trivy)
 - **SSL/TLS**: Certificate expiry, validity, auto-renewal status
 - **Compliance Standards**:
-  - CIS Benchmark (Distribution Independent Linux v2.0)
-  - NIST 800-53 Rev 5 baseline controls
-  - PCI-DSS v4.0 technical requirements
+  - CIS Benchmark (89 Level 1 controls - Distribution Independent Linux v2.0)
+  - NIST 800-53 Rev 5 (5 baseline controls)
+  - PCI-DSS v4.0 (5 technical requirements)
 - **Runtime Security**: Docker/container security, kernel hardening (16+ params), MAC (AppArmor/SELinux)
+- **Advanced Security**: Rootkit detection, sudo configuration audit, system hardening checks
 - **Threat Detection**: Failed login attempts, attack patterns, fail2ban status
 - Returns prioritized actionable recommendations
 

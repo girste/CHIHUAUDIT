@@ -1,6 +1,6 @@
 """Test services analyzer."""
 
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 from mcp_security.analyzers.services import analyze_services
 
 

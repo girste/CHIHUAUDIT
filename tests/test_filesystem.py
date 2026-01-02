@@ -1,6 +1,6 @@
 """Test filesystem analyzer."""
 
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 from mcp_security.analyzers.filesystem import analyze_filesystem
 
 
