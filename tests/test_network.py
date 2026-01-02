@@ -42,8 +42,22 @@ def test_analyze_network_no_connections():
 def test_analyze_network_with_listening():
     """Test network analysis with listening services."""
     mock_connections = [
-        {"state": "LISTEN", "local_ip": "0.0.0.0", "local_port": "22", "remote_ip": "*", "remote_port": "*", "process": "sshd"},
-        {"state": "LISTEN", "local_ip": "0.0.0.0", "local_port": "80", "remote_ip": "*", "remote_port": "*", "process": "nginx"},
+        {
+            "state": "LISTEN",
+            "local_ip": "0.0.0.0",
+            "local_port": "22",
+            "remote_ip": "*",
+            "remote_port": "*",
+            "process": "sshd",
+        },
+        {
+            "state": "LISTEN",
+            "local_ip": "0.0.0.0",
+            "local_port": "80",
+            "remote_ip": "*",
+            "remote_port": "*",
+            "process": "nginx",
+        },
     ]
 
     with patch("mcp_security.analyzers.network._parse_ss_output", return_value=mock_connections):
@@ -57,8 +71,22 @@ def test_analyze_network_with_listening():
 def test_analyze_network_with_established():
     """Test network analysis with established connections."""
     mock_connections = [
-        {"state": "ESTAB", "local_ip": "192.168.1.100", "local_port": "22", "remote_ip": "192.168.1.50", "remote_port": "54321", "process": "sshd"},
-        {"state": "LISTEN", "local_ip": "0.0.0.0", "local_port": "22", "remote_ip": "*", "remote_port": "*", "process": "sshd"},
+        {
+            "state": "ESTAB",
+            "local_ip": "192.168.1.100",
+            "local_port": "22",
+            "remote_ip": "192.168.1.50",
+            "remote_port": "54321",
+            "process": "sshd",
+        },
+        {
+            "state": "LISTEN",
+            "local_ip": "0.0.0.0",
+            "local_port": "22",
+            "remote_ip": "*",
+            "remote_port": "*",
+            "process": "sshd",
+        },
     ]
 
     with patch("mcp_security.analyzers.network._parse_ss_output", return_value=mock_connections):
@@ -72,7 +100,14 @@ def test_analyze_network_with_established():
 def test_analyze_network_suspicious_port():
     """Test detection of connections to suspicious ports."""
     mock_connections = [
-        {"state": "ESTAB", "local_ip": "192.168.1.100", "local_port": "1234", "remote_ip": "8.8.8.8", "remote_port": "4444", "process": "unknown"},
+        {
+            "state": "ESTAB",
+            "local_ip": "192.168.1.100",
+            "local_port": "1234",
+            "remote_ip": "8.8.8.8",
+            "remote_port": "4444",
+            "process": "unknown",
+        },
     ]
 
     with patch("mcp_security.analyzers.network._parse_ss_output", return_value=mock_connections):
@@ -85,7 +120,14 @@ def test_analyze_network_suspicious_port():
 def test_analyze_network_many_services():
     """Test warning when too many services are listening."""
     mock_connections = [
-        {"state": "LISTEN", "local_ip": "0.0.0.0", "local_port": str(8000 + i), "remote_ip": "*", "remote_port": "*", "process": f"service{i}"}
+        {
+            "state": "LISTEN",
+            "local_ip": "0.0.0.0",
+            "local_port": str(8000 + i),
+            "remote_ip": "*",
+            "remote_port": "*",
+            "process": f"service{i}",
+        }
         for i in range(25)
     ]
 
@@ -100,8 +142,22 @@ def test_analyze_network_many_services():
 def test_analyze_network_ipv6():
     """Test parsing IPv6 connections."""
     mock_connections = [
-        {"state": "ESTAB", "local_ip": "::1", "local_port": "22", "remote_ip": "::1", "remote_port": "54321", "process": "sshd"},
-        {"state": "LISTEN", "local_ip": "::", "local_port": "80", "remote_ip": "*", "remote_port": "*", "process": "nginx"},
+        {
+            "state": "ESTAB",
+            "local_ip": "::1",
+            "local_port": "22",
+            "remote_ip": "::1",
+            "remote_port": "54321",
+            "process": "sshd",
+        },
+        {
+            "state": "LISTEN",
+            "local_ip": "::",
+            "local_port": "80",
+            "remote_ip": "*",
+            "remote_port": "*",
+            "process": "nginx",
+        },
     ]
 
     with patch("mcp_security.analyzers.network._parse_ss_output", return_value=mock_connections):
@@ -114,9 +170,13 @@ def test_analyze_network_ipv6():
 
 def test_analyze_network_connection_parsing():
     """Test that subprocess errors are handled gracefully."""
-    with patch("mcp_security.analyzers.network._parse_ss_output", side_effect=Exception("Command failed")):
+    with patch(
+        "mcp_security.analyzers.network._parse_ss_output", side_effect=Exception("Command failed")
+    ):
         with patch("mcp_security.analyzers.network._analyze_listening_services", return_value={}):
-            with patch("mcp_security.analyzers.network._detect_suspicious_connections", return_value=[]):
+            with patch(
+                "mcp_security.analyzers.network._detect_suspicious_connections", return_value=[]
+            ):
                 # analyze_network catches all exceptions from _parse_ss_output and returns checked:False
                 # But in the current implementation, if _parse_ss_output raises an exception,
                 # it returns [] instead of raising, so analyze_network will get empty list

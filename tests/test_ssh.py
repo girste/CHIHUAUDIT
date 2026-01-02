@@ -9,12 +9,14 @@ from mcp_security.analyzers.ssh import parse_sshd_config, analyze_ssh
 def test_parse_sshd_config_secure():
     """Test parsing secure SSH configuration."""
     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".conf") as f:
-        f.write("""# SSH Configuration
+        f.write(
+            """# SSH Configuration
 Port 2222
 PermitRootLogin no
 PasswordAuthentication no
 PubkeyAuthentication yes
-""")
+"""
+        )
         config_path = f.name
 
     try:
@@ -30,10 +32,12 @@ PubkeyAuthentication yes
 def test_parse_sshd_config_insecure():
     """Test parsing insecure SSH configuration."""
     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".conf") as f:
-        f.write("""Port 22
+        f.write(
+            """Port 22
 PermitRootLogin yes
 PasswordAuthentication yes
-""")
+"""
+        )
         config_path = f.name
 
     try:
@@ -48,12 +52,14 @@ PasswordAuthentication yes
 def test_parse_sshd_config_with_comments():
     """Test parsing config with comments."""
     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".conf") as f:
-        f.write("""# This is a comment
+        f.write(
+            """# This is a comment
 Port 2244
 # PermitRootLogin yes (commented out)
 PermitRootLogin no
 PasswordAuthentication no  # inline comment
-""")
+"""
+        )
         config_path = f.name
 
     try:
@@ -68,10 +74,12 @@ PasswordAuthentication no  # inline comment
 def test_parse_sshd_config_case_insensitive():
     """Test that parsing is case insensitive."""
     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".conf") as f:
-        f.write("""PORT 9999
+        f.write(
+            """PORT 9999
 PERMITROOTLOGIN NO
 passwordauthentication NO
-""")
+"""
+        )
         config_path = f.name
 
     try:

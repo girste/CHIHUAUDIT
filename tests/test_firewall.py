@@ -1,7 +1,12 @@
 """Test firewall analyzer."""
 
 from unittest.mock import Mock, patch
-from mcp_security.analyzers.firewall import analyze_ufw, analyze_iptables, analyze_firewalld, analyze_firewall
+from mcp_security.analyzers.firewall import (
+    analyze_ufw,
+    analyze_iptables,
+    analyze_firewalld,
+    analyze_firewall,
+)
 
 
 def test_analyze_ufw_active():
