@@ -1,8 +1,8 @@
 """CVE and vulnerability scanning module."""
 
 import re
-import subprocess
 from typing import Optional
+from ..utils.command import run_command
 
 CRITICAL_PACKAGES = [
     "openssl",
@@ -75,34 +75,14 @@ def _is_vulnerable(current_version, max_safe_version):
 
 def get_package_version(package_name: str) -> Optional[str]:
     """Get installed version of a package."""
-    try:
-        result = subprocess.run(
-            ["dpkg-query", "-W", "-f=${Version}", package_name],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
-            timeout=5,
-        )
-        return result.stdout.strip() if result.returncode == 0 else None
-
-    except (subprocess.SubprocessError, subprocess.TimeoutExpired):
-        return None
+    result = run_command(["dpkg-query", "-W", "-f=${Version}", package_name], timeout=5)
+    return result.stdout.strip() if result and result.success else None
 
 
 def get_kernel_version() -> Optional[str]:
     """Get current kernel version."""
-    try:
-        result = subprocess.run(
-            ["uname", "-r"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
-            timeout=5,
-        )
-        return result.stdout.strip() if result.returncode == 0 else None
-
-    except (subprocess.SubprocessError, subprocess.TimeoutExpired):
-        return None
+    result = run_command(["uname", "-r"], timeout=5)
+    return result.stdout.strip() if result and result.success else None
 
 
 def check_critical_packages():

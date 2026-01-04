@@ -4,8 +4,9 @@ Scans for world-writable files, SUID/SGID binaries, and suspicious files
 that could indicate security issues or privilege escalation risks.
 """
 
-import subprocess
 from typing import List, Dict
+# Command utilities
+from ..utils.command import run_command_sudo
 
 from ..constants import (
     TIMEOUT_SHORT,
@@ -47,15 +48,12 @@ def _find_world_writable_files() -> List[str]:
     exclude_args = _build_exclude_args()
 
     try:
-        result = subprocess.run(
+        result = run_command_sudo(
             ["find", "/", *exclude_args, "-type", "f", "-perm", "-002", "-print"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
             timeout=TIMEOUT_LONG,
         )
 
-        if result.returncode != 0:
+        if not result or not result.success:
             return []
 
         files = [
@@ -66,7 +64,7 @@ def _find_world_writable_files() -> List[str]:
 
         return files[:MAX_WORLD_WRITABLE_FILES]
 
-    except (subprocess.SubprocessError, subprocess.TimeoutExpired):
+    except (Exception):
         return []
 
 
@@ -75,7 +73,7 @@ def _find_suid_files() -> List[Dict[str, str]]:
     exclude_args = _build_exclude_args()
 
     try:
-        result = subprocess.run(
+        result = run_command_sudo(
             [
                 "find",
                 "/",
@@ -91,13 +89,10 @@ def _find_suid_files() -> List[Dict[str, str]]:
                 ")",
                 "-print",
             ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
             timeout=TIMEOUT_LONG,
         )
 
-        if result.returncode != 0:
+        if not result or not result.success:
             return []
 
         files = []
@@ -115,18 +110,15 @@ def _find_suid_files() -> List[Dict[str, str]]:
 
         return files[:MAX_SUID_FILES]
 
-    except (subprocess.SubprocessError, subprocess.TimeoutExpired):
+    except (Exception):
         return []
 
 
 def _check_tmp_permissions() -> Dict:
     """Check /tmp directory permissions."""
     try:
-        result = subprocess.run(
+        result = run_command_sudo(
             ["stat", "-c", "%a", "/tmp"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
             timeout=TIMEOUT_SHORT,
         )
 
@@ -141,7 +133,7 @@ def _check_tmp_permissions() -> Dict:
                 "secure": is_secure,
             }
 
-    except (subprocess.SubprocessError, subprocess.TimeoutExpired):
+    except (Exception):
         pass
 
     return {"checked": False}
@@ -154,11 +146,8 @@ def _check_suspicious_files() -> List[str]:
 
     for location in ["/tmp", "/var/tmp", "/dev/shm"]:
         try:
-            result = subprocess.run(
+            result = run_command_sudo(
                 ["find", location, "-type", "f", "-mtime", "-7"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
-                text=True,
                 timeout=TIMEOUT_MEDIUM,
             )
 
@@ -166,7 +155,7 @@ def _check_suspicious_files() -> List[str]:
                 files = [f.strip() for f in result.stdout.split("\n") if f.strip()]
                 suspicious_files.extend(files[:20])  # Limit per location
 
-        except (subprocess.SubprocessError, subprocess.TimeoutExpired):
+        except (Exception):
             continue
 
     return suspicious_files[:30]  # Global limit

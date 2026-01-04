@@ -1,4 +1,5 @@
 """Rootkit and malware detection analyzer.
+from ..utils.command import run_command_sudo
 
 Checks for common rootkit indicators and suspicious system modifications.
 Does not replace dedicated tools like rkhunter/chkrootkit but provides
@@ -6,7 +7,6 @@ basic compromise detection.
 """
 
 import os
-import subprocess
 from pathlib import Path
 from ..utils.detect import run_with_sudo
 from ..utils.logger import get_logger
@@ -17,30 +17,24 @@ logger = get_logger(__name__)
 def _check_rkhunter_installed():
     """Check if rkhunter is installed and available."""
     try:
-        result = subprocess.run(
+        result = run_command_sudo(
             ["which", "rkhunter"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
             timeout=5,
         )
         return result.returncode == 0
-    except (subprocess.SubprocessError, subprocess.TimeoutExpired):
+    except (Exception):
         return False
 
 
 def _check_chkrootkit_installed():
     """Check if chkrootkit is installed and available."""
     try:
-        result = subprocess.run(
+        result = run_command_sudo(
             ["which", "chkrootkit"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
             timeout=5,
         )
         return result.returncode == 0
-    except (subprocess.SubprocessError, subprocess.TimeoutExpired):
+    except (Exception):
         return False
 
 
@@ -54,15 +48,12 @@ def _check_hidden_processes():
                 proc_pids.add(int(item.name))
 
         # Get PIDs from ps
-        result = subprocess.run(
+        result = run_command_sudo(
             ["ps", "-eo", "pid"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
             timeout=10,
         )
 
-        if result.returncode != 0:
+        if not result or not result.success:
             return 0, []
 
         ps_pids = set()
@@ -211,7 +202,7 @@ def _run_rkhunter_check():
 
         return {"warnings": warnings, "total": len(warnings)}
 
-    except (subprocess.SubprocessError, subprocess.TimeoutExpired) as e:
+    except (Exception) as e:
         logger.warning(f"rkhunter check failed: {e}")
         return None
 

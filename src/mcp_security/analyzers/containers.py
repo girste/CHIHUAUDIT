@@ -1,7 +1,7 @@
 """Docker container image vulnerability scanning module."""
 
 import json
-import subprocess
+from ..utils.command import run_command
 
 CRITICAL_CVE_SCORE = 9.0
 HIGH_CVE_SCORE = 7.0
@@ -9,18 +9,8 @@ HIGH_CVE_SCORE = 7.0
 
 def _run_docker_command(args, timeout=30):
     """Execute docker command safely."""
-    try:
-        result = subprocess.run(
-            ["docker"] + args,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            timeout=timeout,
-        )
-        return result if result.returncode == 0 else None
-
-    except (subprocess.SubprocessError, subprocess.TimeoutExpired):
-        return None
+    result = run_command(["docker"] + args, timeout=timeout, capture_stderr=True)
+    return result if result and result.success else None
 
 
 def get_running_images():
@@ -69,25 +59,16 @@ def inspect_image(image_name):
 
 def scan_image_with_trivy(image_name):
     """Scan image for vulnerabilities using trivy if available."""
-    try:
-        result = subprocess.run(
-            ["trivy", "image", "--format", "json", "--quiet", image_name],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
-            timeout=120,
-        )
+    result = run_command(
+        ["trivy", "image", "--format", "json", "--quiet", image_name],
+        timeout=120,
+    )
 
-        if result.returncode == 0:
+    if result and result.success:
+        try:
             return json.loads(result.stdout)
-
-    except (
-        subprocess.SubprocessError,
-        subprocess.TimeoutExpired,
-        json.JSONDecodeError,
-        FileNotFoundError,
-    ):
-        pass
+        except json.JSONDecodeError:
+            pass
 
     return None
 
@@ -150,14 +131,8 @@ def analyze_containers():
     issues = []
 
     # Check if trivy is available
-    trivy_available = (
-        subprocess.run(
-            ["which", "trivy"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        ).returncode
-        == 0
-    )
+    trivy_check = run_command(["which", "trivy"], timeout=5)
+    trivy_available = trivy_check and trivy_check.success
 
     for image in running_images[:5]:  # Limit to 5 images for performance
         image_info = {

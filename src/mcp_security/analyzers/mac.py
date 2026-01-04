@@ -1,24 +1,15 @@
 """Mandatory Access Control (AppArmor/SELinux) analysis."""
 
 import re
-import subprocess
 from ..utils.command import run_command_sudo
 
 
 def check_apparmor():
     """Check AppArmor status and profiles."""
     # apparmor_status requires root to show profile details
-    # Try with passwordless sudo (requires setup-sudo.sh configuration)
-    try:
-        result = subprocess.run(
-            ["sudo", "-n", "apparmor_status"], capture_output=True, text=True, timeout=5
-        )
+    result = run_command_sudo(["apparmor_status"], timeout=5)
 
-        # If passwordless sudo not configured, command will fail
-        if result.returncode != 0:
-            return None
-
-    except (FileNotFoundError, subprocess.TimeoutExpired):
+    if not result or not result.success:
         return None
 
     output = result.stdout

@@ -4,6 +4,7 @@ import re
 import subprocess
 from datetime import datetime
 from ..utils.logger import get_logger
+from ..utils.command import run_command
 
 logger = get_logger(__name__)
 
@@ -40,24 +41,23 @@ def _parse_x509_date(date_str):
 def get_certificate_info(domain, port=443):
     """Get SSL certificate information for a domain using openssl."""
     try:
-        result = subprocess.run(
+        # Get certificate from server
+        result = run_command(
             ["openssl", "s_client", "-connect", f"{domain}:{port}", "-servername", domain],
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
             timeout=OPENSSL_TIMEOUT_SECONDS,
         )
 
-        if result.returncode != 0:
+        if not result or not result.success:
             return None
 
+        # Parse certificate details (requires piping, so use subprocess directly)
         cert_result = subprocess.run(
             ["openssl", "x509", "-noout", "-dates", "-subject", "-issuer"],
             input=result.stdout,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             text=True,
+            timeout=OPENSSL_TIMEOUT_SECONDS,
         )
 
         if cert_result.returncode != 0:

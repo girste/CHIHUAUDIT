@@ -1,10 +1,10 @@
 """Network connections security analyzer.
+from ..utils.command import run_command_sudo
 
 Analyzes active network connections, listening services, and detects
 suspicious network activity or unexpected connections.
 """
 
-import subprocess
 import re
 from typing import List, Dict
 
@@ -62,15 +62,12 @@ def _is_private_ip(ip: str) -> bool:
 def _parse_ss_output() -> List[Dict]:
     """Parse ss command output to get active connections."""
     try:
-        result = subprocess.run(
+        result = run_command_sudo(
             ["ss", "-tunap"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
             timeout=10,
         )
 
-        if result.returncode != 0:
+        if not result or not result.success:
             return []
 
         connections = []
@@ -111,7 +108,7 @@ def _parse_ss_output() -> List[Dict]:
 
         return connections
 
-    except (subprocess.SubprocessError, subprocess.TimeoutExpired):
+    except (Exception):
         return []
 
 

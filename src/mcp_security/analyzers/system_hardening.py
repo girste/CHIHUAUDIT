@@ -1,4 +1,5 @@
 """System hardening checks.
+from ..utils.command import run_command_sudo
 
 Additional security hardening checks:
 - Core dumps disabled
@@ -8,7 +9,6 @@ Additional security hardening checks:
 """
 
 import os
-import subprocess
 from ..utils.detect import run_with_sudo
 from ..utils.logger import get_logger
 
@@ -21,11 +21,8 @@ def _check_core_dumps():
 
     # Check systemd-coredump
     try:
-        result = subprocess.run(
+        result = run_command_sudo(
             ["systemctl", "is-active", "systemd-coredump.socket"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
             timeout=5,
         )
 
@@ -34,16 +31,13 @@ def _check_core_dumps():
             if status == "active":
                 issues.append("systemd-coredump.socket is active")
 
-    except (subprocess.SubprocessError, subprocess.TimeoutExpired) as e:
+    except (Exception) as e:
         logger.debug(f"Error checking systemd-coredump: {e}")
 
     # Check sysctl fs.suid_dumpable
     try:
-        result = subprocess.run(
+        result = run_command_sudo(
             ["sysctl", "-n", "fs.suid_dumpable"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
             timeout=5,
         )
 
@@ -52,7 +46,7 @@ def _check_core_dumps():
             if value != "0":
                 issues.append(f"fs.suid_dumpable = {value} (should be 0)")
 
-    except (subprocess.SubprocessError, subprocess.TimeoutExpired) as e:
+    except (Exception) as e:
         logger.debug(f"Error checking sysctl: {e}")
 
     # Check /proc/sys/kernel/core_pattern
@@ -69,11 +63,8 @@ def _check_core_dumps():
 
     # Check ulimit
     try:
-        result = subprocess.run(
+        result = run_command_sudo(
             ["sh", "-c", "ulimit -c"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
             timeout=5,
         )
 
@@ -82,7 +73,7 @@ def _check_core_dumps():
             if limit != "0":
                 issues.append(f"ulimit core size = {limit} (should be 0)")
 
-    except (subprocess.SubprocessError, subprocess.TimeoutExpired) as e:
+    except (Exception) as e:
         logger.debug(f"Error checking ulimit: {e}")
 
     return {
@@ -107,11 +98,8 @@ def _check_dev_tools():
 
     for tool in dev_tools:
         try:
-            result = subprocess.run(
+            result = run_command_sudo(
                 ["which", tool],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
-                text=True,
                 timeout=5,
             )
 
@@ -119,7 +107,7 @@ def _check_dev_tools():
                 path = result.stdout.strip()
                 installed_tools.append({"tool": tool, "path": path})
 
-        except (subprocess.SubprocessError, subprocess.TimeoutExpired) as e:
+        except (Exception) as e:
             logger.debug(f"Error checking {tool}: {e}")
             continue
 
@@ -191,11 +179,8 @@ def _check_time_sync():
 
     # Check systemd-timesyncd (most common)
     try:
-        status = subprocess.run(
+        status = run_command_sudo(
             ["systemctl", "is-active", "systemd-timesyncd"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
             timeout=5,
         )
 
@@ -203,16 +188,13 @@ def _check_time_sync():
             result["systemd_timesyncd"] = True
             result["sync_enabled"] = True
 
-    except (subprocess.SubprocessError, subprocess.TimeoutExpired) as e:
+    except (Exception) as e:
         logger.debug(f"Error checking systemd-timesyncd: {e}")
 
     # Check chronyd
     try:
-        status = subprocess.run(
+        status = run_command_sudo(
             ["systemctl", "is-active", "chronyd"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
             timeout=5,
         )
 
@@ -220,16 +202,13 @@ def _check_time_sync():
             result["chrony_installed"] = True
             result["sync_enabled"] = True
 
-    except (subprocess.SubprocessError, subprocess.TimeoutExpired) as e:
+    except (Exception) as e:
         logger.debug(f"Error checking chronyd: {e}")
 
     # Check ntpd
     try:
-        status = subprocess.run(
+        status = run_command_sudo(
             ["systemctl", "is-active", "ntpd"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
             timeout=5,
         )
 
@@ -237,16 +216,13 @@ def _check_time_sync():
             result["ntp_installed"] = True
             result["sync_enabled"] = True
 
-    except (subprocess.SubprocessError, subprocess.TimeoutExpired) as e:
+    except (Exception) as e:
         logger.debug(f"Error checking ntpd: {e}")
 
     # Check timedatectl
     try:
-        tc_result = subprocess.run(
+        tc_result = run_command_sudo(
             ["timedatectl", "show"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
             timeout=5,
         )
 
@@ -256,7 +232,7 @@ def _check_time_sync():
                     result["sync_enabled"] = True
                     break
 
-    except (subprocess.SubprocessError, subprocess.TimeoutExpired) as e:
+    except (Exception) as e:
         logger.debug(f"Error checking timedatectl: {e}")
 
     # Issues

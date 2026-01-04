@@ -4,7 +4,6 @@ Implements technical requirements from PCI-DSS v4.0.
 Focus on system hardening and security controls for Linux servers.
 """
 
-import subprocess
 from ..utils.detect import run_with_sudo
 
 
@@ -65,11 +64,8 @@ def _check_unnecessary_services():
 def _check_password_policy():
     """PCI Req 8.3.6 - Strong password requirements."""
     try:
-        result = subprocess.run(
+        result = run_command_sudo(
             ["grep", "-E", "^minlen", "/etc/security/pwquality.conf"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
             timeout=5,
         )
 
@@ -87,7 +83,7 @@ def _check_password_policy():
 
         return False, "Password policy not configured"
 
-    except (subprocess.SubprocessError, subprocess.TimeoutExpired):
+    except (Exception):
         return False, "Unable to check password policy"
 
 
@@ -98,13 +94,13 @@ def _check_logging_enabled():
 
     for log_file in critical_logs:
         try:
-            result = subprocess.run(
+            result = run_command_sudo(
                 ["test", "-f", log_file],
                 timeout=5,
             )
-            if result.returncode != 0:
+            if not result or not result.success:
                 missing.append(log_file)
-        except (subprocess.SubprocessError, subprocess.TimeoutExpired):
+        except (Exception):
             missing.append(log_file)
 
     if missing:

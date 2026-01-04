@@ -4,8 +4,8 @@ Audits system users, groups, password policies, and identifies
 potential security issues like users with UID 0, no password, etc.
 """
 
-import subprocess
 from typing import List, Dict
+from ..utils.command import run_command_sudo
 
 SYSTEM_UID_MAX = 999
 
@@ -29,15 +29,12 @@ PRIVILEGED_GROUPS = {"root", "sudo", "wheel", "admin", "docker", "adm"}
 def _parse_passwd_file() -> List[Dict]:
     """Parse /etc/passwd for user information."""
     try:
-        result = subprocess.run(
+        result = run_command_sudo(
             ["getent", "passwd"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
             timeout=5,
         )
 
-        if result.returncode != 0:
+        if not result or not result.success:
             return []
 
         users = []
@@ -74,15 +71,15 @@ def _parse_passwd_file() -> List[Dict]:
 def _check_shadow_file() -> Dict[str, bool]:
     """Check for users without passwords or with weak password hashes."""
     try:
-        result = subprocess.run(
+        result = run_command_sudo(
             ["sudo", "-n", "getent", "shadow"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
+            # stdout handled by run_command_sudo,
+            # stderr handled by run_command_sudo,
             text=True,
             timeout=5,
         )
 
-        if result.returncode != 0:
+        if not result or not result.success:
             return {}
 
         users_without_password = {}
@@ -103,22 +100,23 @@ def _check_shadow_file() -> Dict[str, bool]:
 
         return users_without_password
 
-    except (subprocess.SubprocessError, subprocess.TimeoutExpired):
+    # Command handled by run_command_sudo
+    except Exception:
         return {}
 
 
 def _get_group_members() -> Dict[str, List[str]]:
     """Get members of privileged groups."""
     try:
-        result = subprocess.run(
+        result = run_command_sudo(
             ["getent", "group"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
+            # stdout handled by run_command_sudo,
+            # stderr handled by run_command_sudo,
             text=True,
             timeout=5,
         )
 
-        if result.returncode != 0:
+        if not result or not result.success:
             return {}
 
         privileged_members = {}
@@ -138,7 +136,8 @@ def _get_group_members() -> Dict[str, List[str]]:
 
         return privileged_members
 
-    except (subprocess.SubprocessError, subprocess.TimeoutExpired):
+    # Command handled by run_command_sudo
+    except Exception:
         return {}
 
 

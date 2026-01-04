@@ -5,8 +5,8 @@ Reusable functions for common security checks across CIS controls.
 
 import os
 import re
-import subprocess
 from ..utils.detect import run_with_sudo
+from ..utils.command import run_command
 from ..utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -22,60 +22,23 @@ def check_package_installed(package_name):
         tuple: (bool, str) - (installed, detail_message)
     """
     # Try dpkg (Debian/Ubuntu)
-    try:
-        result = subprocess.run(
-            ["dpkg", "-l", package_name],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
-            timeout=5,
-        )
-
-        if result.returncode == 0:
-            # Check if actually installed (not removed)
-            for line in result.stdout.split("\n"):
-                if line.startswith("ii"):  # installed
-                    return True, f"Package {package_name} installed"
-            return False, f"Package {package_name} not installed"
-
-    except (subprocess.SubprocessError, subprocess.TimeoutExpired):
-        pass
+    result = run_command(["dpkg", "-l", package_name], timeout=5)
+    if result and result.success:
+        # Check if actually installed (not removed)
+        for line in result.stdout.split("\n"):
+            if line.startswith("ii"):  # installed
+                return True, f"Package {package_name} installed"
+        return False, f"Package {package_name} not installed"
 
     # Try rpm (RHEL/CentOS/Fedora)
-    try:
-        result = subprocess.run(
-            ["rpm", "-q", package_name],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
-            timeout=5,
-        )
-
-        if result.returncode == 0:
-            return True, f"Package {package_name} installed"
-        else:
-            return False, f"Package {package_name} not installed"
-
-    except (subprocess.SubprocessError, subprocess.TimeoutExpired, FileNotFoundError):
-        pass
+    result = run_command(["rpm", "-q", package_name], timeout=5)
+    if result and result.success:
+        return True, f"Package {package_name} installed"
 
     # Try apk (Alpine)
-    try:
-        result = subprocess.run(
-            ["apk", "info", "-e", package_name],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
-            timeout=5,
-        )
-
-        if result.returncode == 0:
-            return True, f"Package {package_name} installed"
-        else:
-            return False, f"Package {package_name} not installed"
-
-    except (subprocess.SubprocessError, subprocess.TimeoutExpired, FileNotFoundError):
-        pass
+    result = run_command(["apk", "info", "-e", package_name], timeout=5)
+    if result and result.success:
+        return True, f"Package {package_name} installed"
 
     return False, "Cannot determine package status"
 
@@ -111,35 +74,23 @@ def check_mount_option(mount_point, required_option):
     Returns:
         tuple: (bool, str) - (has_option, detail_message)
     """
-    try:
-        result = subprocess.run(
-            ["mount"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
-            timeout=5,
-        )
+    result = run_command(["mount"], timeout=5)
+    if not result or not result.success:
+        return False, "Cannot read mount info"
 
-        if result.returncode != 0:
-            return False, "Cannot read mount info"
+    # Parse mount output
+    for line in result.stdout.split("\n"):
+        if f" on {mount_point} " in line or line.startswith(f"{mount_point} "):
+            # Extract options (between parentheses)
+            match = re.search(r"\((.*?)\)", line)
+            if match:
+                options = match.group(1).split(",")
+                if required_option in options:
+                    return True, f"{mount_point} mounted with {required_option}"
+                else:
+                    return False, f"{mount_point} missing {required_option}"
 
-        # Parse mount output
-        for line in result.stdout.split("\n"):
-            if f" on {mount_point} " in line or line.startswith(f"{mount_point} "):
-                # Extract options (between parentheses)
-                match = re.search(r"\((.*?)\)", line)
-                if match:
-                    options = match.group(1).split(",")
-                    if required_option in options:
-                        return True, f"{mount_point} mounted with {required_option}"
-                    else:
-                        return False, f"{mount_point} missing {required_option}"
-
-        return False, f"{mount_point} not mounted"
-
-    except (subprocess.SubprocessError, subprocess.TimeoutExpired) as e:
-        logger.debug(f"Error checking mount options: {e}")
-        return False, f"Error checking {mount_point}"
+    return False, f"{mount_point} not mounted"
 
 
 def check_config_contains_line(file_path, pattern, regex=False):
@@ -349,18 +300,11 @@ def check_directory_permissions(directory, expected_perms, owner="root", group="
     if not os.path.isdir(directory):
         return False, f"Directory {directory} not found"
 
+    result = run_command(["stat", "-c", "%a %U %G", directory], timeout=5)
+    if not result or not result.success:
+        return False, f"Cannot stat {directory}"
+
     try:
-        result = subprocess.run(
-            ["stat", "-c", "%a %U %G", directory],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
-            timeout=5,
-        )
-
-        if result.returncode != 0:
-            return False, f"Cannot stat {directory}"
-
         perms, dir_owner, dir_group = result.stdout.strip().split()
 
         if perms != expected_perms:
@@ -372,8 +316,8 @@ def check_directory_permissions(directory, expected_perms, owner="root", group="
 
         return True, "Pass"
 
-    except (subprocess.SubprocessError, subprocess.TimeoutExpired, ValueError) as e:
-        logger.debug(f"Error checking {directory}: {e}")
+    except ValueError as e:
+        logger.debug(f"Error parsing stat output for {directory}: {e}")
         return False, f"Error checking {directory}"
 
 

@@ -11,8 +11,8 @@ Sections:
 - 5.x: Access Control (Cron, SSH, PAM, User accounts)
 """
 
-import subprocess
 from ..utils.detect import run_with_sudo
+from ..utils.command import run_command
 from .cis_helpers import (
     check_package_installed,
     check_service_enabled,
@@ -39,18 +39,11 @@ CIS_SECTIONS = {
 
 def _check_file_permissions(path, expected_perms, owner="root", group="root"):
     """Check if file has correct permissions and ownership."""
+    result = run_command(["stat", "-c", "%a %U %G", path], timeout=5)
+    if not result or not result.success:
+        return False, f"File {path} not found"
+
     try:
-        result = subprocess.run(
-            ["stat", "-c", "%a %U %G", path],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
-            timeout=5,
-        )
-
-        if result.returncode != 0:
-            return False, f"File {path} not found"
-
         perms, file_owner, file_group = result.stdout.strip().split()
 
         if perms != expected_perms:
@@ -62,32 +55,21 @@ def _check_file_permissions(path, expected_perms, owner="root", group="root"):
 
         return True, "Pass"
 
-    except (subprocess.SubprocessError, subprocess.TimeoutExpired, ValueError):
+    except ValueError:
         return False, f"Error checking {path}"
 
 
 def _check_kernel_param(param, expected_value):
     """Check if kernel parameter is set to expected value."""
-    try:
-        result = subprocess.run(
-            ["sysctl", "-n", param],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
-            timeout=5,
-        )
+    result = run_command(["sysctl", "-n", param], timeout=5)
+    if not result or not result.success:
+        return False, f"Parameter {param} not found"
 
-        if result.returncode != 0:
-            return False, f"Parameter {param} not found"
+    actual = result.stdout.strip()
+    if actual != str(expected_value):
+        return False, f"Value {actual} (expected {expected_value})"
 
-        actual = result.stdout.strip()
-        if actual != str(expected_value):
-            return False, f"Value {actual} (expected {expected_value})"
-
-        return True, "Pass"
-
-    except (subprocess.SubprocessError, subprocess.TimeoutExpired):
-        return False, f"Error checking {param}"
+    return True, "Pass"
 
 
 def _check_service_disabled(service_name):

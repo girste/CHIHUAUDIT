@@ -1,11 +1,11 @@
 """Web server security headers analyzer.
+from ..utils.command import run_command_sudo
 
 Checks HTTP security headers for web servers running on the system.
 Detects nginx, Apache, Caddy and analyzes their security headers.
 Intelligently extracts real domains from config files and tests them.
 """
 
-import subprocess
 import re
 from typing import Optional, Dict, List
 from pathlib import Path
@@ -160,15 +160,12 @@ def _get_real_domains(web_servers: List[str]) -> List[str]:
 def _get_listening_ports():
     """Get HTTP/HTTPS ports that are listening."""
     try:
-        result = subprocess.run(
+        result = run_command_sudo(
             ["ss", "-tlnp"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
             timeout=5,
         )
 
-        if result.returncode != 0:
+        if not result or not result.success:
             return []
 
         ports = []
@@ -181,7 +178,7 @@ def _get_listening_ports():
 
         return list(set(ports))
 
-    except (subprocess.SubprocessError, subprocess.TimeoutExpired):
+    except (Exception):
         return []
 
 
@@ -193,15 +190,12 @@ def _check_headers_for_url(url: str) -> Optional[Dict[str, str]]:
     """
     try:
         # Follow redirects (-L) to get the final response
-        result = subprocess.run(
+        result = run_command_sudo(
             ["curl", "-I", "-s", "-L", "-m", "10", url],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
             timeout=15,
         )
 
-        if result.returncode != 0:
+        if not result or not result.success:
             return None
 
         # Parse headers from the LAST response (after redirects)
@@ -240,7 +234,7 @@ def _check_headers_for_url(url: str) -> Optional[Dict[str, str]]:
 
         return headers
 
-    except (subprocess.SubprocessError, subprocess.TimeoutExpired):
+    except (Exception):
         return None
 
 
@@ -276,18 +270,15 @@ def _detect_web_server():
     # Check for common web servers
     for service in ["nginx", "apache2", "httpd", "caddy"]:
         try:
-            result = subprocess.run(
+            result = run_command_sudo(
                 ["systemctl", "is-active", f"{service}.service"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
-                text=True,
                 timeout=5,
             )
 
             if result.returncode == 0 and result.stdout.strip() == "active":
                 servers.append(service)
 
-        except (subprocess.SubprocessError, subprocess.TimeoutExpired):
+        except (Exception):
             continue
 
     return servers

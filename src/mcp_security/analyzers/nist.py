@@ -4,7 +4,6 @@ Implements high-priority controls from NIST 800-53 Rev 5.
 Focus on technical controls applicable to Linux servers.
 """
 
-import subprocess
 from ..utils.detect import run_with_sudo
 
 
@@ -35,16 +34,13 @@ def _check_audit_logging():
 def _check_password_complexity():
     """Check if password complexity requirements are enforced."""
     try:
-        result = subprocess.run(
+        result = run_command_sudo(
             [
                 "grep",
                 "-E",
                 "^(minlen|dcredit|ucredit|lcredit|ocredit)",
                 "/etc/security/pwquality.conf",
             ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
             timeout=5,
         )
 
@@ -53,18 +49,15 @@ def _check_password_complexity():
 
         return False, "Password complexity not configured"
 
-    except (subprocess.SubprocessError, subprocess.TimeoutExpired):
+    except (Exception):
         return False, "Unable to check password policy"
 
 
 def _check_session_timeout():
     """Check if idle session timeout is configured."""
     try:
-        result = subprocess.run(
+        result = run_command_sudo(
             ["grep", "-E", "^(TMOUT|ClientAliveInterval)", "/etc/profile", "/etc/ssh/sshd_config"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
             timeout=5,
         )
 
@@ -73,7 +66,7 @@ def _check_session_timeout():
 
         return False, "Session timeout not configured"
 
-    except (subprocess.SubprocessError, subprocess.TimeoutExpired):
+    except (Exception):
         return False, "Unable to check session timeout"
 
 
@@ -147,11 +140,8 @@ def check_system_protection():
 
     # Check kernel ASLR
     try:
-        result = subprocess.run(
+        result = run_command_sudo(
             ["sysctl", "-n", "kernel.randomize_va_space"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
             timeout=5,
         )
 
@@ -159,7 +149,7 @@ def check_system_protection():
         passed = value == "2"
         detail = f"ASLR {'enabled (full)' if passed else f'partial or disabled ({value})'}"
 
-    except (subprocess.SubprocessError, subprocess.TimeoutExpired):
+    except (Exception):
         passed = False
         detail = "Unable to check ASLR"
 

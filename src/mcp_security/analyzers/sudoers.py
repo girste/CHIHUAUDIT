@@ -1,4 +1,5 @@
 """Sudo configuration security analyzer.
+from ..utils.command import run_command_sudo
 
 Audits /etc/sudoers and /etc/sudoers.d/ for security issues:
 - NOPASSWD usage
@@ -8,7 +9,6 @@ Audits /etc/sudoers and /etc/sudoers.d/ for security issues:
 """
 
 import re
-import subprocess
 from pathlib import Path
 from ..utils.detect import run_with_sudo
 from ..utils.logger import get_logger
@@ -163,11 +163,8 @@ def _get_sudo_users():
 
     # Users in sudo group
     try:
-        result = subprocess.run(
+        result = run_command_sudo(
             ["getent", "group", "sudo"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
             timeout=5,
         )
 
@@ -177,16 +174,13 @@ def _get_sudo_users():
             if len(parts) >= 4 and parts[3]:
                 sudo_users.extend(parts[3].split(","))
 
-    except (subprocess.SubprocessError, subprocess.TimeoutExpired) as e:
+    except (Exception) as e:
         logger.debug(f"Error getting sudo group: {e}")
 
     # Users in wheel group (RHEL/CentOS)
     try:
-        result = subprocess.run(
+        result = run_command_sudo(
             ["getent", "group", "wheel"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
             timeout=5,
         )
 
@@ -197,7 +191,7 @@ def _get_sudo_users():
                     if user not in sudo_users:
                         sudo_users.append(user)
 
-    except (subprocess.SubprocessError, subprocess.TimeoutExpired) as e:
+    except (Exception) as e:
         logger.debug(f"Error getting wheel group: {e}")
 
     return sudo_users
