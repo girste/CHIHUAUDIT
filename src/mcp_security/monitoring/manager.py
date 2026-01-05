@@ -93,7 +93,10 @@ class MonitoringManager:
 
             # Check if still running
             if process.poll() is not None:
-                return {"success": False, "error": "Daemon process terminated immediately after start. Check permissions and log directory."}
+                return {
+                    "success": False,
+                    "error": "Daemon process terminated immediately after start. Check permissions and log directory.",
+                }
 
             # Save PID
             with open(self.pid_file, "w") as f:
