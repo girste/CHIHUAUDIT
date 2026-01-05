@@ -118,7 +118,7 @@ def run_command_sudo(
         return result
 
     # Check if error is permission-related
-    if result and result.stderr:
+    if result is not None and result.stderr:
         stderr_lower = result.stderr.lower()
         permission_keywords = ["permission denied", "you must be root", "you need to be root"]
 
