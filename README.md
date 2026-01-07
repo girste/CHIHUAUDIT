@@ -6,7 +6,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Tests](https://github.com/girste/mcp-cybersec-watchdog/actions/workflows/test.yml/badge.svg)](https://github.com/girste/mcp-cybersec-watchdog/actions/workflows/test.yml)
 [![codecov](https://codecov.io/gh/girste/mcp-cybersec-watchdog/graph/badge.svg?token=35352E1D-2C48-4BB3-87E1-38ED5854B4CD)](https://codecov.io/gh/girste/mcp-cybersec-watchdog)
-[![PyPI](https://img.shields.io/badge/PyPI-mcp--cybersec--watchdog-blue)](https://pypi.org/project/mcp-cybersec-watchdog/)
+[![PyPI version](https://badge.fury.io/py/mcp-cybersec-watchdog.svg)](https://pypi.org/project/mcp-cybersec-watchdog/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
 ## Features
