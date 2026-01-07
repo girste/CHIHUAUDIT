@@ -37,3 +37,4 @@ venv/
 # Personal configuration files
 claude_desktop_config.json
 .mcp-security.json
+PUBLISH_TO_PYPI.md
