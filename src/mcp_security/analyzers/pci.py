@@ -202,6 +202,8 @@ def check_requirement_10():
 
 def analyze_pci():
     """Run PCI-DSS compliance baseline checks."""
+    from ..profile_weights import get_pci_control_weight, PROFILES
+
     all_controls = []
     all_controls.extend(check_requirement_2())
     all_controls.extend(check_requirement_8())
@@ -210,6 +212,20 @@ def analyze_pci():
     passed_count = sum(1 for c in all_controls if c["passed"])
     failed_count = len(all_controls) - passed_count
     compliance_percentage = (passed_count / len(all_controls) * 100) if all_controls else 0
+
+    # Calculate profile-weighted scores
+    profile_scores = {}
+    for profile_name in PROFILES.keys():
+        total_weight = 0.0
+        achieved_weight = 0.0
+
+        for control in all_controls:
+            weight = get_pci_control_weight(control["id"], profile_name)
+            total_weight += weight
+            if control["passed"]:
+                achieved_weight += weight
+
+        profile_scores[profile_name] = round((achieved_weight / total_weight * 100) if total_weight > 0 else 0, 1)
 
     issues = []
     for control in all_controls:
@@ -229,6 +245,7 @@ def analyze_pci():
         "passed": passed_count,
         "failed": failed_count,
         "compliance_percentage": round(compliance_percentage, 1),
+        "profile_scores": profile_scores,
         "controls": all_controls,
         "issues": issues,
         "note": "Automated checks cover technical subset - full PCI-DSS compliance requires QSA assessment",

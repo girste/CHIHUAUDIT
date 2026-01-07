@@ -199,6 +199,20 @@ def check_modprobe_disabled(module_name):
     Returns:
         tuple: (bool, str) - (disabled, detail_message)
     """
+    # First, check if module is actually loaded in memory
+    result = run_command(["lsmod"], timeout=5)
+    if result and result.success:
+        # Check if module is in lsmod output
+        for line in result.stdout.split("\n"):
+            # lsmod output: "module_name size used_by"
+            if line.split()[0:1] == [module_name]:
+                # Module is loaded, must be explicitly disabled
+                break
+        else:
+            # Module not loaded = secure by default
+            return True, f"Module {module_name} not loaded"
+
+    # Module is loaded or lsmod check failed, check blacklist
     modprobe_files = [
         f"/etc/modprobe.d/{module_name}.conf",
         "/etc/modprobe.d/blacklist.conf",
@@ -268,6 +282,12 @@ def check_pam_module_enabled(pam_file, module_name):
     if not os.path.exists(pam_file):
         return False, f"PAM file {pam_file} not found"
 
+    # Support both legacy and modern PAM modules
+    module_variants = [module_name]
+    if "tally" in module_name.lower():
+        # pam_tally2.so (legacy) or pam_faillock.so (modern Ubuntu 24.04+)
+        module_variants = ["pam_tally2.so", "pam_faillock.so"]
+
     try:
         with open(pam_file, "r") as f:
             for line in f:
@@ -275,10 +295,16 @@ def check_pam_module_enabled(pam_file, module_name):
                 if line.startswith("#") or not line:
                     continue
 
-                if module_name in line and not line.startswith("#"):
-                    return True, f"{module_name} enabled"
+                # Check if any variant is present
+                for variant in module_variants:
+                    if variant in line and not line.startswith("#"):
+                        return True, f"{variant} enabled"
 
-        return False, f"{module_name} not found in {pam_file}"
+        # Build error message
+        if len(module_variants) > 1:
+            return False, f"Neither {' nor '.join(module_variants)} found in {pam_file}"
+        else:
+            return False, f"{module_name} not found in {pam_file}"
 
     except (OSError, PermissionError) as e:
         logger.debug(f"Error reading {pam_file}: {e}")

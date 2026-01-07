@@ -159,6 +159,49 @@ def _get_analyzer_registry(config: Dict[str, Any]) -> List[Dict[str, Any]]:
     ]
 
 
+def calculate_profile_scores(cis, nist, pci):
+    """
+    Calculate aggregate security scores for each profile level.
+
+    Combines weighted scores from CIS, NIST, and PCI-DSS compliance frameworks.
+
+    Returns dict with profile names as keys and aggregate scores as values.
+    """
+    from .profile_weights import PROFILES, get_profile_recommendation
+
+    profile_scores = {}
+
+    # Extract profile scores from each framework
+    cis_profiles = cis.get("profile_scores", {}) if cis else {}
+    nist_profiles = nist.get("profile_scores", {}) if nist else {}
+    pci_profiles = pci.get("profile_scores", {}) if pci else {}
+
+    # Calculate weighted average for each profile
+    # CIS: 60%, NIST: 25%, PCI: 15% (CIS has most controls)
+    for profile_name in PROFILES.keys():
+        cis_score = cis_profiles.get(profile_name, 0)
+        nist_score = nist_profiles.get(profile_name, 0)
+        pci_score = pci_profiles.get(profile_name, 0)
+
+        # Weighted average
+        aggregate_score = (cis_score * 0.6) + (nist_score * 0.25) + (pci_score * 0.15)
+        profile_scores[profile_name] = round(aggregate_score, 1)
+
+    # Determine recommended profile
+    recommended_profile = get_profile_recommendation(profile_scores)
+
+    return {
+        "profile_scores": profile_scores,
+        "recommended_profile": recommended_profile,
+        "profile_details": PROFILES,
+        "framework_breakdown": {
+            "cis": cis_profiles,
+            "nist": nist_profiles,
+            "pci": pci_profiles,
+        }
+    }
+
+
 def run_audit(mask_data=None, verbose=False):
     """
     Run complete security audit and return structured report.
@@ -273,6 +316,9 @@ def run_audit(mask_data=None, verbose=False):
         system_hardening,
     )
 
+    # Calculate multi-level profile scores
+    profile_analysis = calculate_profile_scores(cis, nist, pci)
+
     # Generate security analysis summary
     analysis = generate_security_analysis(
         firewall,
@@ -299,6 +345,7 @@ def run_audit(mask_data=None, verbose=False):
         sudoers,
         system_hardening,
         recommendations,
+        profile_analysis,
     )
 
     # Build report
@@ -362,6 +409,7 @@ def generate_security_analysis(
     sudoers,
     system_hardening,
     recommendations,
+    profile_analysis=None,
 ):
     """Generate human-readable security analysis summary using rule-based evaluation."""
     issues = []
@@ -461,7 +509,7 @@ def generate_security_analysis(
             "Server follows security best practices with only minor improvements needed."
         )
 
-    return {
+    result = {
         "overall_status": overall_status,
         "summary": overall_summary,
         "issues": issues,
@@ -475,6 +523,12 @@ def generate_security_analysis(
             "warnings": len(warnings),
         },
     }
+
+    # Add multi-level profile analysis if available
+    if profile_analysis:
+        result["profile_analysis"] = profile_analysis
+
+    return result
 
 
 def generate_recommendations(

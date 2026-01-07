@@ -1,21 +1,60 @@
 """Mandatory Access Control (AppArmor/SELinux) analysis."""
 
 import re
-from ..utils.command import run_command_sudo
+import os
+from ..utils.command import run_command_sudo, run_command
 
 
 def check_apparmor():
     """Check AppArmor status and profiles."""
-    # apparmor_status requires root to show profile details
-    result = run_command_sudo(["apparmor_status"], timeout=5)
+    # First try without sudo - check if module is loaded
+    result = run_command(["lsmod"], timeout=5)
+    apparmor_loaded = False
+    if result and result.success:
+        apparmor_loaded = "apparmor" in result.stdout.lower()
+
+    # Also check /sys/module/apparmor/parameters/enabled
+    if not apparmor_loaded and os.path.exists("/sys/module/apparmor/parameters/enabled"):
+        try:
+            with open("/sys/module/apparmor/parameters/enabled", "r") as f:
+                apparmor_loaded = f.read().strip() == "Y"
+        except (OSError, PermissionError):
+            pass
+
+    # If AppArmor not loaded at all, return None
+    if not apparmor_loaded:
+        return None
+
+    # AppArmor is loaded, now try to get detailed status
+    # Try with full path first (required by sudo rules)
+    result = run_command_sudo(["/usr/sbin/apparmor_status"], timeout=5)
+    if not result or not result.success:
+        # Fallback to aa-status
+        result = run_command_sudo(["/usr/sbin/aa-status"], timeout=5)
 
     if not result or not result.success:
-        return None
+        # AppArmor exists but we can't read status - needs sudo
+        return {
+            "type": "apparmor",
+            "enabled": True,
+            "enforce_count": 0,
+            "complain_count": 0,
+            "unconfined_count": 0,
+            "needs_sudo": True,
+        }
 
     output = result.stdout
 
     if not output or "do not have enough privilege" in output.lower():
-        return None
+        # AppArmor exists but needs sudo
+        return {
+            "type": "apparmor",
+            "enabled": True,
+            "enforce_count": 0,
+            "complain_count": 0,
+            "unconfined_count": 0,
+            "needs_sudo": True,
+        }
 
     # Parse status
     enabled = "apparmor module is loaded" in output.lower()
@@ -48,7 +87,7 @@ def check_apparmor():
 
 def check_selinux():
     """Check SELinux status and mode."""
-    result = run_command_sudo(["getenforce"])
+    result = run_command_sudo(["/usr/sbin/getenforce"])
 
     if not result:
         return None
@@ -68,7 +107,16 @@ def analyze_mac():
     if apparmor:
         issues = []
 
-        if not apparmor["enabled"]:
+        # Check if we need sudo for full analysis
+        if apparmor.get("needs_sudo"):
+            issues.append(
+                {
+                    "severity": "info",
+                    "message": "AppArmor detected but full status requires sudo access",
+                    "recommendation": "Run ./setup-sudo.sh to enable complete AppArmor analysis",
+                }
+            )
+        elif not apparmor["enabled"]:
             issues.append(
                 {
                     "severity": "high",

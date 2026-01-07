@@ -111,6 +111,14 @@ def run_command_sudo(
     if isinstance(cmd, str):
         cmd = cmd.split()
 
+    # If command is in /usr/sbin or /sbin, likely needs sudo - try directly
+    if cmd and (cmd[0].startswith("/usr/sbin/") or cmd[0].startswith("/sbin/")):
+        sudo_cmd = ["sudo", "-n"] + cmd
+        result = run_command(sudo_cmd, timeout=timeout, capture_stderr=capture_stderr)
+        if result and result.success:
+            return result
+        # If sudo fails, fall through to try without sudo
+
     # Try without sudo first
     result = run_command(cmd, timeout=timeout, capture_stderr=True)
 

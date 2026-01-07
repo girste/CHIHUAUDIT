@@ -86,6 +86,9 @@ def _check_nopasswd_usage(entries):
 
 def _check_dangerous_wildcards(entries):
     """Check for dangerous wildcard usage in commands."""
+    # Standard system users and groups that are expected to have full access
+    EXPECTED_FULL_ACCESS = {"root", "%admin", "%sudo", "%wheel"}
+
     dangerous_patterns = [
         (r"\bALL\s*=.*\bALL\b", "Full root access (user ALL=(ALL) ALL)"),
         (r"/bin/\*", "Wildcard in /bin/* allows arbitrary commands"),
@@ -104,6 +107,10 @@ def _check_dangerous_wildcards(entries):
             if re.search(pattern, content, re.IGNORECASE):
                 match = re.match(r"^([%\w]+)\s+", content)
                 user = match.group(1) if match else "unknown"
+
+                # Skip if this is an expected full access entry for system accounts
+                if description == "Full root access (user ALL=(ALL) ALL)" and user in EXPECTED_FULL_ACCESS:
+                    continue
 
                 findings.append(
                     {
@@ -221,9 +228,9 @@ def analyze_sudoers():
     if result["sudoers_files_parsed"] == 0:
         result["issues"].append(
             {
-                "severity": "medium",
-                "message": "Cannot read sudoers configuration",
-                "recommendation": "Ensure tool has sufficient privileges to audit sudo config",
+                "severity": "info",
+                "message": "Sudoers audit requires sudo access",
+                "recommendation": "Run ./setup-sudo.sh to enable complete sudoers analysis",
             }
         )
         return result

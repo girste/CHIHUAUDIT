@@ -25,6 +25,7 @@ from .cis_helpers import (
     check_directory_permissions,
     check_syslog_service,
 )
+from .docker_sec import check_docker_installed
 
 
 CIS_SECTIONS = {
@@ -37,8 +38,24 @@ CIS_SECTIONS = {
 }
 
 
-def _check_file_permissions(path, expected_perms, owner="root", group="root"):
-    """Check if file has correct permissions and ownership."""
+def _check_file_permissions(path, expected_perms, owner="root", group="root",
+                           alt_perms=None, alt_owner=None, alt_group=None):
+    """Check if file has correct permissions and ownership.
+
+    Supports alternative valid configurations (e.g., Debian/Ubuntu standards).
+
+    Args:
+        path: File path to check
+        expected_perms: Expected permission octal (e.g., "755")
+        owner: Expected owner (default: "root")
+        group: Expected group (default: "root")
+        alt_perms: Alternative valid permissions (optional)
+        alt_owner: Alternative valid owner (optional)
+        alt_group: Alternative valid group (optional)
+
+    Returns:
+        tuple: (bool, str) - (valid, detail_message)
+    """
     result = run_command(["stat", "-c", "%a %U %G", path], timeout=5)
     if not result or not result.success:
         return False, f"File {path} not found"
@@ -46,14 +63,30 @@ def _check_file_permissions(path, expected_perms, owner="root", group="root"):
     try:
         perms, file_owner, file_group = result.stdout.strip().split()
 
-        if perms != expected_perms:
-            return False, f"Permissions {perms} (expected {expected_perms})"
-        if file_owner != owner:
-            return False, f"Owner {file_owner} (expected {owner})"
-        if file_group != group:
-            return False, f"Group {file_group} (expected {group})"
+        # Check primary configuration
+        if perms == expected_perms and file_owner == owner and file_group == group:
+            return True, "Pass"
 
-        return True, "Pass"
+        # Check alternative configuration (if provided)
+        alt_perms_match = alt_perms is None or perms == alt_perms
+        alt_owner_match = alt_owner is None or file_owner == alt_owner
+        alt_group_match = alt_group is None or file_group == alt_group
+
+        if alt_perms_match and alt_owner_match and alt_group_match:
+            # At least one alternative parameter was specified and matched
+            if alt_perms or alt_owner or alt_group:
+                return True, f"Pass (standard config: {perms} {file_owner}:{file_group})"
+
+        # Neither primary nor alternative matched, return error
+        errors = []
+        if perms != expected_perms and (alt_perms is None or perms != alt_perms):
+            errors.append(f"Permissions {perms} (expected {expected_perms})")
+        if file_owner != owner and (alt_owner is None or file_owner != alt_owner):
+            errors.append(f"Owner {file_owner} (expected {owner})")
+        if file_group != group and (alt_group is None or file_group != alt_group):
+            errors.append(f"Group {file_group} (expected {group})")
+
+        return False, ", ".join(errors) if errors else "Mismatch"
 
     except ValueError:
         return False, f"Error checking {path}"
@@ -373,6 +406,12 @@ def check_network_controls():
 
     for cis_id, desc, param, expected in network_params:
         passed, detail = _check_kernel_param(param, expected)
+
+        # Special case: IP forwarding is required by Docker
+        if cis_id == "3.2.1" and not passed and check_docker_installed():
+            passed = True
+            detail = "Value 1 (required by Docker)"
+
         controls.append(
             {
                 "id": cis_id,
@@ -615,22 +654,35 @@ def check_logging_controls():
     )
 
     # 4.4 - Log file permissions
-    log_files = [
-        ("4.4.1", "Ensure /var/log permissions are configured", "/var/log", "755"),
-        ("4.4.2", "Ensure /var/log/syslog permissions are configured", "/var/log/syslog", "640"),
-    ]
+    # 4.4.1 - /var/log permissions (accept Debian/Ubuntu standard 775 root:syslog)
+    passed, detail = _check_file_permissions(
+        "/var/log", "755", "root", "root",
+        alt_perms="775", alt_group="syslog"
+    )
+    controls.append(
+        {
+            "id": "4.4.1",
+            "description": "Ensure /var/log permissions are configured",
+            "level": 1,
+            "passed": passed,
+            "detail": detail,
+        }
+    )
 
-    for cis_id, desc, filepath, perms in log_files:
-        passed, detail = _check_file_permissions(filepath, perms)
-        controls.append(
-            {
-                "id": cis_id,
-                "description": desc,
-                "level": 1,
-                "passed": passed,
-                "detail": detail,
-            }
-        )
+    # 4.4.2 - /var/log/syslog permissions (accept rsyslog standard syslog:adm 640)
+    passed, detail = _check_file_permissions(
+        "/var/log/syslog", "640", "root", "root",
+        alt_owner="syslog", alt_group="adm"
+    )
+    controls.append(
+        {
+            "id": "4.4.2",
+            "description": "Ensure /var/log/syslog permissions are configured",
+            "level": 1,
+            "passed": passed,
+            "detail": detail,
+        }
+    )
 
     return controls
 
@@ -828,6 +880,8 @@ def check_access_controls():
 
 def analyze_cis():
     """Run CIS Benchmark compliance checks - Complete implementation (80 controls)."""
+    from ..profile_weights import get_cis_control_weight, PROFILES
+
     all_controls = []
     all_controls.extend(check_filesystem_controls())
     all_controls.extend(check_services_controls())
@@ -838,6 +892,20 @@ def analyze_cis():
     passed_count = sum(1 for c in all_controls if c["passed"])
     failed_count = len(all_controls) - passed_count
     compliance_percentage = (passed_count / len(all_controls) * 100) if all_controls else 0
+
+    # Calculate profile-weighted scores
+    profile_scores = {}
+    for profile_name in PROFILES.keys():
+        total_weight = 0.0
+        achieved_weight = 0.0
+
+        for control in all_controls:
+            weight = get_cis_control_weight(control["id"], profile_name)
+            total_weight += weight
+            if control["passed"]:
+                achieved_weight += weight
+
+        profile_scores[profile_name] = round((achieved_weight / total_weight * 100) if total_weight > 0 else 0, 1)
 
     issues = []
     for control in all_controls:
@@ -858,6 +926,7 @@ def analyze_cis():
         "passed": passed_count,
         "failed": failed_count,
         "compliance_percentage": round(compliance_percentage, 1),
+        "profile_scores": profile_scores,
         "controls": all_controls,
         "issues": issues,
         "note": "Automated checks cover Level 1 controls - full compliance requires manual review",

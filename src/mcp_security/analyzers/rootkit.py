@@ -68,7 +68,22 @@ def _check_hidden_processes():
         # Filter out kernel threads and very short-lived processes
         hidden = {pid for pid in hidden if pid > 1}
 
-        return len(hidden), list(hidden)[:10]  # Sample first 10
+        # Filter out kernel threads by checking cmdline
+        filtered_hidden = []
+        for pid in hidden:
+            cmdline_path = Path(f"/proc/{pid}/cmdline")
+            try:
+                if cmdline_path.exists():
+                    cmdline = cmdline_path.read_text()
+                    # Kernel threads have empty cmdline
+                    if cmdline.strip():
+                        # Not a kernel thread - potential hidden process
+                        filtered_hidden.append(pid)
+            except (OSError, PermissionError):
+                # Can't read - might be suspicious, include it
+                filtered_hidden.append(pid)
+
+        return len(filtered_hidden), filtered_hidden[:10]  # Sample first 10
 
     except OSError as e:
         logger.debug(f"Error checking hidden processes: {e}")
