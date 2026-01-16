@@ -438,8 +438,8 @@ func findBackupDestinations(ctx context.Context) []BackupDest {
 func isWritable(path string) bool {
 	testFile := filepath.Join(path, ".backup_test_"+time.Now().Format("20060102150405"))
 	if f, err := os.Create(testFile); err == nil {
-		f.Close()
-		os.Remove(testFile)
+		_ = f.Close()
+		_ = os.Remove(testFile)
 		return true
 	}
 	return false

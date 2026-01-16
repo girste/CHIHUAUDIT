@@ -216,9 +216,10 @@ func ScanAppSecurity(ctx context.Context, path string, depth string) *AppSecurit
 	criticalCount := 0
 	highCount := 0
 	for _, issue := range issues {
-		if issue.Severity == "critical" {
+		switch issue.Severity {
+		case "critical":
 			criticalCount++
-		} else if issue.Severity == "high" {
+		case "high":
 			highCount++
 		}
 	}

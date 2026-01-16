@@ -69,21 +69,21 @@ func (m *MonitoringManager) IsRunning() bool {
 
 	pid, err := strconv.Atoi(string(data))
 	if err != nil {
-		os.Remove(m.pidFile)
+		_ = os.Remove(m.pidFile)
 		return false
 	}
 
 	// Check if process exists
 	process, err := os.FindProcess(pid)
 	if err != nil {
-		os.Remove(m.pidFile)
+		_ = os.Remove(m.pidFile)
 		return false
 	}
 
 	// On Unix, FindProcess always succeeds. Check if process is really running.
 	err = process.Signal(syscall.Signal(0))
 	if err != nil {
-		os.Remove(m.pidFile)
+		_ = os.Remove(m.pidFile)
 		return false
 	}
 

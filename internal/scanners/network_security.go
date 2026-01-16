@@ -305,7 +305,7 @@ func scanExternalPorts(publicIP string) map[string]interface{} {
 	for _, port := range commonPorts {
 		conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", publicIP, port), 2*time.Second)
 		if err == nil {
-			conn.Close()
+			_ = conn.Close()
 			openPorts = append(openPorts, port)
 
 			if !expectedPorts[port] {
