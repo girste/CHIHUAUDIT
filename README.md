@@ -1,8 +1,8 @@
 # MCP Cybersec Watchdog
 
 [![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go&logoColor=white)](https://go.dev)
-[![CI](https://github.com/girste/mcp-cybersec-watchdog/actions/workflows/ci.yml/badge.svg)](https://github.com/girste/mcp-cybersec-watchdog/actions)
-[![codecov](https://codecov.io/gh/girste/mcp-cybersec-watchdog/branch/main/graph/badge.svg)](https://codecov.io/gh/girste/mcp-cybersec-watchdog)
+[![CI](https://github.com/girste/mcp-cybersec-watchdog/actions/workflows/ci.yml/badge.svg?branch=go)](https://github.com/girste/mcp-cybersec-watchdog/actions)
+[![codecov](https://codecov.io/gh/girste/mcp-cybersec-watchdog/branch/go/graph/badge.svg)](https://codecov.io/gh/girste/mcp-cybersec-watchdog/tree/go)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 **Linux security audit tool for Claude Desktop.** Single 8MB binary, no dependencies.
