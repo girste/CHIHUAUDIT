@@ -85,7 +85,7 @@ func (a *SSLAnalyzer) Analyze(ctx context.Context, cfg *config.Config) (*Result,
 func (a *SSLAnalyzer) scanDirectory(ctx context.Context, dir string) []certInfo {
 	var certs []certInfo
 
-	filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+	_ = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() {
 			return nil
 		}

@@ -514,7 +514,7 @@ func scanSecrets(appPath string, depth string) map[string]interface{} {
 	var secretsFound []map[string]interface{}
 	filesScanned := 0
 
-	filepath.Walk(appPath, func(path string, info os.FileInfo, err error) error {
+	_ = filepath.Walk(appPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil
 		}
@@ -579,7 +579,7 @@ func checkConfigIssues(appPath string) map[string]interface{} {
 	// Check for .env in public directories
 	publicDirs := map[string]bool{"public": true, "static": true, "dist": true, "build": true}
 
-	filepath.Walk(appPath, func(path string, info os.FileInfo, err error) error {
+	_ = filepath.Walk(appPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() {
 			return nil
 		}

@@ -24,7 +24,7 @@ type BaselineManager struct {
 func NewBaselineManager(baselinePath string) *BaselineManager {
 	// Ensure parent directory exists
 	dir := filepath.Dir(baselinePath)
-	os.MkdirAll(dir, 0700)
+	_ = os.MkdirAll(dir, 0700)
 
 	return &BaselineManager{
 		baselinePath: baselinePath,
@@ -70,7 +70,7 @@ func (m *BaselineManager) Save(report map[string]interface{}) error {
 // GetBaseline returns the current baseline, loading if needed
 func (m *BaselineManager) GetBaseline() *Baseline {
 	if m.baseline == nil {
-		m.Load()
+		_, _ = m.Load()
 	}
 	return m.baseline
 }

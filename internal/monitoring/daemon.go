@@ -36,7 +36,7 @@ func NewSecurityMonitor(intervalSeconds int, logDir, baselinePath string, verbos
 	}
 
 	// Create log directory
-	os.MkdirAll(logDir, 0700)
+	_ = os.MkdirAll(logDir, 0700)
 
 	// Default baseline path
 	if baselinePath == "" {

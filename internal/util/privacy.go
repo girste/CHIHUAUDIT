@@ -52,9 +52,3 @@ func GetMaskedHostname() string {
 	return MaskHostname(hostname)
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}

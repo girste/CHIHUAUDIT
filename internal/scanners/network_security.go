@@ -45,6 +45,9 @@ var serviceNames = map[int]string{
 	27017: "MongoDB",
 }
 
+// Precompiled regex for IP validation
+var ipv4Regex = regexp.MustCompile(`^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$`)
+
 // NetworkSecurityResult is the result of a network security scan
 type NetworkSecurityResult struct {
 	ScanCompleted bool                   `json:"scan_completed"`
@@ -176,7 +179,7 @@ func getPublicIP(ctx context.Context) string {
 		}
 
 		ip := strings.TrimSpace(result.Stdout)
-		if matched, _ := regexp.MatchString(`^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$`, ip); matched {
+		if ipv4Regex.MatchString(ip) {
 			return ip
 		}
 	}
