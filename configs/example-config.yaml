@@ -1,0 +1,38 @@
+# MCP Cybersec Watchdog Configuration Example
+#
+# Copy this file to one of these locations:
+# - .mcp-watchdog.yaml (current directory)
+# - ~/.mcp-watchdog.yaml (home directory)
+# - /etc/mcp-watchdog/config.yaml (system-wide)
+
+# Enable/disable specific analyzers
+checks:
+  firewall: true
+  ssh: true
+  threats: true
+  fail2ban: true
+  services: true
+  docker: true
+  updates: true
+  mac: true
+  kernel: true
+  ssl: true
+  disk: true
+  cve: true
+  users: true
+
+# Analysis settings
+threatAnalysisDays: 7        # Days of logs to analyze for threats
+analyzerTimeoutSeconds: 10   # Max time per analyzer
+maxConcurrency: 0            # 0 = auto (NumCPU * 2)
+
+# Privacy settings
+maskData: true               # Mask IPs and hostnames in output
+
+# Monitoring daemon settings
+monitoring:
+  enabled: false
+  intervalSeconds: 3600      # Check every hour (min: 300 = 5 minutes)
+  logDir: /var/log/mcp-watchdog
+  maxBulletins: 50           # Keep last 50 bulletins
+  maxAnomalies: 20           # Keep last 20 anomaly reports
