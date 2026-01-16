@@ -68,7 +68,7 @@ Open a [private security advisory](https://github.com/girste/mcp-cybersec-watchd
 
 This tool requires sudo for read-only access to system info (firewall, logs, services). No write access is granted.
 
-## License
+---
 
 [![Go](https://img.shields.io/badge/Go-1.23+-00ADD8?logo=go&logoColor=white)](https://go.dev)
 [![Release](https://img.shields.io/github/v/release/girste/mcp-cybersec-watchdog)](https://github.com/girste/mcp-cybersec-watchdog/releases)
