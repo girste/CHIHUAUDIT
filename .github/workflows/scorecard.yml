@@ -3,6 +3,7 @@ name: Scorecard
 on:
   push:
     branches: [main]
+  workflow_dispatch:
   schedule:
     - cron: '0 6 * * 1'
 
