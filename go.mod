@@ -6,7 +6,7 @@ toolchain go1.24.11
 
 require (
 	github.com/mark3labs/mcp-go v0.43.2
-	go.uber.org/zap v1.26.0
+	go.uber.org/zap v1.27.1
 	gopkg.in/yaml.v3 v3.0.1
 )
 
