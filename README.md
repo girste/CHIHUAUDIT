@@ -5,6 +5,8 @@
 [![CodeQL](https://github.com/girste/mcp-cybersec-watchdog/actions/workflows/codeql.yml/badge.svg?branch=go)](https://github.com/girste/mcp-cybersec-watchdog/security/code-scanning)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+![MCP Cybersec Watchdog](cover-watchdog-mcp.png)
+
 **Linux security audit tool for Claude Desktop.** Single 8MB binary, no dependencies.
 
 Analyzes firewall, SSH, fail2ban, Docker, kernel hardening, SSL certificates, network services, and more. Includes continuous monitoring with anomaly detection.
