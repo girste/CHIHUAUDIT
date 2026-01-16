@@ -11,8 +11,8 @@
 **Do not report security vulnerabilities through public GitHub issues.**
 
 Report via:
-- Email: **security@girste.com**
 - [Private Security Advisory](https://github.com/girste/mcp-cybersec-watchdog/security/advisories/new)
+- DM [@girste](https://github.com/girste)
 
 Include: description, steps to reproduce, potential impact.
 
