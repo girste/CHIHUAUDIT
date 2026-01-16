@@ -258,7 +258,7 @@ func (m *MonitoringManager) Stop() *StopResult {
 	}
 
 	// Remove PID file
-	os.Remove(m.pidFile)
+	_ = os.Remove(m.pidFile)
 
 	return &StopResult{
 		Success: true,
