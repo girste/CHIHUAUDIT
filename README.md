@@ -33,35 +33,7 @@ Analyzes firewall, SSH, fail2ban, Docker, kernel hardening, SSL certificates, ne
 - **configure_webhook** / **test_webhook** — Discord/Slack/custom webhooks
 - **get_notification_config** — Show notification settings
 
-## Commands
-
-| Command | Description |
-|---------|-------------|
-| `audit` | Run security audit with standardized output |
-| `test` | Run security audit (legacy JSON output) |
-| `verify` | Check prerequisites |
-| `monitor` | Start continuous monitoring |
-| `monitor-status` | Show daemon status |
-
-## Quick Start
-
-```bash
-# Download binary (no build required)
-wget https://github.com/girste/mcp-cybersec-watchdog/releases/latest/download/mcp-watchdog
-chmod +x mcp-watchdog
-
-# Run audit
-sudo ./mcp-watchdog audit
-```
-
-**For developers:**
-
-```bash
-make build
-sudo ./bin/mcp-watchdog audit
-```
-
-### Example Output
+## Example Output
 
 📄 **[View all output examples →](docs/outputs/)** - Full audit reports, CIS benchmarks, network scans, monitoring alerts, and webhook notifications with screenshots.
 
@@ -94,17 +66,49 @@ sudo ./bin/mcp-watchdog audit
 
 </details>
 
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `audit` | Run security audit with standardized output |
+| `test` | Run security audit (legacy JSON output) |
+| `verify` | Check prerequisites |
+| `monitor` | Start continuous monitoring |
+| `monitor-status` | Show daemon status |
+
+## Quick Start
+
+```bash
+# Download binary (no build required)
+wget https://github.com/girste/mcp-cybersec-watchdog/releases/latest/download/mcp-watchdog
+chmod +x mcp-watchdog
+
+# Run audit
+sudo ./mcp-watchdog audit
+```
+
+**For developers:**
+
+```bash
+make build
+sudo ./bin/mcp-watchdog audit
+```
+
 ## Architecture
 
 ```
 internal/
-├── analyzers/   # Security checks (13 analyzers)
-├── scanners/    # Advanced scans (6 scanners)
+├── analyzers/   # Security checks (firewall, SSH, fail2ban, etc.)
+├── audit/       # Core audit orchestration
 ├── cis/         # CIS Benchmark Ubuntu 22.04 (60 controls)
-├── monitoring/  # Daemon + anomaly detection
+├── config/      # Configuration management
+├── mcp/         # MCP server (16 tools)
+├── monitoring/  # Continuous monitoring daemon + anomaly detection
 ├── notify/      # Discord/Slack/Webhook notifications
-├── output/      # Standardized output formatter
-└── mcp/         # MCP server (16 tools)
+├── output/      # Standardized output formatter (traffic light system)
+├── scanners/    # Advanced scans (network, WAF, database, vulnerability intel)
+├── system/      # System information utilities
+└── util/        # Helper functions
 ```
 
 ---
