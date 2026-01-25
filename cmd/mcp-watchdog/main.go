@@ -187,10 +187,30 @@ func runAudit() int {
 				})
 			}
 
+			// Convert traffic light status to severity level
+			statusSeverity := "ok"
+			if report.TrafficLight.Status == "red" {
+				// Check for critical issues
+				hasCritical := false
+				for _, n := range report.Negatives {
+					if n.Severity == "critical" {
+						hasCritical = true
+						break
+					}
+				}
+				if hasCritical {
+					statusSeverity = "critical"
+				} else {
+					statusSeverity = "high"
+				}
+			} else if report.TrafficLight.Status == "yellow" {
+				statusSeverity = "medium"
+			}
+
 			alert := &notify.AlertPayload{
 				Timestamp: report.Timestamp,
 				Hostname:  report.Hostname,
-				Status:    report.TrafficLight.Status,
+				Status:    statusSeverity,
 				Score:     report.Score.Value,
 				Title:     "Security Audit Report",
 				Summary:   fmt.Sprintf("Security score: %d/100 (%s)", report.Score.Value, report.Score.Grade),
