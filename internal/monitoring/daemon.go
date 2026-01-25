@@ -12,6 +12,7 @@ import (
 
 	"github.com/girste/mcp-cybersec-watchdog/internal/audit"
 	"github.com/girste/mcp-cybersec-watchdog/internal/config"
+	"github.com/girste/mcp-cybersec-watchdog/internal/notify"
 	"github.com/girste/mcp-cybersec-watchdog/internal/util"
 	"go.uber.org/zap"
 )
@@ -128,23 +129,31 @@ func (m *SecurityMonitor) RunOnce() (*CheckResult, error) {
 
 	// Write anomaly report if detected
 	var anomalyFile string
+	status := "ok"
 	if len(anomalies) > 0 {
 		m.log(fmt.Sprintf("Detected %d anomalies", len(anomalies)))
 		anomalyFile = m.writeAnomalyReport(anomalies, report)
 
 		if m.anomalyDetector.HasCritical() {
+			status = "critical"
 			m.log("CRITICAL anomalies detected - AI analysis recommended")
 			if m.verbose {
 				fmt.Printf("\nCRITICAL ANOMALY DETECTED\n")
 				fmt.Printf("Run AI analysis: Use MCP tool 'analyze_anomaly' with file %s\n", anomalyFile)
 			}
 		} else if m.anomalyDetector.HasHigh() {
+			status = "high"
 			m.log("High severity anomalies detected - AI analysis recommended")
 			if m.verbose {
 				fmt.Printf("\nHIGH SEVERITY ANOMALY DETECTED\n")
 				fmt.Printf("Run AI analysis: Use MCP tool 'analyze_anomaly' with file %s\n", anomalyFile)
 			}
+		} else {
+			status = "medium"
 		}
+
+		// Send webhook notification
+		m.sendNotification(ctx, cfg, report, anomalies, status, anomalyFile)
 	} else {
 		m.log("No anomalies detected - system stable")
 	}
@@ -264,4 +273,86 @@ func (m *SecurityMonitor) ResetBaseline() error {
 	}
 	m.log("Baseline reset - will be recreated on next check")
 	return nil
+}
+
+// sendNotification sends webhook notifications for anomalies
+func (m *SecurityMonitor) sendNotification(ctx context.Context, cfg *config.Config, report map[string]interface{}, anomalies []Anomaly, status, anomalyFile string) {
+	if !cfg.Notifications.Enabled {
+		return
+	}
+
+	notifier := notify.NewNotifier(&cfg.Notifications)
+	if !notifier.ShouldNotify(status, len(anomalies) > 0) {
+		return
+	}
+
+	// Build alert payload
+	hostname := "unknown"
+	if h, ok := report["hostname"].(string); ok {
+		hostname = h
+	}
+
+	// Calculate score from analysis
+	score := 100
+	if analysis, ok := report["analysis"].(map[string]interface{}); ok {
+		if scoreData, ok := analysis["score"].(map[string]int); ok {
+			// Deduct points for issues
+			score -= scoreData["criticalIssues"] * 25
+			score -= scoreData["highPriorityIssues"] * 10
+			score -= scoreData["mediumIssues"] * 3
+			if score < 0 {
+				score = 0
+			}
+		}
+	}
+
+	// Convert anomalies to alert issues
+	issues := make([]notify.AlertIssue, 0, len(anomalies))
+	for _, a := range anomalies {
+		issues = append(issues, notify.AlertIssue{
+			Severity: a.Severity,
+			Message:  a.Message,
+			Category: a.Category,
+		})
+	}
+
+	// Build positives from report
+	positives := []string{}
+	if fwData, ok := report["firewall"].(map[string]interface{}); ok {
+		if active, ok := fwData["active"].(bool); ok && active {
+			positives = append(positives, "Firewall active")
+		}
+	}
+	if sshData, ok := report["ssh"].(map[string]interface{}); ok {
+		if rootLogin, ok := sshData["permit_root_login"].(string); ok && rootLogin == "no" {
+			positives = append(positives, "Root SSH login disabled")
+		}
+	}
+	if f2bData, ok := report["fail2ban"].(map[string]interface{}); ok {
+		if active, ok := f2bData["active"].(bool); ok && active {
+			positives = append(positives, "Fail2ban active")
+		}
+	}
+
+	alert := &notify.AlertPayload{
+		Timestamp:   time.Now().UTC().Format(time.RFC3339),
+		Hostname:    hostname,
+		Status:      status,
+		Score:       score,
+		Title:       "Security Alert: Anomalies Detected",
+		Summary:     fmt.Sprintf("Detected %d security anomalies on %s", len(anomalies), hostname),
+		Issues:      issues,
+		Positives:   positives,
+		AnomalyFile: anomalyFile,
+	}
+
+	result := notifier.Send(ctx, alert)
+	if len(result.Sent) > 0 {
+		m.log(fmt.Sprintf("Notifications sent to: %v", result.Sent))
+	}
+	if len(result.Failed) > 0 {
+		for _, f := range result.Failed {
+			m.log(fmt.Sprintf("Notification failed for %s: %s", f.Provider, f.Error))
+		}
+	}
 }

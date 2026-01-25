@@ -15,6 +15,7 @@ type Config struct {
 	MaxConcurrency     int              `yaml:"maxConcurrency"`
 	MaskData           bool             `yaml:"maskData"`
 	Monitoring         MonitoringConfig `yaml:"monitoring"`
+	Notifications      NotifyConfig     `yaml:"notifications"`
 }
 
 type MonitoringConfig struct {
@@ -23,6 +24,37 @@ type MonitoringConfig struct {
 	LogDir          string `yaml:"logDir"`
 	MaxBulletins    int    `yaml:"maxBulletins"`
 	MaxAnomalies    int    `yaml:"maxAnomalies"`
+}
+
+// NotifyConfig holds webhook notification settings
+type NotifyConfig struct {
+	Enabled       bool            `yaml:"enabled"`
+	OnlyOnIssues  bool            `yaml:"onlyOnIssues"`
+	MinSeverity   string          `yaml:"minSeverity"` // critical, high, medium, low
+	Discord       DiscordConfig   `yaml:"discord"`
+	Slack         SlackConfig     `yaml:"slack"`
+	GenericWebhook WebhookConfig  `yaml:"webhook"`
+}
+
+type DiscordConfig struct {
+	Enabled    bool   `yaml:"enabled"`
+	WebhookURL string `yaml:"webhookUrl"`
+	Username   string `yaml:"username"`
+	AvatarURL  string `yaml:"avatarUrl"`
+}
+
+type SlackConfig struct {
+	Enabled    bool   `yaml:"enabled"`
+	WebhookURL string `yaml:"webhookUrl"`
+	Channel    string `yaml:"channel"`
+	Username   string `yaml:"username"`
+}
+
+type WebhookConfig struct {
+	Enabled bool              `yaml:"enabled"`
+	URL     string            `yaml:"url"`
+	Method  string            `yaml:"method"` // POST, PUT
+	Headers map[string]string `yaml:"headers"`
 }
 
 func Default() *Config {
@@ -44,6 +76,21 @@ func Default() *Config {
 		Monitoring: MonitoringConfig{
 			Enabled: false, IntervalSeconds: 3600,
 			LogDir: "/var/log/mcp-watchdog", MaxBulletins: 50, MaxAnomalies: 20,
+		},
+		Notifications: NotifyConfig{
+			Enabled:      false,
+			OnlyOnIssues: true,
+			MinSeverity:  "high",
+			Discord: DiscordConfig{
+				Username:  "Security Watchdog",
+				AvatarURL: "",
+			},
+			Slack: SlackConfig{
+				Username: "Security Watchdog",
+			},
+			GenericWebhook: WebhookConfig{
+				Method: "POST",
+			},
 		},
 	}
 }

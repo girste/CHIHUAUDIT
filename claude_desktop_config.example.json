@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "cybersec-watchdog": {
+      "command": "/path/to/mcp-watchdog",
+      "args": []
+    }
+  }
+}

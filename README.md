@@ -3,6 +3,7 @@
 ![MCP Cybersec Watchdog](cover-watchdog-mcp.png)
 
 [![CI](https://github.com/girste/mcp-cybersec-watchdog/actions/workflows/ci.yml/badge.svg)](https://github.com/girste/mcp-cybersec-watchdog/actions)
+[![Lint](https://github.com/girste/mcp-cybersec-watchdog/actions/workflows/lint.yml/badge.svg)](https://github.com/girste/mcp-cybersec-watchdog/actions/workflows/lint.yml)
 [![CodeQL](https://github.com/girste/mcp-cybersec-watchdog/actions/workflows/codeql.yml/badge.svg)](https://github.com/girste/mcp-cybersec-watchdog/security/code-scanning)
 [![Trivy](https://github.com/girste/mcp-cybersec-watchdog/actions/workflows/trivy.yml/badge.svg)](https://github.com/girste/mcp-cybersec-watchdog/actions/workflows/trivy.yml)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/girste/mcp-cybersec-watchdog/badge)](https://securityscorecards.dev/viewer/?uri=github.com/girste/mcp-cybersec-watchdog)
@@ -15,13 +16,14 @@ Analyzes firewall, SSH, fail2ban, Docker, kernel hardening, SSL certificates, ne
 
 ## MCP Tools
 
-`security_audit` `scan_app_security` `scan_network_security` `scan_database_security` `verify_backup_config` `check_vulnerability_intel` `start_monitoring` `stop_monitoring` `monitoring_status` `analyze_anomaly` `cleanup_old_logs`
+`security_audit` `cis_audit` `scan_app_security` `scan_network_security` `scan_database_security` `scan_waf_cdn` `verify_backup_config` `check_vulnerability_intel` `start_monitoring` `stop_monitoring` `monitoring_status` `analyze_anomaly` `cleanup_old_logs` `configure_webhook` `test_webhook` `get_notification_config`
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `test` | Run security audit |
+| `audit` | Run security audit with standardized output |
+| `test` | Run security audit (legacy JSON output) |
 | `verify` | Check prerequisites |
 | `monitor` | Start continuous monitoring |
 | `monitor-status` | Show daemon status |
@@ -32,8 +34,14 @@ Analyzes firewall, SSH, fail2ban, Docker, kernel hardening, SSL certificates, ne
 # Build
 make build
 
-# Run audit
-sudo ./bin/mcp-watchdog test
+# Run audit with visual output
+sudo ./bin/mcp-watchdog audit
+
+# Run audit for cron (notify only on issues)
+sudo ./bin/mcp-watchdog audit --quiet --webhook --on-issues
+
+# JSON output for scripts
+sudo ./bin/mcp-watchdog audit --format=json
 
 # Start monitoring
 sudo ./bin/mcp-watchdog monitor
@@ -44,9 +52,12 @@ sudo ./bin/mcp-watchdog monitor
 ```
 internal/
 ├── analyzers/   # Security checks (13 analyzers)
-├── scanners/    # Advanced scans (5 scanners)
+├── scanners/    # Advanced scans (6 scanners)
+├── cis/         # CIS Benchmark Ubuntu 22.04 (60 controls)
 ├── monitoring/  # Daemon + anomaly detection
-└── mcp/         # MCP server (11 tools)
+├── notify/      # Discord/Slack/Webhook notifications
+├── output/      # Standardized output formatter
+└── mcp/         # MCP server (16 tools)
 ```
 
 ---

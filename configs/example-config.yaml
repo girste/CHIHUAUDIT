@@ -36,3 +36,32 @@ monitoring:
   logDir: /var/log/mcp-watchdog
   maxBulletins: 50           # Keep last 50 bulletins
   maxAnomalies: 20           # Keep last 20 anomaly reports
+
+# Webhook notification settings
+# Configure to receive alerts via Discord, Slack, or custom webhooks
+notifications:
+  enabled: false
+  onlyOnIssues: true         # Only notify when issues are found
+  minSeverity: "high"        # Minimum severity: critical, high, medium, low
+
+  # Discord webhook (https://discord.com/developers/docs/resources/webhook)
+  discord:
+    enabled: false
+    webhookUrl: ""           # Get from Discord: Server Settings > Integrations > Webhooks
+    username: "Security Watchdog"
+    avatarUrl: ""            # Optional custom avatar
+
+  # Slack webhook (https://api.slack.com/messaging/webhooks)
+  slack:
+    enabled: false
+    webhookUrl: ""           # Get from Slack: Apps > Incoming Webhooks
+    channel: ""              # Optional: override default channel
+    username: "Security Watchdog"
+
+  # Generic webhook (any HTTP endpoint)
+  webhook:
+    enabled: false
+    url: ""
+    method: "POST"           # HTTP method: POST, PUT
+    headers:                 # Custom headers
+      # Authorization: "Bearer your-token"

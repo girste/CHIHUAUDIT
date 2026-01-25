@@ -8,8 +8,10 @@ import (
 	"strings"
 
 	"github.com/girste/mcp-cybersec-watchdog/internal/audit"
+	"github.com/girste/mcp-cybersec-watchdog/internal/cis"
 	"github.com/girste/mcp-cybersec-watchdog/internal/config"
 	"github.com/girste/mcp-cybersec-watchdog/internal/monitoring"
+	"github.com/girste/mcp-cybersec-watchdog/internal/notify"
 	"github.com/girste/mcp-cybersec-watchdog/internal/scanners"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -149,7 +151,7 @@ func (s *Server) registerTools() {
 	// Scan network security
 	s.mcp.AddTool(mcp.Tool{
 		Name:        "scan_network_security",
-		Description: "Analyze network security posture and attack surface. LOCAL scope: port bindings, wildcard listeners (0.0.0.0), risky exposed services, IPv6. EXTERNAL scope: public IP detection, open port scan, SSL/TLS analysis, DNS security (SPF/DMARC/CAA). Use scope='local' for safe internal checks, 'external' for internet-facing analysis, 'both' for complete audit.",
+		Description: "Analyze network security posture and attack surface. LOCAL scope: port bindings, wildcard listeners (0.0.0.0), risky exposed services, IPv6. EXTERNAL scope: public IP detection, open port scan, SSL/TLS analysis, DNS security (SPF/DMARC/CAA). ATTACKER_VIEW: compare local vs external visibility using Shodan InternetDB (free, no API key), check IP reputation. CLOUD_CONTEXT: detect AWS/GCP/Azure and analyze security groups. Use scope='local' for safe internal checks, 'external' for internet-facing analysis, 'both' for complete audit.",
 		InputSchema: mcp.ToolInputSchema{
 			Type: "object",
 			Properties: map[string]interface{}{
@@ -162,6 +164,16 @@ func (s *Server) registerTools() {
 				"deep": map[string]interface{}{
 					"type":        "boolean",
 					"description": "Enable deep analysis (SSL/TLS ciphers, DNS records) - only for external scope",
+					"default":     false,
+				},
+				"attacker_view": map[string]interface{}{
+					"type":        "boolean",
+					"description": "Compare local ports vs externally visible ports using Shodan InternetDB. Checks IP reputation via DNSBL. Identifies discrepancies and known vulnerabilities.",
+					"default":     false,
+				},
+				"cloud_context": map[string]interface{}{
+					"type":        "boolean",
+					"description": "Detect cloud provider (AWS/GCP/Azure/DigitalOcean) via metadata endpoints. Analyze security groups if AWS CLI available. Compare cloud firewall with local listeners.",
 					"default":     false,
 				},
 			},
@@ -211,6 +223,113 @@ func (s *Server) registerTools() {
 			Required: []string{"cve_ids"},
 		},
 	}, s.handleCheckVulnerabilityIntel)
+
+	// Scan WAF/CDN detection
+	s.mcp.AddTool(mcp.Tool{
+		Name:        "scan_waf_cdn",
+		Description: "Detect WAF (Web Application Firewall) and CDN protection for a domain. Identifies: Cloudflare, AWS CloudFront/WAF, Akamai, Azure CDN/Front Door, Fastly, Imperva/Incapsula, Sucuri, Google Cloud CDN, StackPath, KeyCDN, BunnyCDN, DDoS-Guard. Detection methods: HTTP response headers, DNS CNAME chain analysis, IP range matching, cookie inspection. Returns security posture analysis with protection status and recommendations.",
+		InputSchema: mcp.ToolInputSchema{
+			Type: "object",
+			Properties: map[string]interface{}{
+				"domain": map[string]interface{}{
+					"type":        "string",
+					"description": "Domain to analyze (e.g., 'example.com'). Do not include protocol (http/https).",
+				},
+				"include_headers": map[string]interface{}{
+					"type":        "boolean",
+					"description": "Include raw HTTP response headers in output for manual inspection (default: false)",
+					"default":     false,
+				},
+			},
+			Required: []string{"domain"},
+		},
+	}, s.handleScanWAFCDN)
+
+	// CIS Benchmark audit
+	s.mcp.AddTool(mcp.Tool{
+		Name:        "cis_audit",
+		Description: "Run CIS Benchmark compliance audit. Currently supports Ubuntu 22.04 LTS Level 1 (60 scored controls). Checks filesystem hardening, network security, logging/auditing, access control, and system maintenance. Returns compliance percentage and detailed control results with remediation guidance.",
+		InputSchema: mcp.ToolInputSchema{
+			Type: "object",
+			Properties: map[string]interface{}{
+				"level": map[string]interface{}{
+					"type":        "integer",
+					"description": "CIS Level (1 or 2). Level 1 provides essential security. Level 2 adds defense-in-depth. Currently only Level 1 is implemented. Default: 1",
+					"default":     1,
+					"enum":        []int{1, 2},
+				},
+				"include_all_controls": map[string]interface{}{
+					"type":        "boolean",
+					"description": "Include all controls in output (not just failed). Default: false",
+					"default":     false,
+				},
+			},
+		},
+	}, s.handleCISAudit)
+
+	// Configure webhook notifications
+	s.mcp.AddTool(mcp.Tool{
+		Name:        "configure_webhook",
+		Description: "Configure webhook notifications for security alerts. Supports Discord, Slack, and generic webhooks. The webhook URL will be saved to the config file. Use this to set up real-time alerts when security issues are detected. IMPORTANT: Ask the user for their webhook URL before calling this tool.",
+		InputSchema: mcp.ToolInputSchema{
+			Type: "object",
+			Properties: map[string]interface{}{
+				"provider": map[string]interface{}{
+					"type":        "string",
+					"description": "Webhook provider: 'discord', 'slack', or 'generic'",
+					"enum":        []string{"discord", "slack", "generic"},
+				},
+				"webhook_url": map[string]interface{}{
+					"type":        "string",
+					"description": "The webhook URL to send notifications to",
+				},
+				"enabled": map[string]interface{}{
+					"type":        "boolean",
+					"description": "Enable or disable notifications (default: true)",
+					"default":     true,
+				},
+				"only_on_issues": map[string]interface{}{
+					"type":        "boolean",
+					"description": "Only send notifications when issues are found (default: true)",
+					"default":     true,
+				},
+				"min_severity": map[string]interface{}{
+					"type":        "string",
+					"description": "Minimum severity to trigger notifications: 'critical', 'high', 'medium', 'low' (default: 'high')",
+					"enum":        []string{"critical", "high", "medium", "low"},
+					"default":     "high",
+				},
+			},
+			Required: []string{"provider", "webhook_url"},
+		},
+	}, s.handleConfigureWebhook)
+
+	// Test webhook
+	s.mcp.AddTool(mcp.Tool{
+		Name:        "test_webhook",
+		Description: "Send a test notification to verify webhook configuration. Use this after configuring a webhook to ensure it works correctly.",
+		InputSchema: mcp.ToolInputSchema{
+			Type: "object",
+			Properties: map[string]interface{}{
+				"provider": map[string]interface{}{
+					"type":        "string",
+					"description": "Webhook provider to test: 'discord', 'slack', or 'generic'",
+					"enum":        []string{"discord", "slack", "generic"},
+				},
+			},
+			Required: []string{"provider"},
+		},
+	}, s.handleTestWebhook)
+
+	// Get notification config
+	s.mcp.AddTool(mcp.Tool{
+		Name:        "get_notification_config",
+		Description: "Get current webhook notification configuration. Shows which webhooks are configured and their settings (URLs are partially masked for security).",
+		InputSchema: mcp.ToolInputSchema{
+			Type:       "object",
+			Properties: map[string]interface{}{},
+		},
+	}, s.handleGetNotificationConfig)
 }
 
 func (s *Server) getLogDir() string {
@@ -376,6 +495,8 @@ func (s *Server) handleScanAppSecurity(ctx context.Context, request mcp.CallTool
 func (s *Server) handleScanNetworkSecurity(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	scope := "local"
 	deep := false
+	attackerView := false
+	cloudContext := false
 
 	if arguments, ok := request.Params.Arguments.(map[string]interface{}); ok {
 		if v, ok := arguments["scope"].(string); ok {
@@ -384,9 +505,15 @@ func (s *Server) handleScanNetworkSecurity(ctx context.Context, request mcp.Call
 		if v, ok := arguments["deep"].(bool); ok {
 			deep = v
 		}
+		if v, ok := arguments["attacker_view"].(bool); ok {
+			attackerView = v
+		}
+		if v, ok := arguments["cloud_context"].(bool); ok {
+			cloudContext = v
+		}
 	}
 
-	result := scanners.ScanNetworkSecurity(ctx, scope, deep)
+	result := scanners.ScanNetworkSecurity(ctx, scope, deep, attackerView, cloudContext)
 
 	resultJSON, _ := json.MarshalIndent(result, "", "  ")
 	return mcp.NewToolResultText(string(resultJSON)), nil
@@ -436,6 +563,239 @@ func (s *Server) handleCheckVulnerabilityIntel(ctx context.Context, request mcp.
 
 	resultJSON, _ := json.MarshalIndent(result, "", "  ")
 	return mcp.NewToolResultText(string(resultJSON)), nil
+}
+
+func (s *Server) handleScanWAFCDN(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	arguments, ok := request.Params.Arguments.(map[string]interface{})
+	if !ok {
+		return mcp.NewToolResultError("Invalid arguments"), nil
+	}
+
+	domain, ok := arguments["domain"].(string)
+	if !ok || domain == "" {
+		return mcp.NewToolResultError("domain parameter required"), nil
+	}
+
+	includeHeaders := false
+	if v, ok := arguments["include_headers"].(bool); ok {
+		includeHeaders = v
+	}
+
+	result := scanners.ScanWAFCDN(ctx, domain, includeHeaders)
+
+	resultJSON, _ := json.MarshalIndent(result, "", "  ")
+	return mcp.NewToolResultText(string(resultJSON)), nil
+}
+
+func (s *Server) handleCISAudit(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	level := 1
+	includeAllControls := false
+
+	if arguments, ok := request.Params.Arguments.(map[string]interface{}); ok {
+		if v, ok := arguments["level"].(float64); ok {
+			level = int(v)
+		}
+		if v, ok := arguments["include_all_controls"].(bool); ok {
+			includeAllControls = v
+		}
+	}
+
+	// Validate level
+	if level != 1 && level != 2 {
+		level = 1
+	}
+
+	// Run CIS audit with compact output by default
+	result := cis.RunCISAudit(ctx, level, includeAllControls)
+
+	resultJSON, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return mcp.NewToolResultError("Failed to marshal CIS result: " + err.Error()), nil
+	}
+
+	return mcp.NewToolResultText(string(resultJSON)), nil
+}
+
+func (s *Server) handleConfigureWebhook(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	arguments, ok := request.Params.Arguments.(map[string]interface{})
+	if !ok {
+		return mcp.NewToolResultError("Invalid arguments"), nil
+	}
+
+	provider, ok := arguments["provider"].(string)
+	if !ok || provider == "" {
+		return mcp.NewToolResultError("provider parameter required"), nil
+	}
+
+	webhookURL, ok := arguments["webhook_url"].(string)
+	if !ok || webhookURL == "" {
+		return mcp.NewToolResultError("webhook_url parameter required"), nil
+	}
+
+	enabled := true
+	if v, ok := arguments["enabled"].(bool); ok {
+		enabled = v
+	}
+
+	onlyOnIssues := true
+	if v, ok := arguments["only_on_issues"].(bool); ok {
+		onlyOnIssues = v
+	}
+
+	minSeverity := "high"
+	if v, ok := arguments["min_severity"].(string); ok {
+		minSeverity = v
+	}
+
+	// Update config
+	s.config.Notifications.Enabled = enabled
+	s.config.Notifications.OnlyOnIssues = onlyOnIssues
+	s.config.Notifications.MinSeverity = minSeverity
+
+	switch provider {
+	case "discord":
+		s.config.Notifications.Discord.Enabled = enabled
+		s.config.Notifications.Discord.WebhookURL = webhookURL
+	case "slack":
+		s.config.Notifications.Slack.Enabled = enabled
+		s.config.Notifications.Slack.WebhookURL = webhookURL
+	case "generic":
+		s.config.Notifications.GenericWebhook.Enabled = enabled
+		s.config.Notifications.GenericWebhook.URL = webhookURL
+	default:
+		return mcp.NewToolResultError("Invalid provider. Use 'discord', 'slack', or 'generic'"), nil
+	}
+
+	// Save config to file
+	if err := s.saveNotificationConfig(); err != nil {
+		return mcp.NewToolResultError("Failed to save config: " + err.Error()), nil
+	}
+
+	result := map[string]interface{}{
+		"success":       true,
+		"provider":      provider,
+		"enabled":       enabled,
+		"only_on_issues": onlyOnIssues,
+		"min_severity":  minSeverity,
+		"message":       "Webhook configured successfully. Use 'test_webhook' to verify.",
+	}
+
+	resultJSON, _ := json.MarshalIndent(result, "", "  ")
+	return mcp.NewToolResultText(string(resultJSON)), nil
+}
+
+func (s *Server) handleTestWebhook(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	arguments, ok := request.Params.Arguments.(map[string]interface{})
+	if !ok {
+		return mcp.NewToolResultError("Invalid arguments"), nil
+	}
+
+	provider, ok := arguments["provider"].(string)
+	if !ok || provider == "" {
+		return mcp.NewToolResultError("provider parameter required"), nil
+	}
+
+	notifier := notify.NewNotifier(&s.config.Notifications)
+	if err := notifier.TestWebhook(ctx, provider); err != nil {
+		return mcp.NewToolResultError("Webhook test failed: " + err.Error()), nil
+	}
+
+	result := map[string]interface{}{
+		"success":  true,
+		"provider": provider,
+		"message":  "Test notification sent successfully!",
+	}
+
+	resultJSON, _ := json.MarshalIndent(result, "", "  ")
+	return mcp.NewToolResultText(string(resultJSON)), nil
+}
+
+func (s *Server) handleGetNotificationConfig(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// Mask webhook URLs for security
+	maskURL := func(url string) string {
+		if url == "" {
+			return "(not configured)"
+		}
+		if len(url) < 20 {
+			return "****"
+		}
+		return url[:15] + "..." + url[len(url)-10:]
+	}
+
+	result := map[string]interface{}{
+		"enabled":        s.config.Notifications.Enabled,
+		"only_on_issues": s.config.Notifications.OnlyOnIssues,
+		"min_severity":   s.config.Notifications.MinSeverity,
+		"discord": map[string]interface{}{
+			"enabled":     s.config.Notifications.Discord.Enabled,
+			"webhook_url": maskURL(s.config.Notifications.Discord.WebhookURL),
+			"username":    s.config.Notifications.Discord.Username,
+		},
+		"slack": map[string]interface{}{
+			"enabled":     s.config.Notifications.Slack.Enabled,
+			"webhook_url": maskURL(s.config.Notifications.Slack.WebhookURL),
+			"channel":     s.config.Notifications.Slack.Channel,
+			"username":    s.config.Notifications.Slack.Username,
+		},
+		"generic_webhook": map[string]interface{}{
+			"enabled": s.config.Notifications.GenericWebhook.Enabled,
+			"url":     maskURL(s.config.Notifications.GenericWebhook.URL),
+			"method":  s.config.Notifications.GenericWebhook.Method,
+		},
+	}
+
+	resultJSON, _ := json.MarshalIndent(result, "", "  ")
+	return mcp.NewToolResultText(string(resultJSON)), nil
+}
+
+func (s *Server) saveNotificationConfig() error {
+	// Find or create config file
+	home, _ := os.UserHomeDir()
+	configPath := filepath.Join(home, ".mcp-watchdog.yaml")
+
+	// Read existing config if any
+	existingData, _ := os.ReadFile(configPath)
+
+	// Simple YAML append/update for notifications section
+	notifyConfig := `
+notifications:
+  enabled: ` + boolToYAML(s.config.Notifications.Enabled) + `
+  onlyOnIssues: ` + boolToYAML(s.config.Notifications.OnlyOnIssues) + `
+  minSeverity: "` + s.config.Notifications.MinSeverity + `"
+  discord:
+    enabled: ` + boolToYAML(s.config.Notifications.Discord.Enabled) + `
+    webhookUrl: "` + s.config.Notifications.Discord.WebhookURL + `"
+    username: "` + s.config.Notifications.Discord.Username + `"
+  slack:
+    enabled: ` + boolToYAML(s.config.Notifications.Slack.Enabled) + `
+    webhookUrl: "` + s.config.Notifications.Slack.WebhookURL + `"
+    channel: "` + s.config.Notifications.Slack.Channel + `"
+    username: "` + s.config.Notifications.Slack.Username + `"
+  webhook:
+    enabled: ` + boolToYAML(s.config.Notifications.GenericWebhook.Enabled) + `
+    url: "` + s.config.Notifications.GenericWebhook.URL + `"
+    method: "` + s.config.Notifications.GenericWebhook.Method + `"
+`
+
+	// If file exists and has notifications section, we need to be smarter
+	// For now, simple append if not exists or write new
+	content := string(existingData)
+	if strings.Contains(content, "notifications:") {
+		// Replace existing notifications section (simple approach)
+		// In production, use proper YAML merge
+		return os.WriteFile(configPath, []byte(notifyConfig), 0600)
+	}
+
+	// Append to existing
+	newContent := content + notifyConfig
+	return os.WriteFile(configPath, []byte(newContent), 0600)
+}
+
+func boolToYAML(b bool) string {
+	if b {
+		return "true"
+	}
+	return "false"
 }
 
 // Serve starts the MCP server

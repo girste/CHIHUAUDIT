@@ -1,4 +1,4 @@
-name: CI
+name: Lint
 
 on:
   push:
@@ -10,7 +10,8 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  golangci-lint:
+    name: golangci-lint
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -23,8 +24,8 @@ jobs:
         with:
           go-version: '1.23'
 
-      - name: Build
-        run: go build -v ./...
-
-      - name: Test
-        run: go test -v -race ./...
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@a3ab332f6d083c87fdd2be6cebbc09cada03e30e # v9.2.0
+        with:
+          version: latest
+          args: --timeout=5m

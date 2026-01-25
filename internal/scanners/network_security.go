@@ -2,8 +2,11 @@ package scanners
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net"
+	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
@@ -11,6 +14,8 @@ import (
 
 	"github.com/girste/mcp-cybersec-watchdog/internal/system"
 )
+
+const shodanTimeout = 10 * time.Second
 
 // Common ports to scan
 var commonPorts = []int{21, 22, 23, 25, 80, 443, 3306, 5432, 6379, 8080, 8443, 27017}
@@ -50,14 +55,48 @@ var ipv4Regex = regexp.MustCompile(`^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$`)
 
 // NetworkSecurityResult is the result of a network security scan
 type NetworkSecurityResult struct {
-	ScanCompleted bool                   `json:"scan_completed"`
-	Scope         string                 `json:"scope"`
-	Deep          bool                   `json:"deep"`
-	Local         map[string]interface{} `json:"local,omitempty"`
-	External      map[string]interface{} `json:"external,omitempty"`
-	Issues        []NetworkIssue         `json:"issues"`
-	Summary       NetworkSummary         `json:"summary"`
-	Error         string                 `json:"error,omitempty"`
+	ScanCompleted       bool                   `json:"scan_completed"`
+	Scope               string                 `json:"scope"`
+	Deep                bool                   `json:"deep"`
+	AttackerView        bool                   `json:"attacker_view,omitempty"`
+	CloudContext        bool                   `json:"cloud_context,omitempty"`
+	Local               map[string]interface{} `json:"local,omitempty"`
+	External            map[string]interface{} `json:"external,omitempty"`
+	AttackerPerspective *AttackerViewResult    `json:"attacker_perspective,omitempty"`
+	CloudInfo           *CloudProviderInfo     `json:"cloud_info,omitempty"`
+	Issues              []NetworkIssue         `json:"issues"`
+	Summary             NetworkSummary         `json:"summary"`
+	Error               string                 `json:"error,omitempty"`
+}
+
+// AttackerViewResult compares internal vs external visibility
+type AttackerViewResult struct {
+	Scanned           bool                  `json:"scanned"`
+	ExternalService   string                `json:"external_service"`
+	LocalPorts        []int                 `json:"local_ports"`
+	ExternallyVisible []int                 `json:"externally_visible"`
+	FilteredPorts     []int                 `json:"filtered_ports"`
+	DiscrepancyFound  bool                  `json:"discrepancy_found"`
+	IPReputation      *IPReputationInfo     `json:"ip_reputation,omitempty"`
+	ShodanData        *ShodanInternetDBInfo `json:"shodan_data,omitempty"`
+}
+
+// IPReputationInfo contains IP reputation check results
+type IPReputationInfo struct {
+	IP         string   `json:"ip"`
+	Clean      bool     `json:"clean"`
+	ListedOn   []string `json:"listed_on,omitempty"`
+	AbuseScore int      `json:"abuse_score,omitempty"`
+}
+
+// ShodanInternetDBInfo contains data from Shodan InternetDB
+type ShodanInternetDBInfo struct {
+	IP        string   `json:"ip"`
+	Ports     []int    `json:"ports"`
+	Hostnames []string `json:"hostnames,omitempty"`
+	CPEs      []string `json:"cpes,omitempty"`
+	Vulns     []string `json:"vulns,omitempty"`
+	Tags      []string `json:"tags,omitempty"`
 }
 
 type NetworkIssue struct {
@@ -76,7 +115,7 @@ type NetworkSummary struct {
 }
 
 // ScanNetworkSecurity analyzes network security posture
-func ScanNetworkSecurity(ctx context.Context, scope string, deep bool) *NetworkSecurityResult {
+func ScanNetworkSecurity(ctx context.Context, scope string, deep bool, attackerView bool, cloudContext bool) *NetworkSecurityResult {
 	if scope != "local" && scope != "external" && scope != "both" {
 		return &NetworkSecurityResult{
 			ScanCompleted: false,
@@ -88,16 +127,26 @@ func ScanNetworkSecurity(ctx context.Context, scope string, deep bool) *NetworkS
 		ScanCompleted: true,
 		Scope:         scope,
 		Deep:          deep,
+		AttackerView:  attackerView,
+		CloudContext:  cloudContext,
 		Local:         make(map[string]interface{}),
 		External:      make(map[string]interface{}),
 		Issues:        []NetworkIssue{},
 	}
+
+	// Track local listening ports for comparison
+	var localListeningPorts []int
 
 	// Local scanning
 	if scope == "local" || scope == "both" {
 		localPorts := scanLocalPorts(ctx)
 		result.Local["ports"] = localPorts
 		result.Issues = append(result.Issues, localPorts["issues"].([]NetworkIssue)...)
+
+		// Extract listening ports for attacker view comparison
+		if portsData, ok := localPorts["listening_ports"].([]int); ok {
+			localListeningPorts = portsData
+		}
 
 		ipv6 := checkIPv6Exposure(ctx)
 		result.Local["ipv6"] = ipv6
@@ -106,9 +155,31 @@ func ScanNetworkSecurity(ctx context.Context, scope string, deep bool) *NetworkS
 		}
 	}
 
+	// Cloud context detection
+	if cloudContext {
+		cloudInfo := DetectCloudProvider(ctx)
+		result.CloudInfo = cloudInfo
+
+		if cloudInfo.Detected {
+			// Add cloud issues
+			result.Issues = append(result.Issues, convertCloudIssues(cloudInfo.Issues)...)
+
+			// Compare cloud firewall with local ports if we have local data
+			if len(localListeningPorts) > 0 {
+				localPortsMap := make(map[int]bool)
+				for _, p := range localListeningPorts {
+					localPortsMap[p] = true
+				}
+				cloudIssues := CompareCloudFirewallWithLocal(cloudInfo, localPortsMap)
+				result.Issues = append(result.Issues, convertCloudIssues(cloudIssues)...)
+			}
+		}
+	}
+
 	// External scanning
+	var publicIP string
 	if scope == "external" || scope == "both" {
-		publicIP := getPublicIP(ctx)
+		publicIP = getPublicIP(ctx)
 		result.External["public_ip"] = publicIP
 
 		if publicIP != "" {
@@ -130,6 +201,16 @@ func ScanNetworkSecurity(ctx context.Context, scope string, deep bool) *NetworkS
 				if issues, ok := dnsCheck["issues"].([]NetworkIssue); ok {
 					result.Issues = append(result.Issues, issues...)
 				}
+			}
+
+			// Attacker view scan
+			if attackerView {
+				attackerResult := performAttackerViewScan(ctx, publicIP, localListeningPorts)
+				result.AttackerPerspective = attackerResult
+
+				// Generate issues from attacker perspective
+				attackerIssues := generateAttackerViewIssues(attackerResult)
+				result.Issues = append(result.Issues, attackerIssues...)
 			}
 		} else {
 			result.External["note"] = "Could not determine public IP"
@@ -163,6 +244,205 @@ func ScanNetworkSecurity(ctx context.Context, scope string, deep bool) *NetworkS
 	}
 
 	return result
+}
+
+// convertCloudIssues converts CloudIssue to NetworkIssue
+func convertCloudIssues(cloudIssues []CloudIssue) []NetworkIssue {
+	var issues []NetworkIssue
+	for _, ci := range cloudIssues {
+		issues = append(issues, NetworkIssue{
+			Severity:       ci.Severity,
+			Type:           ci.Type,
+			Message:        ci.Message,
+			Recommendation: ci.Recommendation,
+		})
+	}
+	return issues
+}
+
+// performAttackerViewScan uses external services to see what attackers see
+func performAttackerViewScan(ctx context.Context, publicIP string, localPorts []int) *AttackerViewResult {
+	result := &AttackerViewResult{
+		Scanned:         true,
+		ExternalService: "shodan_internetdb",
+		LocalPorts:      localPorts,
+	}
+
+	// Use Shodan InternetDB (free, no API key)
+	shodanData := fetchShodanInternetDB(ctx, publicIP)
+	result.ShodanData = shodanData
+
+	if shodanData != nil {
+		result.ExternallyVisible = shodanData.Ports
+
+		// Compare local vs external visibility
+		localPortsMap := make(map[int]bool)
+		for _, p := range localPorts {
+			localPortsMap[p] = true
+		}
+
+		externalPortsMap := make(map[int]bool)
+		for _, p := range shodanData.Ports {
+			externalPortsMap[p] = true
+		}
+
+		// Find discrepancies
+		for _, port := range shodanData.Ports {
+			if !localPortsMap[port] {
+				// Port visible externally but not in our local scan
+				result.DiscrepancyFound = true
+			}
+		}
+
+		// Find filtered ports (local but not external)
+		for _, port := range localPorts {
+			if !externalPortsMap[port] {
+				result.FilteredPorts = append(result.FilteredPorts, port)
+			}
+		}
+	}
+
+	// Check IP reputation
+	result.IPReputation = checkIPReputation(ctx, publicIP)
+
+	return result
+}
+
+// fetchShodanInternetDB queries the free Shodan InternetDB API
+func fetchShodanInternetDB(ctx context.Context, ip string) *ShodanInternetDBInfo {
+	client := &http.Client{Timeout: shodanTimeout}
+	url := fmt.Sprintf("https://internetdb.shodan.io/%s", ip)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	// Shodan returns 404 for IPs with no data, which is fine
+	if resp.StatusCode == http.StatusNotFound {
+		return &ShodanInternetDBInfo{IP: ip, Ports: []int{}}
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil
+	}
+
+	var data ShodanInternetDBInfo
+	if err := json.Unmarshal(body, &data); err != nil {
+		return nil
+	}
+
+	data.IP = ip
+	return &data
+}
+
+// checkIPReputation checks if IP is on any blocklists using DNS-based blocklists
+func checkIPReputation(ctx context.Context, ip string) *IPReputationInfo {
+	info := &IPReputationInfo{
+		IP:    ip,
+		Clean: true,
+	}
+
+	// Validate IPv4
+	if !ipv4Regex.MatchString(ip) {
+		return info
+	}
+
+	// Common DNS-based blocklists
+	blocklists := []string{
+		"zen.spamhaus.org",
+		"bl.spamcop.net",
+		"b.barracudacentral.org",
+		"dnsbl.sorbs.net",
+	}
+
+	// Reverse IP for DNSBL lookup
+	parts := strings.Split(ip, ".")
+	if len(parts) != 4 {
+		return info
+	}
+	reversed := parts[3] + "." + parts[2] + "." + parts[1] + "." + parts[0]
+
+	for _, bl := range blocklists {
+		lookup := reversed + "." + bl
+		_, err := net.LookupHost(lookup)
+		if err == nil {
+			// IP is listed
+			info.Clean = false
+			info.ListedOn = append(info.ListedOn, bl)
+		}
+	}
+
+	return info
+}
+
+// generateAttackerViewIssues generates issues based on attacker perspective
+func generateAttackerViewIssues(av *AttackerViewResult) []NetworkIssue {
+	var issues []NetworkIssue
+
+	if av == nil || !av.Scanned {
+		return issues
+	}
+
+	// Check for known vulnerabilities from Shodan
+	if av.ShodanData != nil && len(av.ShodanData.Vulns) > 0 {
+		for _, vuln := range av.ShodanData.Vulns {
+			issues = append(issues, NetworkIssue{
+				Severity:       "critical",
+				Type:           "known_cve",
+				Message:        fmt.Sprintf("Shodan reports known vulnerability: %s", vuln),
+				Recommendation: "Immediately patch or mitigate this vulnerability",
+			})
+		}
+	}
+
+	// Check for unexpected exposed ports
+	if av.ShodanData != nil {
+		for _, port := range av.ShodanData.Ports {
+			if service, ok := riskyPorts[port]; ok {
+				// Check if it's not in local ports (might be from old scan)
+				found := false
+				for _, lp := range av.LocalPorts {
+					if lp == port {
+						found = true
+						break
+					}
+				}
+				if !found {
+					issues = append(issues, NetworkIssue{
+						Severity:       "high",
+						Type:           "port_discrepancy",
+						Message:        fmt.Sprintf("%s (port %d) visible in Shodan but not detected locally", service, port),
+						Recommendation: "Investigate if this service is running or if it's from cached Shodan data",
+					})
+				}
+			}
+		}
+	}
+
+	// Check IP reputation
+	if av.IPReputation != nil && !av.IPReputation.Clean {
+		blocklists := strings.Join(av.IPReputation.ListedOn, ", ")
+		issues = append(issues, NetworkIssue{
+			Severity:       "medium",
+			Type:           "ip_blocklisted",
+			Message:        fmt.Sprintf("Server IP is listed on blocklists: %s", blocklists),
+			Recommendation: "Request removal from blocklists; this may affect email deliverability and reputation",
+		})
+	}
+
+	return issues
 }
 
 func getPublicIP(ctx context.Context) string {
@@ -254,11 +534,20 @@ func scanLocalPorts(ctx context.Context) map[string]interface{} {
 		}
 	}
 
+	// Extract port numbers for attacker view comparison
+	var portNumbers []int
+	for _, lp := range listeningPorts {
+		if port, ok := lp["port"].(int); ok {
+			portNumbers = append(portNumbers, port)
+		}
+	}
+
 	return map[string]interface{}{
 		"scanned":           true,
 		"total_listening":   len(listeningPorts),
 		"wildcard_bindings": len(wildcardBindings),
 		"risky_exposed":     wildcardBindings,
+		"listening_ports":   portNumbers,
 		"issues":            issues,
 	}
 }
