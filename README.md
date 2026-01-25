@@ -63,6 +63,11 @@ sudo ./bin/mcp-watchdog audit
 
 ### Example Output
 
+📄 **[View all output examples →](docs/outputs/)** - Full audit reports, CIS benchmarks, network scans, monitoring alerts, and webhook notifications with screenshots.
+
+<details>
+<summary>Quick preview: Security Audit</summary>
+
 ```
 ═══════════════════════════════════════════════════════════════
   🟡  SECURITY REPORT  -  production-web-01
@@ -70,44 +75,24 @@ sudo ./bin/mcp-watchdog audit
 
   Status: 🟡 WARNINGS - Some security issues detected
   Score:  72/100 (Grade: C)
-  Time:   2026-01-25T14:30:45Z
 
 ───────────────────────────────────────────────────────────────
   ✅ WHAT'S WORKING WELL
 ───────────────────────────────────────────────────────────────
-  • Firewall is active and protecting the system
-  • Root SSH login is disabled
-  • SSH password authentication disabled (key-only)
-  • Fail2ban is active and blocking attacks
-  • AppArmor is enforcing security policies
-  • System updates are current
-  • Kernel hardening enabled
-  • SSL certificates are valid
+  • Firewall active • SSH hardened • Fail2ban protecting
+  • AppArmor enforcing • System updated • Kernel hardened
 
 ───────────────────────────────────────────────────────────────
   ⚠️  ISSUES REQUIRING ATTENTION
 ───────────────────────────────────────────────────────────────
-  🔴 [HIGH] Docker daemon exposed without TLS authentication
-  ⚠️ [MEDIUM] MySQL listening on 0.0.0.0:3306 (internet-facing)
+  🔴 [HIGH] Docker daemon exposed without TLS
+  ⚠️ [MEDIUM] MySQL listening on 0.0.0.0:3306
   ⚠️ [MEDIUM] Last backup is 8 days old
-  ⚠️ [LOW] 3 Docker containers running with --privileged flag
-
-───────────────────────────────────────────────────────────────
-  💡 RECOMMENDATIONS
-───────────────────────────────────────────────────────────────
-  1. Enable Docker TLS authentication immediately
-  2. Bind MySQL to 127.0.0.1 or use firewall rules
-  3. Review backup automation schedule
-  4. Audit privileged containers for security risks
 
 ═══════════════════════════════════════════════════════════════
 ```
 
-**Advanced features:**
-- JSON output: `--format=json` for parsing/automation
-- Webhook alerts: `--webhook` sends to Discord/Slack
-- CIS Benchmark: `--cis` runs 60+ compliance checks
-- Continuous monitoring: `monitor` mode with anomaly detection
+</details>
 
 ## Architecture
 
