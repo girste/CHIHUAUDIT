@@ -64,70 +64,50 @@ sudo ./bin/mcp-watchdog audit
 ### Example Output
 
 ```
-═════════════════════════════════════════════════════════════════
+═══════════════════════════════════════════════════════════════
   🟡  SECURITY REPORT  -  production-web-01
-═════════════════════════════════════════════════════════════════
+═══════════════════════════════════════════════════════════════
 
   Status: 🟡 WARNINGS - Some security issues detected
   Score:  72/100 (Grade: C)
   Time:   2026-01-25T14:30:45Z
 
-─────────────────────────────────────────────────────────────────
+───────────────────────────────────────────────────────────────
   ✅ WHAT'S WORKING WELL
-─────────────────────────────────────────────────────────────────
-
-  • Firewall is active (UFW enabled with 18 rules)
+───────────────────────────────────────────────────────────────
+  • Firewall is active and protecting the system
   • Root SSH login is disabled
   • SSH password authentication disabled (key-only)
-  • Fail2ban is active (3 jails protecting SSH, HTTP, MySQL)
+  • Fail2ban is active and blocking attacks
   • AppArmor is enforcing security policies
-  • System updates are current (last check: 2 days ago)
-  • Kernel hardening enabled (sysctl protections active)
-  • SSL certificates valid (60 days until expiry)
+  • System updates are current
+  • Kernel hardening enabled
+  • SSL certificates are valid
 
-─────────────────────────────────────────────────────────────────
-  ⚠️  ISSUES FOUND
-─────────────────────────────────────────────────────────────────
+───────────────────────────────────────────────────────────────
+  ⚠️  ISSUES REQUIRING ATTENTION
+───────────────────────────────────────────────────────────────
+  🔴 [HIGH] Docker daemon exposed without TLS authentication
+  ⚠️ [MEDIUM] MySQL listening on 0.0.0.0:3306 (internet-facing)
+  ⚠️ [MEDIUM] Last backup is 8 days old
+  ⚠️ [LOW] 3 Docker containers running with --privileged flag
 
-  🟡 MEDIUM - Docker daemon socket exposed without TLS
-     Impact: Container escape risk if compromised
-     Fix: Enable TLS authentication for Docker API
-
-  🟡 MEDIUM - Open port 3306 (MySQL) listening on 0.0.0.0
-     Impact: Database exposed to internet
-     Fix: Bind MySQL to 127.0.0.1 or use firewall rules
-
-  🟡 LOW - Backup verification: Last backup is 8 days old
-     Impact: Data loss window increased
-     Fix: Review backup schedule configuration
-
-─────────────────────────────────────────────────────────────────
-  📊 DETAILED BREAKDOWN
-─────────────────────────────────────────────────────────────────
-
-  Firewall:        ✅ Active (18 rules, default deny)
-  SSH Security:    ✅ Hardened (key-only, no root)
-  Fail2ban:        ✅ Active (blocking 47 IPs)
-  MAC (AppArmor):  ✅ Enforcing (23 profiles)
-  Docker:          🟡 Running (TLS not configured)
-  Network:         🟡 2 services exposed
-  Updates:         ✅ Current (0 security patches pending)
-  Kernel:          ✅ Hardened (ASLR, exec-shield enabled)
-  Backups:         🟡 Configured (last: 8 days ago)
-  SSL/TLS:         ✅ Valid certificates
-  CVE Check:       ✅ No critical vulnerabilities found
-
-═════════════════════════════════════════════════════════════════
+───────────────────────────────────────────────────────────────
   💡 RECOMMENDATIONS
-═════════════════════════════════════════════════════════════════
+───────────────────────────────────────────────────────────────
+  1. Enable Docker TLS authentication immediately
+  2. Bind MySQL to 127.0.0.1 or use firewall rules
+  3. Review backup automation schedule
+  4. Audit privileged containers for security risks
 
-  1. Configure Docker TLS authentication immediately
-  2. Restrict MySQL to localhost or whitelist IPs
-  3. Verify backup automation is running correctly
-
-Run with --format=json for machine-readable output
-Use --webhook to send results to Discord/Slack
+═══════════════════════════════════════════════════════════════
 ```
+
+**Advanced features:**
+- JSON output: `--format=json` for parsing/automation
+- Webhook alerts: `--webhook` sends to Discord/Slack
+- CIS Benchmark: `--cis` runs 60+ compliance checks
+- Continuous monitoring: `monitor` mode with anomaly detection
 
 ## Architecture
 
