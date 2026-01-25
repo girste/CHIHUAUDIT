@@ -434,9 +434,12 @@ func analyzeDNS(ctx context.Context, domain string) DNSChainInfo {
 func fetchHTTPInfo(ctx context.Context, domain string) (map[string][]string, []*http.Cookie, string) {
 	jar, _ := cookiejar.New(nil)
 
+	// #nosec G402 -- InsecureSkipVerify is intentional for security scanning.
+	// This scanner needs to connect to servers with invalid/self-signed certs
+	// to detect WAF/CDN headers. This is read-only reconnaissance, not production traffic.
 	transport := &http.Transport{
 		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true, // We want to detect even with invalid certs
+			InsecureSkipVerify: true, // Required to scan servers with invalid SSL certificates
 		},
 		DialContext: (&net.Dialer{
 			Timeout: 10 * time.Second,
