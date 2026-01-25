@@ -10,13 +10,28 @@
 [![SLSA 3](https://slsa.dev/images/gh-badge-level3.svg)](https://slsa.dev)
 [![Mentioned in Awesome](https://awesome.re/mentioned-badge.svg)](https://github.com/punkpeye/awesome-mcp-servers)
 
-**Linux security audit tool.** Single 8MB binary, no dependencies.
+**Linux security audit tool.** Single 8.1MB binary, no dependencies.
 
-Analyzes firewall, SSH, fail2ban, Docker, kernel hardening, SSL certificates, network services, and more. Includes continuous monitoring with anomaly detection.
+Analyzes firewall, SSH, fail2ban, Docker, kernel hardening, SSL certificates, network services, and more. Includes continuous monitoring with anomaly detection and EU Vulnerability Database integration.
+
+**Just want to use it?** Download the latest binary from [Releases](https://github.com/girste/mcp-cybersec-watchdog/releases) — no compilation needed.
 
 ## MCP Tools
 
-`security_audit` `cis_audit` `scan_app_security` `scan_network_security` `scan_database_security` `scan_waf_cdn` `verify_backup_config` `check_vulnerability_intel` `start_monitoring` `stop_monitoring` `monitoring_status` `analyze_anomaly` `cleanup_old_logs` `configure_webhook` `test_webhook` `get_notification_config`
+- **security_audit** — Complete system security analysis
+- **cis_audit** — CIS Benchmark Ubuntu 22.04 compliance check
+- **scan_app_security** — Application layer security (ports, processes, containers)
+- **scan_network_security** — Network configuration & firewall rules
+- **scan_database_security** — Database exposure & hardening
+- **scan_waf_cdn** — WAF/CDN detection & SSL/TLS analysis
+- **verify_backup_config** — Backup integrity verification
+- **check_vulnerability_intel** — CVE database lookup (EU Vulnerability Database)
+- **start_monitoring** / **stop_monitoring** — Continuous monitoring daemon
+- **monitoring_status** — Daemon status & statistics
+- **analyze_anomaly** — Anomaly detection analysis
+- **cleanup_old_logs** — Log rotation
+- **configure_webhook** / **test_webhook** — Discord/Slack/custom webhooks
+- **get_notification_config** — Show notification settings
 
 ## Commands
 
@@ -31,20 +46,39 @@ Analyzes firewall, SSH, fail2ban, Docker, kernel hardening, SSL certificates, ne
 ## Quick Start
 
 ```bash
-# Build
+# Download binary (no build required)
+wget https://github.com/girste/mcp-cybersec-watchdog/releases/latest/download/mcp-watchdog
+chmod +x mcp-watchdog
+
+# Run audit
+sudo ./mcp-watchdog audit
+```
+
+**For developers:**
+
+```bash
 make build
-
-# Run audit with visual output
 sudo ./bin/mcp-watchdog audit
+```
 
-# Run audit for cron (notify only on issues)
-sudo ./bin/mcp-watchdog audit --quiet --webhook --on-issues
+### Example Output
 
-# JSON output for scripts
-sudo ./bin/mcp-watchdog audit --format=json
+```
+╔══════════════════════════════════════════════════╗
+║          SECURITY AUDIT REPORT                   ║
+╠══════════════════════════════════════════════════╣
+║  Status: ⚠️  WARNINGS FOUND                      ║
+║  Score:  75/100                                  ║
+╚══════════════════════════════════════════════════╝
 
-# Start monitoring
-sudo ./bin/mcp-watchdog monitor
+🟢 PASS  Firewall active (UFW enabled, 12 rules)
+🟢 PASS  SSH hardened (key-only, root login disabled)
+🟡 WARN  Docker daemon socket exposed (review access)
+🟢 PASS  Kernel hardening enabled
+🔴 FAIL  Unpatched CVE-2024-1234 detected (critical)
+🟢 PASS  SSL certificates valid (30 days to expiry)
+
+Run with --format=json for machine-readable output
 ```
 
 ## Architecture
