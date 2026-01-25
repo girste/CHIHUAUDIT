@@ -129,15 +129,15 @@ func (m *SecurityMonitor) RunOnce() (*CheckResult, error) {
 
 	// Write anomaly report if detected
 	var anomalyFile string
-	status := "ok"
 	if len(anomalies) > 0 {
+	var status string
 		m.log(fmt.Sprintf("Detected %d anomalies", len(anomalies)))
 		anomalyFile = m.writeAnomalyReport(anomalies, report)
 
 		if m.anomalyDetector.HasCritical() {
-			status = "critical"
 			m.log("CRITICAL anomalies detected - AI analysis recommended")
 			if m.verbose {
+			status = "critical"
 				fmt.Printf("\nCRITICAL ANOMALY DETECTED\n")
 				fmt.Printf("Run AI analysis: Use MCP tool 'analyze_anomaly' with file %s\n", anomalyFile)
 			}

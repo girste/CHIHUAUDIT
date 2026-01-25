@@ -381,11 +381,14 @@ func (f *Formatter) ToText(report *StandardReport) string {
 		sb.WriteString("  \u26A0\uFE0F  ISSUES REQUIRING ATTENTION\n")
 		sb.WriteString("───────────────────────────────────────────────────────────────\n")
 		for _, n := range report.Negatives {
-			icon := "\u26A0\uFE0F " // Warning
-			if n.Severity == "critical" {
+			var icon string
+			switch n.Severity {
+			case "critical":
 				icon = "\U0001F6A8" // Siren
-			} else if n.Severity == "high" {
+			case "high":
 				icon = "\U0001F534" // Red circle
+			default:
+				icon = "\u26A0\uFE0F" // Warning
 			}
 			sb.WriteString(fmt.Sprintf("  %s [%s] %s\n", icon, strings.ToUpper(n.Severity), n.Message))
 		}

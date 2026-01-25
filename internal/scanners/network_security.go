@@ -250,12 +250,7 @@ func ScanNetworkSecurity(ctx context.Context, scope string, deep bool, attackerV
 func convertCloudIssues(cloudIssues []CloudIssue) []NetworkIssue {
 	var issues []NetworkIssue
 	for _, ci := range cloudIssues {
-		issues = append(issues, NetworkIssue{
-			Severity:       ci.Severity,
-			Type:           ci.Type,
-			Message:        ci.Message,
-			Recommendation: ci.Recommendation,
-		})
+		issues = append(issues, NetworkIssue(ci))
 	}
 	return issues
 }
