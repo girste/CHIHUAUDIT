@@ -439,7 +439,7 @@ func fetchHTTPInfo(ctx context.Context, domain string) (map[string][]string, []*
 	// to detect WAF/CDN headers. This is read-only reconnaissance, not production traffic.
 	transport := &http.Transport{
 		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true, // Required to scan servers with invalid SSL certificates
+			InsecureSkipVerify: true, // lgtm[go/disabled-certificate-check] Required to scan servers with invalid SSL certificates
 		},
 		DialContext: (&net.Dialer{
 			Timeout: 10 * time.Second,
