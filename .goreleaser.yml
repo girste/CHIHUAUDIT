@@ -41,10 +41,12 @@ signs:
   - cmd: cosign
     env:
       - COSIGN_EXPERIMENTAL=1
-    signature: '${artifact}.bundle'
+    signature: '${artifact}.sig'
+    certificate: '${artifact}.pem'
     args:
       - sign-blob
-      - '--bundle=${signature}'
+      - '--output-certificate=${certificate}'
+      - '--output-signature=${signature}'
       - '${artifact}'
       - '--yes'
     artifacts: all
