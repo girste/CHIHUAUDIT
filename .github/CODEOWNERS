@@ -1,0 +1,21 @@
+# Code Owners
+# Each line is a file pattern followed by one or more owners.
+# Order is important; the last matching pattern takes precedence.
+
+# Default owners for everything in the repo
+* @girste
+
+# Go source code
+*.go @girste
+
+# GitHub workflows and configuration
+/.github/ @girste
+
+# Documentation
+*.md @girste
+/docs/ @girste
+
+# Security-sensitive files
+/internal/scanners/ @girste
+/internal/cis/ @girste
+/.goreleaser.yml @girste
