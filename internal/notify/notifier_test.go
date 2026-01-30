@@ -32,11 +32,11 @@ func TestNewNotifier(t *testing.T) {
 
 func TestShouldNotify(t *testing.T) {
 	tests := []struct {
-		name         string
-		cfg          config.NotifyConfig
-		status       string
-		hasIssues    bool
-		wantNotify   bool
+		name       string
+		cfg        config.NotifyConfig
+		status     string
+		hasIssues  bool
+		wantNotify bool
 	}{
 		{
 			name:       "disabled",
@@ -185,13 +185,14 @@ func TestSendDiscord(t *testing.T) {
 		t.Fatalf("Expected 1 embed, got %d", len(payload.Embeds))
 	}
 
-	if payload.Embeds[0].Title != "Test Alert" {
-		t.Errorf("Embed title = %s, want Test Alert", payload.Embeds[0].Title)
+	// Discord generates standard titles based on severity
+	if payload.Embeds[0].Title != "CRITICAL SECURITY ISSUES DETECTED" {
+		t.Errorf("Embed title = %s, want CRITICAL SECURITY ISSUES DETECTED", payload.Embeds[0].Title)
 	}
 
-	// Red color for critical
-	if payload.Embeds[0].Color != 0xE74C3C {
-		t.Errorf("Embed color = %x, want %x (red)", payload.Embeds[0].Color, 0xE74C3C)
+	// Discord standard red color #ED4245
+	if payload.Embeds[0].Color != 0xED4245 {
+		t.Errorf("Embed color = %x, want %x (Discord red)", payload.Embeds[0].Color, 0xED4245)
 	}
 }
 

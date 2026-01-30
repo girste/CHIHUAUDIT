@@ -55,14 +55,14 @@ type IPRangeInfo struct {
 
 // WAFSecurityPosture represents the security posture analysis
 type WAFSecurityPosture struct {
-	ProtectedByWAF  bool   `json:"protected_by_waf"`
-	ProtectedByCDN  bool   `json:"protected_by_cdn"`
-	OriginExposed   bool   `json:"origin_exposed"`
-	EdgeCaching     bool   `json:"edge_caching"`
-	DDoSProtection  string `json:"ddos_protection"`
-	SSLTermination  string `json:"ssl_termination"`
-	BotProtection   bool   `json:"bot_protection"`
-	RateLimiting    bool   `json:"rate_limiting"`
+	ProtectedByWAF bool   `json:"protected_by_waf"`
+	ProtectedByCDN bool   `json:"protected_by_cdn"`
+	OriginExposed  bool   `json:"origin_exposed"`
+	EdgeCaching    bool   `json:"edge_caching"`
+	DDoSProtection string `json:"ddos_protection"`
+	SSLTermination string `json:"ssl_termination"`
+	BotProtection  bool   `json:"bot_protection"`
+	RateLimiting   bool   `json:"rate_limiting"`
 }
 
 // WAFCDNIssue represents a security issue found

@@ -17,13 +17,16 @@ import (
 
 const shodanTimeout = 10 * time.Second
 
+// NOTE: Port patterns are centralized in internal/config/patterns.go
+// This scanner maintains local definitions for standalone operation
+
 // Common ports to scan
 var commonPorts = []int{21, 22, 23, 25, 80, 443, 3306, 5432, 6379, 8080, 8443, 27017}
 
-// Expected open ports
+// Expected open ports (web services + SSH)
 var expectedPorts = map[int]bool{22: true, 80: true, 443: true}
 
-// Risky service ports
+// Risky service ports (databases and dev servers)
 var riskyPorts = map[int]string{
 	3306:  "MySQL",
 	5432:  "PostgreSQL",
@@ -32,16 +35,16 @@ var riskyPorts = map[int]string{
 	9200:  "Elasticsearch",
 	5984:  "CouchDB",
 	8086:  "InfluxDB",
-	3000:  "Common dev server",
-	8000:  "Common dev server",
-	8080:  "Common dev server",
 }
 
-// Service names
+// Service names for common ports
 var serviceNames = map[int]string{
 	21:    "FTP",
+	22:    "SSH",
 	23:    "Telnet",
 	25:    "SMTP",
+	80:    "HTTP",
+	443:   "HTTPS",
 	3306:  "MySQL",
 	5432:  "PostgreSQL",
 	6379:  "Redis",

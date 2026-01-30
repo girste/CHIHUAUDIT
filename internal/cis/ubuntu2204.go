@@ -217,10 +217,10 @@ func Ubuntu2204Level1Controls(checker *Checker) []ControlDefinition {
 				Section:      "Network Configuration",
 				Level:        1,
 				Scored:       true,
-				Remediation:  "Set net.ipv4.ip_forward = 0 in /etc/sysctl.conf",
+				Remediation:  "Set net.ipv4.ip_forward = 0 in /etc/sysctl.conf (Note: Docker requires IP forwarding enabled)",
 				AuditCommand: "sysctl net.ipv4.ip_forward",
 			},
-			Check: checker.CheckSysctl("net.ipv4.ip_forward", "0"),
+			Check: checker.CheckIPForwarding(),
 		},
 		{
 			Control: CISControl{

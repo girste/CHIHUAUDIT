@@ -65,6 +65,45 @@ release:
   github:
     owner: girste
     name: mcp-cybersec-watchdog
-  name_template: "{{.Tag}} Stable"
+  name_template: "{{.Tag}}"
   prerelease: auto
   draft: false
+  header: |
+    ## 📦 Download Instructions
+
+    Choose the right binary for your system:
+
+    | OS | Architecture | File | Use Case |
+    |---|---|---|---|
+    | 🐧 Linux | Intel/AMD 64-bit | `mcp-watchdog_{{.Tag}}_linux_amd64.tar.gz` | Most Linux servers & desktops |
+    | 🐧 Linux | ARM 64-bit | `mcp-watchdog_{{.Tag}}_linux_arm64.tar.gz` | Raspberry Pi 4+, ARM servers |
+    | 🍎 macOS | Intel | `mcp-watchdog_{{.Tag}}_darwin_amd64.tar.gz` | macOS Intel chips |
+    | 🍎 macOS | Apple Silicon | `mcp-watchdog_{{.Tag}}_darwin_arm64.tar.gz` | M1/M2/M3/M4 Macs |
+
+    ### Quick Install (Linux/macOS)
+
+    ```bash
+    # Download (replace with your architecture)
+    wget https://github.com/girste/mcp-cybersec-watchdog/releases/download/{{.Tag}}/mcp-watchdog_{{.Tag}}_linux_amd64.tar.gz
+
+    # Extract
+    tar xzf mcp-watchdog_{{.Tag}}_linux_amd64.tar.gz
+
+    # Run
+    ./mcp-watchdog --help
+
+    # Optional: Move to PATH
+    sudo mv mcp-watchdog /usr/local/bin/
+    ```
+
+    ### Verify Download (Optional)
+
+    ```bash
+    # Download checksums
+    wget https://github.com/girste/mcp-cybersec-watchdog/releases/download/{{.Tag}}/checksums.txt
+
+    # Verify
+    sha256sum -c checksums.txt --ignore-missing
+    ```
+
+    ---

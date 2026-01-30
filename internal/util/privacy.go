@@ -51,4 +51,3 @@ func GetMaskedHostname() string {
 	}
 	return MaskHostname(hostname)
 }
-

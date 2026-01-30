@@ -15,18 +15,18 @@ import (
 
 // CloudProviderInfo contains information about the cloud environment
 type CloudProviderInfo struct {
-	Detected        bool                 `json:"detected"`
-	Provider        string               `json:"provider"`
-	Region          string               `json:"region,omitempty"`
-	AvailabilityZone string              `json:"availability_zone,omitempty"`
-	InstanceID      string               `json:"instance_id,omitempty"`
-	InstanceType    string               `json:"instance_type,omitempty"`
-	AccountID       string               `json:"account_id,omitempty"`
-	SecurityGroups  []CloudSecurityGroup `json:"security_groups,omitempty"`
-	VPC             string               `json:"vpc,omitempty"`
-	PublicIP        string               `json:"public_ip,omitempty"`
-	PrivateIP       string               `json:"private_ip,omitempty"`
-	Issues          []CloudIssue         `json:"issues,omitempty"`
+	Detected         bool                 `json:"detected"`
+	Provider         string               `json:"provider"`
+	Region           string               `json:"region,omitempty"`
+	AvailabilityZone string               `json:"availability_zone,omitempty"`
+	InstanceID       string               `json:"instance_id,omitempty"`
+	InstanceType     string               `json:"instance_type,omitempty"`
+	AccountID        string               `json:"account_id,omitempty"`
+	SecurityGroups   []CloudSecurityGroup `json:"security_groups,omitempty"`
+	VPC              string               `json:"vpc,omitempty"`
+	PublicIP         string               `json:"public_ip,omitempty"`
+	PrivateIP        string               `json:"private_ip,omitempty"`
+	Issues           []CloudIssue         `json:"issues,omitempty"`
 }
 
 // CloudSecurityGroup represents a cloud security group/firewall rule

@@ -44,15 +44,16 @@ func (a *MACAnalyzer) Analyze(ctx context.Context, cfg *config.Config) (*Result,
 }
 
 func (a *MACAnalyzer) analyzeAppArmor(ctx context.Context) (string, map[string]interface{}) {
-	// Check if AppArmor module is loaded
-	lsmodResult, _ := system.RunCommand(ctx, system.TimeoutShort, "lsmod")
-	if lsmodResult == nil || !strings.Contains(lsmodResult.Stdout, "apparmor") {
-		return "", nil
-	}
-
-	// Check if enabled
+	// Check if AppArmor is enabled via sysfs (works for both built-in and module)
 	if data, err := os.ReadFile("/sys/module/apparmor/parameters/enabled"); err == nil {
 		if strings.TrimSpace(string(data)) != "Y" {
+			return "", nil
+		}
+		// AppArmor is enabled, continue with status gathering
+	} else {
+		// Fallback: Check if AppArmor module is loaded (for older kernels)
+		lsmodResult, _ := system.RunCommand(ctx, system.TimeoutShort, "lsmod")
+		if lsmodResult == nil || !strings.Contains(lsmodResult.Stdout, "apparmor") {
 			return "", nil
 		}
 	}

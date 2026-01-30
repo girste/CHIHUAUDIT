@@ -3,14 +3,16 @@ package cis
 import (
 	"context"
 	"strings"
+
+	"github.com/girste/mcp-cybersec-watchdog/internal/config"
 )
 
 // RunCISAudit executes a CIS benchmark audit for Ubuntu 22.04 LTS
-func RunCISAudit(ctx context.Context, level int, includeAllControls bool) *CISResult {
+func RunCISAudit(ctx context.Context, level int, includeAllControls bool, wl *config.Whitelist) *CISResult {
 	result := NewCISResult("cis-ubuntu-22.04-lts", level)
 
 	// Create checker instance
-	checker := NewChecker(ctx)
+	checker := NewChecker(ctx, wl)
 
 	// Get controls for the specified level
 	var controlDefs []ControlDefinition

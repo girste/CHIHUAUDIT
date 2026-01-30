@@ -32,9 +32,10 @@ type SecurityMonitor struct {
 
 // NewSecurityMonitor creates a new monitor
 func NewSecurityMonitor(intervalSeconds int, logDir, baselinePath string, verbose bool) *SecurityMonitor {
-	if intervalSeconds < 300 {
-		intervalSeconds = 300 // Minimum 5 minutes
-	}
+	// Minimum interval (commented out for testing - normally 300 seconds)
+	// if intervalSeconds < 300 {
+	// 	intervalSeconds = 300 // Minimum 5 minutes
+	// }
 
 	// Create log directory
 	_ = os.MkdirAll(logDir, 0700)
@@ -107,9 +108,16 @@ func (m *SecurityMonitor) RunOnce() (*CheckResult, error) {
 	// Extract comparable snapshots
 	currentSnapshot := m.baselineMgr.ExtractComparableData(report)
 
-	// Detect anomalies
+	// Check system health (services, disk, memory, errors)
+	m.log("Checking system health...")
+	systemHealth := CheckSystemHealth(ctx, cfg)
+
+	// Detect anomalies (baseline comparison + system health)
 	m.log("Checking for anomalies...")
 	anomalies := m.anomalyDetector.Detect(baseline.Snapshot, currentSnapshot)
+
+	// Add system health anomalies
+	anomalies = append(anomalies, detectSystemHealthAnomalies(systemHealth)...)
 
 	// Calculate baseline age
 	baselineTime, _ := time.Parse(time.RFC3339, baseline.Timestamp)
@@ -130,14 +138,14 @@ func (m *SecurityMonitor) RunOnce() (*CheckResult, error) {
 	// Write anomaly report if detected
 	var anomalyFile string
 	if len(anomalies) > 0 {
-	var status string
+		var status string
 		m.log(fmt.Sprintf("Detected %d anomalies", len(anomalies)))
 		anomalyFile = m.writeAnomalyReport(anomalies, report)
 
 		if m.anomalyDetector.HasCritical() {
 			m.log("CRITICAL anomalies detected - AI analysis recommended")
 			if m.verbose {
-			status = "critical"
+				status = "critical"
 				fmt.Printf("\nCRITICAL ANOMALY DETECTED\n")
 				fmt.Printf("Run AI analysis: Use MCP tool 'analyze_anomaly' with file %s\n", anomalyFile)
 			}

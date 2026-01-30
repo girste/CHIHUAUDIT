@@ -47,10 +47,10 @@ type AlertIssue struct {
 
 // NotifyResult contains the result of notification attempts
 type NotifyResult struct {
-	Success  bool              `json:"success"`
-	Sent     []string          `json:"sent"`
-	Failed   []NotifyError     `json:"failed,omitempty"`
-	Skipped  string            `json:"skipped,omitempty"`
+	Success bool          `json:"success"`
+	Sent    []string      `json:"sent"`
+	Failed  []NotifyError `json:"failed,omitempty"`
+	Skipped string        `json:"skipped,omitempty"`
 }
 
 type NotifyError struct {
@@ -185,59 +185,90 @@ type discordFooter struct {
 }
 
 func (n *Notifier) sendDiscord(ctx context.Context, alert *AlertPayload) error {
-	// Color based on status
-	color := 0x2ECC71 // Green
-	emoji := ":white_check_mark:"
+	// Discord standard colors
+	color := 5763719 // Green #57F287
+	statusEmoji := "✅"
+	title := "All Systems Secure"
+
 	switch strings.ToLower(alert.Status) {
-	case SeverityCritical:
-		color = 0xE74C3C // Red
-		emoji = ":red_circle:"
-	case SeverityHigh:
-		color = 0xE67E22 // Orange
-		emoji = ":orange_circle:"
+	case SeverityCritical, SeverityHigh:
+		color = 15548997 // Red #ED4245 (Discord danger)
+		statusEmoji = "🔴"
+		if strings.ToLower(alert.Status) == SeverityCritical {
+			title = "CRITICAL SECURITY ISSUES DETECTED"
+		} else {
+			title = "High Priority Security Issues"
+		}
 	case SeverityMedium:
-		color = 0xF1C40F // Yellow
-		emoji = ":yellow_circle:"
+		color = 16776960 // Yellow #FFFF00
+		statusEmoji = "🟡"
+		title = "Security Warnings Detected"
 	}
 
-	// Build description
-	description := alert.Summary
+	// Build description with clear issue breakdown
+	description := fmt.Sprintf("**%s** `%s`\n", statusEmoji, alert.Hostname)
+
 	if len(alert.Issues) > 0 {
-		description += "\n\n**Issues Found:**"
-		for i, issue := range alert.Issues {
-			if i >= 5 { // Limit to 5 issues in Discord
-				description += fmt.Sprintf("\n... and %d more", len(alert.Issues)-5)
-				break
+		// Group issues by severity
+		critical := []string{}
+		high := []string{}
+		medium := []string{}
+		low := []string{}
+
+		for _, issue := range alert.Issues {
+			// Just the message, no category prefix
+			issueText := issue.Message
+			switch strings.ToLower(issue.Severity) {
+			case "critical":
+				critical = append(critical, issueText)
+			case "high":
+				high = append(high, issueText)
+			case "medium":
+				medium = append(medium, issueText)
+			default:
+				low = append(low, issueText)
 			}
-			description += fmt.Sprintf("\n• [%s] %s", strings.ToUpper(issue.Severity), issue.Message)
 		}
+
+		description += "\n**⚠️ Issues Requiring Attention:**\n"
+
+		// Show ALL critical issues
+		if len(critical) > 0 {
+			for _, msg := range critical {
+				description += fmt.Sprintf("🔴 **CRITICAL:** %s\n", msg)
+			}
+		}
+		// Show ALL high issues
+		if len(high) > 0 {
+			for _, msg := range high {
+				description += fmt.Sprintf("🔴 **HIGH:** %s\n", msg)
+			}
+		}
+		// Show ALL medium issues
+		if len(medium) > 0 {
+			for _, msg := range medium {
+				description += fmt.Sprintf("🟡 %s\n", msg)
+			}
+		}
+		// Show ALL low issues (only if no critical/high)
+		if len(low) > 0 && len(critical) == 0 && len(high) == 0 {
+			for _, msg := range low {
+				description += fmt.Sprintf("ℹ️ %s\n", msg)
+			}
+		}
+	} else {
+		description += "\n✅ All security checks passed successfully"
 	}
 
-	// Build fields
-	fields := []discordField{
-		{Name: "Status", Value: fmt.Sprintf("%s %s", emoji, strings.ToUpper(alert.Status)), Inline: true},
-		{Name: "Score", Value: fmt.Sprintf("%d/100", alert.Score), Inline: true},
-		{Name: "Host", Value: alert.Hostname, Inline: true},
-	}
-
-	if len(alert.Positives) > 0 {
-		posText := ""
-		for i, p := range alert.Positives {
-			if i >= 3 {
-				posText += fmt.Sprintf("\n... and %d more", len(alert.Positives)-3)
-				break
-			}
-			posText += fmt.Sprintf(":white_check_mark: %s\n", p)
-		}
-		fields = append(fields, discordField{Name: "Positives", Value: posText, Inline: false})
-	}
+	// No fields - keep it clean
+	var fields []discordField
 
 	payload := discordPayload{
 		Username:  n.config.Discord.Username,
 		AvatarURL: n.config.Discord.AvatarURL,
 		Embeds: []discordEmbed{
 			{
-				Title:       alert.Title,
+				Title:       title,
 				Description: description,
 				Color:       color,
 				Timestamp:   alert.Timestamp,

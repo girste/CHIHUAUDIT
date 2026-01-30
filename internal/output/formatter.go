@@ -24,14 +24,14 @@ const (
 
 // StandardReport is the unified output format
 type StandardReport struct {
-	Timestamp   string              `json:"timestamp"`
-	Hostname    string              `json:"hostname"`
+	Timestamp    string             `json:"timestamp"`
+	Hostname     string             `json:"hostname"`
 	TrafficLight TrafficLightStatus `json:"traffic_light"`
-	Score       ScoreInfo           `json:"score"`
-	Positives   []string            `json:"positives"`
-	Negatives   []NegativeItem      `json:"negatives"`
-	Advice      []string            `json:"advice,omitempty"` // Only with AI mode
-	RawReport   interface{}         `json:"raw_report,omitempty"`
+	Score        ScoreInfo          `json:"score"`
+	Positives    []string           `json:"positives"`
+	Negatives    []NegativeItem     `json:"negatives"`
+	Advice       []string           `json:"advice,omitempty"` // Only with AI mode
+	RawReport    interface{}        `json:"raw_report,omitempty"`
 }
 
 type TrafficLightStatus struct {
@@ -41,8 +41,8 @@ type TrafficLightStatus struct {
 }
 
 type ScoreInfo struct {
-	Value    int    `json:"value"`    // 0-100
-	Grade    string `json:"grade"`    // A, B, C, D, F
+	Value    int    `json:"value"` // 0-100
+	Grade    string `json:"grade"` // A, B, C, D, F
 	MaxScore int    `json:"max_score"`
 }
 
@@ -262,19 +262,23 @@ func (f *Formatter) calculateScore(baseScore int, negatives []NegativeItem) Scor
 }
 
 func (f *Formatter) determineTrafficLight(score int, negatives []NegativeItem) TrafficLightStatus {
-	// Check for critical issues
+	// Check for critical/high/medium issues
 	hasCritical := false
 	hasHigh := false
+	hasMedium := false
 	for _, neg := range negatives {
-		if neg.Severity == "critical" {
+		switch neg.Severity {
+		case "critical":
 			hasCritical = true
-		}
-		if neg.Severity == "high" {
+		case "high":
 			hasHigh = true
+		case "medium":
+			hasMedium = true
 		}
 	}
 
-	if hasCritical || score < 50 {
+	// RED: critical or high severity issues
+	if hasCritical || hasHigh || score < 50 {
 		return TrafficLightStatus{
 			Status: StatusRed,
 			Emoji:  "\U0001F534", // Red circle
@@ -282,7 +286,8 @@ func (f *Formatter) determineTrafficLight(score int, negatives []NegativeItem) T
 		}
 	}
 
-	if hasHigh || score < 70 {
+	// YELLOW: medium severity or score issues
+	if hasMedium || score < 80 {
 		return TrafficLightStatus{
 			Status: StatusYellow,
 			Emoji:  "\U0001F7E1", // Yellow circle
@@ -290,6 +295,7 @@ func (f *Formatter) determineTrafficLight(score int, negatives []NegativeItem) T
 		}
 	}
 
+	// GREEN: all clear
 	return TrafficLightStatus{
 		Status: StatusGreen,
 		Emoji:  "\U0001F7E2", // Green circle

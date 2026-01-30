@@ -16,6 +16,9 @@ type Config struct {
 	MaskData           bool             `yaml:"maskData"`
 	Monitoring         MonitoringConfig `yaml:"monitoring"`
 	Notifications      NotifyConfig     `yaml:"notifications"`
+	Whitelist          *Whitelist       `yaml:"-"` // Loaded separately, not from YAML
+	Ports              *PortPatterns    `yaml:"-"` // Pattern definitions
+	Processes          *ProcessPatterns `yaml:"-"` // Process patterns
 }
 
 type MonitoringConfig struct {
@@ -28,12 +31,12 @@ type MonitoringConfig struct {
 
 // NotifyConfig holds webhook notification settings
 type NotifyConfig struct {
-	Enabled       bool            `yaml:"enabled"`
-	OnlyOnIssues  bool            `yaml:"onlyOnIssues"`
-	MinSeverity   string          `yaml:"minSeverity"` // critical, high, medium, low
-	Discord       DiscordConfig   `yaml:"discord"`
-	Slack         SlackConfig     `yaml:"slack"`
-	GenericWebhook WebhookConfig  `yaml:"webhook"`
+	Enabled        bool          `yaml:"enabled"`
+	OnlyOnIssues   bool          `yaml:"onlyOnIssues"`
+	MinSeverity    string        `yaml:"minSeverity"` // critical, high, medium, low
+	Discord        DiscordConfig `yaml:"discord"`
+	Slack          SlackConfig   `yaml:"slack"`
+	GenericWebhook WebhookConfig `yaml:"webhook"`
 }
 
 type DiscordConfig struct {
@@ -112,8 +115,20 @@ func Load() (*Config, error) {
 		if err := yaml.Unmarshal(data, cfg); err != nil {
 			return nil, err
 		}
-		return cfg, nil
+		break
 	}
+
+	// Load whitelist separately
+	wl, err := LoadWhitelist()
+	if err != nil {
+		return nil, err
+	}
+	cfg.Whitelist = wl
+
+	// Load default patterns (can be overridden by user config later)
+	cfg.Ports = DefaultPortPatterns()
+	cfg.Processes = DefaultProcessPatterns()
+
 	return cfg, nil
 }
 

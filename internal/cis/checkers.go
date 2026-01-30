@@ -10,19 +10,31 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/girste/mcp-cybersec-watchdog/internal/config"
 	"github.com/girste/mcp-cybersec-watchdog/internal/system"
 )
 
 // Checker provides CIS control verification functions
 type Checker struct {
 	ctx            context.Context
+	whitelist      *config.Whitelist
 	sshConfigCache string
 	sshConfigRead  bool
 }
 
 // NewChecker creates a new Checker instance
-func NewChecker(ctx context.Context) *Checker {
-	return &Checker{ctx: ctx}
+func NewChecker(ctx context.Context, wl *config.Whitelist) *Checker {
+	return &Checker{ctx: ctx, whitelist: wl}
+}
+
+// WithWhitelistCheck wraps a CheckFunc to check the whitelist before executing
+func (c *Checker) WithWhitelistCheck(controlID string, check CheckFunc) CheckFunc {
+	return func() (ComplianceStatus, string) {
+		if c.whitelist != nil && c.whitelist.IsCISExcepted(controlID) {
+			return StatusPass, "Check skipped (whitelisted in configuration)"
+		}
+		return check()
+	}
 }
 
 // CheckModuleDisabled returns a check function for verifying a kernel module is disabled
@@ -34,6 +46,11 @@ func (c *Checker) CheckModuleDisabled(module string) CheckFunc {
 			// Use regex for exact module name match (first column of lsmod)
 			re := regexp.MustCompile(`(?m)^` + regexp.QuoteMeta(module) + `\s`)
 			if re.MatchString(result.Stdout) {
+				// Context-aware: Check if module is required by installed software
+				contextMsg := c.getModuleContext(module)
+				if contextMsg != "" {
+					return StatusPass, contextMsg
+				}
 				return StatusFail, fmt.Sprintf("Module %s is currently loaded", module)
 			}
 		}
@@ -74,6 +91,21 @@ func (c *Checker) CheckModuleDisabled(module string) CheckFunc {
 
 		return StatusFail, fmt.Sprintf("Module %s is not disabled", module)
 	}
+}
+
+// getModuleContext checks if a kernel module is required by installed software
+func (c *Checker) getModuleContext(module string) string {
+	switch module {
+	case "squashfs":
+		// Check if snap is installed
+		if system.CommandExists("snap") {
+			snapResult, _ := system.RunCommand(c.ctx, system.TimeoutShort, "snap", "list")
+			if snapResult != nil && snapResult.Success && len(strings.TrimSpace(snapResult.Stdout)) > 0 {
+				return "Module squashfs is loaded (required by snap packages)"
+			}
+		}
+	}
+	return ""
 }
 
 // CheckTmpPartition verifies /tmp is a separate partition
@@ -233,6 +265,61 @@ func (c *Checker) CheckSysctl(param, expected string) CheckFunc {
 		}
 		return StatusFail, fmt.Sprintf("Could not read %s", param)
 	}
+}
+
+// CheckIPForwarding returns a check function that is context-aware of containers
+// IP forwarding is required by Docker/Podman/LXC, so we don't flag it as a failure if container runtime is active
+// Also checks whitelist for manual exceptions
+func (c *Checker) CheckIPForwarding() CheckFunc {
+	return func() (ComplianceStatus, string) {
+		// Check whitelist first
+		if c.whitelist != nil && c.whitelist.IsCISExcepted("3.2.2") {
+			return StatusPass, "IP forwarding check skipped (whitelisted in configuration)"
+		}
+
+		result, _ := system.RunCommand(c.ctx, system.TimeoutShort, "sysctl", "-n", "net.ipv4.ip_forward")
+		if result == nil || !result.Success {
+			return StatusFail, "Could not read net.ipv4.ip_forward"
+		}
+
+		actual := strings.TrimSpace(result.Stdout)
+		if actual == "0" {
+			return StatusPass, "IP forwarding is disabled (net.ipv4.ip_forward = 0)"
+		}
+
+		// IP forwarding is enabled - check if container runtime is active
+		containerRuntime := c.detectContainerRuntime()
+		if containerRuntime != "" {
+			return StatusPass, fmt.Sprintf("IP forwarding is enabled (net.ipv4.ip_forward = 1, required by %s)", containerRuntime)
+		}
+
+		return StatusFail, "IP forwarding is enabled (net.ipv4.ip_forward = 1)"
+	}
+}
+
+// detectContainerRuntime checks if any container runtime is active
+// Uses centralized patterns from config for extensibility
+func (c *Checker) detectContainerRuntime() string {
+	// Try common container runtimes via systemd
+	runtimes := []string{"docker", "podman", "lxd", "containerd"}
+	for _, runtime := range runtimes {
+		if system.CommandExists(runtime) {
+			result, _ := system.RunCommand(c.ctx, system.TimeoutShort, "systemctl", "is-active", runtime)
+			if result != nil && strings.TrimSpace(result.Stdout) == "active" {
+				return runtime
+			}
+		}
+	}
+
+	// Check for LXC (might not have systemd service)
+	if system.CommandExists("lxc-ls") {
+		result, _ := system.RunCommand(c.ctx, system.TimeoutShort, "lxc-ls")
+		if result != nil && result.Success && len(strings.TrimSpace(result.Stdout)) > 0 {
+			return "LXC"
+		}
+	}
+
+	return ""
 }
 
 // CheckFirewallInstalled verifies a firewall package is installed

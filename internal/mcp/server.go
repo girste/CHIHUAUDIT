@@ -330,6 +330,54 @@ func (s *Server) registerTools() {
 			Properties: map[string]interface{}{},
 		},
 	}, s.handleGetNotificationConfig)
+
+	// Manage whitelist
+	s.mcp.AddTool(mcp.Tool{
+		Name:        "manage_whitelist",
+		Description: "Manage the security whitelist for server-specific exceptions. Use this AI-driven tool to add/update whitelist entries when the user confirms certain findings are false positives. The whitelist is saved locally in .mcp-watchdog-whitelist.yaml (in .gitignore). Supports whitelisting: services on specific ports/binds, wildcard ports (0.0.0.0), and CIS control exceptions.",
+		InputSchema: mcp.ToolInputSchema{
+			Type: "object",
+			Properties: map[string]interface{}{
+				"action": map[string]interface{}{
+					"type":        "string",
+					"description": "Action to perform: 'get' (read current), 'add' (add entries), 'save' (persist to disk)",
+					"enum":        []string{"get", "add", "save"},
+				},
+				"service": map[string]interface{}{
+					"type":        "object",
+					"description": "Service to whitelist (for action=add)",
+					"properties": map[string]interface{}{
+						"port":    map[string]interface{}{"type": "integer"},
+						"bind":    map[string]interface{}{"type": "string"},
+						"service": map[string]interface{}{"type": "string"},
+						"reason":  map[string]interface{}{"type": "string"},
+					},
+				},
+				"wildcard_port": map[string]interface{}{
+					"type":        "integer",
+					"description": "Port number to allow on wildcard binding (0.0.0.0/::) - for action=add",
+				},
+				"cis_exception": map[string]interface{}{
+					"type":        "object",
+					"description": "CIS control exception (for action=add)",
+					"properties": map[string]interface{}{
+						"id":     map[string]interface{}{"type": "string"},
+						"reason": map[string]interface{}{"type": "string"},
+					},
+				},
+				"server_info": map[string]interface{}{
+					"type":        "object",
+					"description": "Server metadata (for action=add or save)",
+					"properties": map[string]interface{}{
+						"role":        map[string]interface{}{"type": "string"},
+						"environment": map[string]interface{}{"type": "string"},
+						"notes":       map[string]interface{}{"type": "string"},
+					},
+				},
+			},
+			Required: []string{"action"},
+		},
+	}, s.handleManageWhitelist)
 }
 
 func (s *Server) getLogDir() string {
@@ -606,7 +654,7 @@ func (s *Server) handleCISAudit(ctx context.Context, request mcp.CallToolRequest
 	}
 
 	// Run CIS audit with compact output by default
-	result := cis.RunCISAudit(ctx, level, includeAllControls)
+	result := cis.RunCISAudit(ctx, level, includeAllControls, s.config.Whitelist)
 
 	resultJSON, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
@@ -672,12 +720,12 @@ func (s *Server) handleConfigureWebhook(ctx context.Context, request mcp.CallToo
 	}
 
 	result := map[string]interface{}{
-		"success":       true,
-		"provider":      provider,
-		"enabled":       enabled,
+		"success":        true,
+		"provider":       provider,
+		"enabled":        enabled,
 		"only_on_issues": onlyOnIssues,
-		"min_severity":  minSeverity,
-		"message":       "Webhook configured successfully. Use 'test_webhook' to verify.",
+		"min_severity":   minSeverity,
+		"message":        "Webhook configured successfully. Use 'test_webhook' to verify.",
 	}
 
 	resultJSON, _ := json.MarshalIndent(result, "", "  ")
@@ -746,6 +794,86 @@ func (s *Server) handleGetNotificationConfig(ctx context.Context, request mcp.Ca
 
 	resultJSON, _ := json.MarshalIndent(result, "", "  ")
 	return mcp.NewToolResultText(string(resultJSON)), nil
+}
+
+func (s *Server) handleManageWhitelist(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	arguments, ok := request.Params.Arguments.(map[string]interface{})
+	if !ok {
+		return mcp.NewToolResultError("Invalid arguments"), nil
+	}
+
+	action, ok := arguments["action"].(string)
+	if !ok {
+		return mcp.NewToolResultError("action parameter required"), nil
+	}
+
+	switch action {
+	case "get":
+		// Return current whitelist
+		resultJSON, _ := json.MarshalIndent(s.config.Whitelist, "", "  ")
+		return mcp.NewToolResultText(string(resultJSON)), nil
+
+	case "add":
+		// Add entries to whitelist
+		if svcData, ok := arguments["service"].(map[string]interface{}); ok {
+			svc := config.ServiceWhitelist{}
+			if port, ok := svcData["port"].(float64); ok {
+				svc.Port = int(port)
+			}
+			if bind, ok := svcData["bind"].(string); ok {
+				svc.Bind = bind
+			}
+			if service, ok := svcData["service"].(string); ok {
+				svc.Service = service
+			}
+			if reason, ok := svcData["reason"].(string); ok {
+				svc.Reason = reason
+			}
+			s.config.Whitelist.Services = append(s.config.Whitelist.Services, svc)
+		}
+
+		if port, ok := arguments["wildcard_port"].(float64); ok {
+			s.config.Whitelist.Network.AllowedWildcardPorts = append(
+				s.config.Whitelist.Network.AllowedWildcardPorts,
+				int(port),
+			)
+		}
+
+		if cisData, ok := arguments["cis_exception"].(map[string]interface{}); ok {
+			exc := config.CISException{}
+			if id, ok := cisData["id"].(string); ok {
+				exc.ID = id
+			}
+			if reason, ok := cisData["reason"].(string); ok {
+				exc.Reason = reason
+			}
+			s.config.Whitelist.CIS.Exceptions = append(s.config.Whitelist.CIS.Exceptions, exc)
+		}
+
+		if serverInfo, ok := arguments["server_info"].(map[string]interface{}); ok {
+			if role, ok := serverInfo["role"].(string); ok {
+				s.config.Whitelist.Server.Role = role
+			}
+			if env, ok := serverInfo["environment"].(string); ok {
+				s.config.Whitelist.Server.Environment = env
+			}
+			if notes, ok := serverInfo["notes"].(string); ok {
+				s.config.Whitelist.Server.Notes = notes
+			}
+		}
+
+		return mcp.NewToolResultText("Entry added to whitelist (in memory). Use action='save' to persist."), nil
+
+	case "save":
+		// Save whitelist to disk
+		if err := config.SaveWhitelist(s.config.Whitelist, ".mcp-watchdog-whitelist.yaml"); err != nil {
+			return mcp.NewToolResultError("Failed to save whitelist: " + err.Error()), nil
+		}
+		return mcp.NewToolResultText("Whitelist saved to .mcp-watchdog-whitelist.yaml"), nil
+
+	default:
+		return mcp.NewToolResultError("Invalid action. Use 'get', 'add', or 'save'"), nil
+	}
 }
 
 func (s *Server) saveNotificationConfig() error {

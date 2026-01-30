@@ -1,6 +1,6 @@
 # MCP Cybersec Watchdog
 
-![MCP Cybersec Watchdog](cover-watchdog-mcp.png)
+![MCP Cybersec Watchdog](docs/images/cover-watchdog-mcp.png)
 
 [![CI](https://github.com/girste/mcp-cybersec-watchdog/actions/workflows/ci.yml/badge.svg)](https://github.com/girste/mcp-cybersec-watchdog/actions)
 [![Lint](https://github.com/girste/mcp-cybersec-watchdog/actions/workflows/lint.yml/badge.svg)](https://github.com/girste/mcp-cybersec-watchdog/actions/workflows/lint.yml)
@@ -10,126 +10,60 @@
 [![SLSA 3](https://slsa.dev/images/gh-badge-level3.svg)](https://slsa.dev)
 [![Mentioned in Awesome](https://awesome.re/mentioned-badge.svg)](https://github.com/punkpeye/awesome-mcp-servers)
 
-**Linux security audit tool.** Single 8.1MB binary, no dependencies.
+**Linux security audit tool for AI assistants.** Single 8.1MB static binary, zero dependencies.
 
 Analyzes firewall, SSH, fail2ban, Docker, kernel hardening, SSL certificates, network services, and more. Includes continuous monitoring with anomaly detection and EU Vulnerability Database integration.
 
-**Just want to use it?** Download the latest binary from [Releases](https://github.com/girste/mcp-cybersec-watchdog/releases) — no compilation needed.
+**Download:** Get the latest binary from [Releases](https://github.com/girste/mcp-cybersec-watchdog/releases) — no compilation needed.
 
 ## MCP Tools
 
 - **security_audit** — Complete system security analysis
-- **cis_audit** — CIS Benchmark Ubuntu 22.04 compliance check
-- **scan_app_security** — Application layer security (ports, processes, containers)
-- **scan_network_security** — Network configuration & firewall rules
+- **cis_audit** — CIS Benchmark compliance check
+- **scan_app_security** — Ports, processes, containers
+- **scan_network_security** — Network & firewall rules
 - **scan_database_security** — Database exposure & hardening
-- **scan_waf_cdn** — WAF/CDN detection & SSL/TLS analysis
-- **verify_backup_config** — Backup integrity verification
+- **scan_waf_cdn** — WAF/CDN detection & SSL/TLS
+- **verify_backup_config** — Backup integrity
 - **check_vulnerability_intel** — CVE database lookup (EU Vulnerability Database)
-- **start_monitoring** / **stop_monitoring** — Continuous monitoring daemon
-- **monitoring_status** — Daemon status & statistics
-- **analyze_anomaly** — Anomaly detection analysis
+- **start_monitoring** / **stop_monitoring** / **monitoring_status** — Continuous monitoring daemon
+- **analyze_anomaly** — AI anomaly detection analysis
 - **cleanup_old_logs** — Log rotation
-- **configure_webhook** / **test_webhook** — Discord/Slack/custom webhooks
-- **get_notification_config** — Show notification settings
+- **configure_webhook** / **test_webhook** / **get_notification_config** — Discord/Slack/custom webhooks
+- **manage_whitelist** — AI-driven whitelist for false positives
 
-## Example Output
+## Features
 
-📄 **[View all output examples →](docs/outputs/)** - Full audit reports, CIS benchmarks, network scans, monitoring alerts, and webhook notifications with screenshots.
+### AI-Driven Whitelist
+Eliminate false positives with AI-managed `.mcp-watchdog-whitelist.yaml`. Ask AI to identify false positives → automatic whitelisting → clean results. See `.mcp-watchdog-whitelist.example.yaml` for template.
 
-<details>
-<summary>Quick preview: Security Audit</summary>
+### Discord/Slack Webhooks
+Customizable security alerts with rich embeds, severity colors, and detailed breakdowns.
 
-```
-═══════════════════════════════════════════════════════════════
-  🟡  SECURITY REPORT  -  production-web-01
-═══════════════════════════════════════════════════════════════
-
-  Status: 🟡 WARNINGS - Some security issues detected
-  Score:  72/100 (Grade: C)
-
-───────────────────────────────────────────────────────────────
-  ✅ WHAT'S WORKING WELL
-───────────────────────────────────────────────────────────────
-  • Firewall active • SSH hardened • Fail2ban protecting
-  • AppArmor enforcing • System updated • Kernel hardened
-
-───────────────────────────────────────────────────────────────
-  ⚠️  ISSUES REQUIRING ATTENTION
-───────────────────────────────────────────────────────────────
-  🔴 [HIGH] Docker daemon exposed without TLS
-  ⚠️ [MEDIUM] MySQL listening on 0.0.0.0:3306
-  ⚠️ [MEDIUM] Last backup is 8 days old
-
-═══════════════════════════════════════════════════════════════
-```
-
-</details>
-
-## Commands
-
-| Command | Description |
-|---------|-------------|
-| `audit` | Run security audit with standardized output |
-| `test` | Run security audit (legacy JSON output) |
-| `verify` | Check prerequisites |
-| `monitor` | Start continuous monitoring |
-| `monitor-status` | Show daemon status |
+![Discord Webhook Example](docs/images/screen-discord.png)
 
 ## Quick Start
 
 ```bash
-# Download binary (no build required)
-wget https://github.com/girste/mcp-cybersec-watchdog/releases/latest/download/mcp-watchdog
+# Download binary
+wget https://github.com/girste/mcp-cybersec-watchdog/releases/latest/download/mcp-watchdog_linux_amd64.tar.gz
+tar xzf mcp-watchdog_linux_amd64.tar.gz
 chmod +x mcp-watchdog
 
 # Run audit
 sudo ./mcp-watchdog audit
+
+# Or build from source
+make build && sudo ./bin/mcp-watchdog audit
 ```
 
-**For developers:**
-
-```bash
-make build
-sudo ./bin/mcp-watchdog audit
-```
-
-## Architecture
-
-```
-internal/
-├── analyzers/   # Security checks (firewall, SSH, fail2ban, etc.)
-├── audit/       # Core audit orchestration
-├── cis/         # CIS Benchmark Ubuntu 22.04 (60 controls)
-├── config/      # Configuration management
-├── mcp/         # MCP server (16 tools)
-├── monitoring/  # Continuous monitoring daemon + anomaly detection
-├── notify/      # Discord/Slack/Webhook notifications
-├── output/      # Standardized output formatter (traffic light system)
-├── scanners/    # Advanced scans (network, WAF, database, vulnerability intel)
-├── system/      # System information utilities
-└── util/        # Helper functions
-```
-
----
-
-## Contributing
-
-1. Fork the repo
-2. Create a branch (`git checkout -b feature/your-feature`)
-3. Make changes and run `make lint`
-4. Commit (`git commit -m "Add feature"`)
-5. Push and open a PR
-
-**Code standards:** Go 1.23+, `gofmt`, pass `golangci-lint`.
+📄 **[View all output examples](docs/outputs/)** - Full audit reports, CIS benchmarks, monitoring alerts, webhook notifications.
 
 ## Security
 
-**Do not report vulnerabilities via public issues.**
+**Do not report vulnerabilities via public issues.** Open a [private security advisory](https://github.com/girste/mcp-cybersec-watchdog/security/advisories/new) or DM [@girste](https://github.com/girste).
 
-Open a [private security advisory](https://github.com/girste/mcp-cybersec-watchdog/security/advisories/new) or DM [@girste](https://github.com/girste).
-
-This tool requires sudo for read-only access to system info (firewall, logs, services). No write access is granted.
+This tool requires sudo for read-only access to system info (firewall, logs, services). No write operations.
 
 ---
 

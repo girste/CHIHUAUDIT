@@ -31,6 +31,7 @@ Thumbs.db
 
 # Config (local)
 .mcp-watchdog.yaml
+.mcp-watchdog-whitelist.yaml
 claude_desktop_config.json
 
 # Logs

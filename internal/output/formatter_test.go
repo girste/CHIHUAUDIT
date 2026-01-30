@@ -197,12 +197,12 @@ func TestDetermineTrafficLight(t *testing.T) {
 			want: StatusRed,
 		},
 		{
-			name:  "yellow_with_high",
+			name:  "red_with_high",
 			score: 85,
 			negatives: []NegativeItem{
 				{Severity: "high", Message: "test"},
 			},
-			want: StatusYellow,
+			want: StatusRed, // High severity issues = RED
 		},
 	}
 

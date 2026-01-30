@@ -1,0 +1,62 @@
+# MCP Cybersec Watchdog - Whitelist Configuration Example
+# Copy this file to .mcp-watchdog-whitelist.yaml and customize for your server
+# This file is LOCAL and should NOT be committed (already in .gitignore)
+
+version: "1.0"
+
+# Optional: Server metadata (for documentation)
+server:
+  role: "web-server"           # e.g., web, db, docker-host, k8s-node
+  environment: "production"     # e.g., production, staging, development
+  notes: "Main application server with Docker and PostgreSQL"
+
+# Whitelist specific services/ports that are safe in your environment
+services:
+  # Example: PostgreSQL running on localhost only
+  - port: 5432
+    bind: "127.0.0.1"
+    service: "PostgreSQL"
+    reason: "Internal database for application, localhost-only"
+
+  # Example: Redis on localhost
+  - port: 6379
+    bind: "127.0.0.1"
+    service: "Redis"
+    reason: "Cache server, localhost-only"
+
+# Network-related whitelists
+network:
+  # Ports that are intentionally exposed on wildcard (0.0.0.0/::)
+  allowedWildcardPorts:
+    - 80    # HTTP
+    - 443   # HTTPS
+  # Add more ports as needed for your legitimate services
+
+# CIS Benchmark exceptions
+cis:
+  exceptions:
+    # Example: IP forwarding required by Docker
+    - id: "3.2.2"
+      reason: "Docker requires IP forwarding enabled"
+
+    # Example: squashfs module required by snap
+    # - id: "1.1.1.6"
+    #   reason: "Snap packages require squashfs module"
+
+    # Add more CIS control exceptions as needed
+
+# Customizable alert thresholds
+# Adjust these if you have high-resource AI workloads (like Claude Code sessions)
+# or want stricter/looser monitoring for your specific use case
+thresholds:
+  memory:
+    ram_percent: 95.0   # Alert when RAM usage exceeds this % (default: 90.0)
+    swap_percent: 25.0  # Alert when swap usage exceeds this % (default: 10.0)
+
+  disk:
+    usage_percent: 90.0 # Alert when disk usage exceeds this % (default: 90.0)
+
+  cpu:
+    load_avg_1min: 8.0   # Alert when 1-min load avg exceeds this (default: cores * 2)
+    load_avg_5min: 6.0   # Alert when 5-min load avg exceeds this (default: cores * 1.5)
+    load_avg_15min: 4.0  # Alert when 15-min load avg exceeds this (default: cores * 1)
