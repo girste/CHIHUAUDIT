@@ -78,3 +78,4 @@ This tool requires sudo for read-only access to system info (firewall, logs, ser
 [![Downloads](https://img.shields.io/github/downloads/girste/mcp-cybersec-watchdog/total)](https://github.com/girste/mcp-cybersec-watchdog/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+# Test
