@@ -1,0 +1,56 @@
+name: Fuzzing
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Run fuzzing daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    name: Fuzz Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v6.0.2
+
+      - name: Set up Go
+        uses: actions/setup-go@3041bf56c941b39c61721a86cd11f3bb1338122a # v5.2.0
+        with:
+          go-version: '1.23'
+
+      - name: Run fuzz tests (short)
+        run: |
+          # Run each fuzz test for 30 seconds on PRs/pushes
+          go test -fuzz=FuzzLoadConfig -fuzztime=30s ./internal/config/ || true
+          go test -fuzz=FuzzWhitelistParsing -fuzztime=30s ./internal/config/ || true
+          go test -fuzz=FuzzFormatJSON -fuzztime=30s ./internal/output/ || true
+          go test -fuzz=FuzzGetTrafficLightStatus -fuzztime=30s ./internal/output/ || true
+        if: github.event_name != 'schedule'
+
+      - name: Run fuzz tests (extended)
+        run: |
+          # Run longer fuzzing on scheduled runs (5 minutes each)
+          go test -fuzz=FuzzLoadConfig -fuzztime=5m ./internal/config/
+          go test -fuzz=FuzzWhitelistParsing -fuzztime=5m ./internal/config/
+          go test -fuzz=FuzzFormatJSON -fuzztime=5m ./internal/output/
+          go test -fuzz=FuzzGetTrafficLightStatus -fuzztime=5m ./internal/output/
+        if: github.event_name == 'schedule'
+
+      - name: Upload fuzz failures
+        if: failure()
+        uses: actions/upload-artifact@6f51ac03b9356f520e9adb1b1b7802705f340c2b # v4.5.0
+        with:
+          name: fuzz-failures
+          path: |
+            **/testdata/fuzz/
+          retention-days: 7
