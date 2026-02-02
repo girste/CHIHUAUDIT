@@ -16,9 +16,7 @@
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/11858/badge)](https://www.bestpractices.dev/projects/11858)
 [![SLSA 3](https://slsa.dev/images/gh-badge-level3.svg)](https://slsa.dev)
 
-**AI-powered Linux security auditing tool.** Single 8.1MB static binary, zero dependencies.
-
-Continuous monitoring with anomaly detection, Discord/Slack webhooks, and AI-driven whitelisting for false positive elimination.
+Single full system checkup or ontinuous monitoring with anomaly detection, Discord/Slack webhooks.
 
 ## Quick Start
 
