@@ -309,7 +309,7 @@ func BenchmarkHostExecutor_RunHostCommand(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		executor.RunHostCommand(ctx, TimeoutShort, "cat", "/dev/null")
+		_, _ = executor.RunHostCommand(ctx, TimeoutShort, "cat", "/dev/null")
 	}
 }
 
