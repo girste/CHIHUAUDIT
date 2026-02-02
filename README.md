@@ -4,16 +4,16 @@
 
 [![Mentioned in Awesome](https://awesome.re/mentioned-badge.svg)](https://github.com/punkpeye/awesome-mcp-servers)
 
-[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/girste/chihuaudit/badge)](https://securityscorecards.dev/viewer/?uri=github.com/girste/chihuaudit)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/girste/CHIHUAUDIT/badge)](https://securityscorecards.dev/viewer/?uri=github.com/girste/CHIHUAUDIT)
 
 </div>
 
 ![Chihuaudit](docs/images/chihuaudit_cover.png)
 
-[![CI](https://github.com/girste/chihuaudit/actions/workflows/ci.yml/badge.svg)](https://github.com/girste/chihuaudit/actions)
-[![Lint](https://github.com/girste/chihuaudit/actions/workflows/lint.yml/badge.svg)](https://github.com/girste/chihuaudit/actions/workflows/lint.yml)
-[![CodeQL](https://github.com/girste/chihuaudit/actions/workflows/codeql.yml/badge.svg)](https://github.com/girste/chihuaudit/security/code-scanning)
-[![Trivy](https://github.com/girste/chihuaudit/actions/workflows/trivy.yml/badge.svg)](https://github.com/girste/chihuaudit/actions/workflows/trivy.yml)
+[![CI](https://github.com/girste/CHIHUAUDIT/actions/workflows/ci.yml/badge.svg)](https://github.com/girste/CHIHUAUDIT/actions)
+[![Lint](https://github.com/girste/CHIHUAUDIT/actions/workflows/lint.yml/badge.svg)](https://github.com/girste/CHIHUAUDIT/actions/workflows/lint.yml)
+[![CodeQL](https://github.com/girste/CHIHUAUDIT/actions/workflows/codeql.yml/badge.svg)](https://github.com/girste/CHIHUAUDIT/security/code-scanning)
+[![Trivy](https://github.com/girste/CHIHUAUDIT/actions/workflows/trivy.yml/badge.svg)](https://github.com/girste/CHIHUAUDIT/actions/workflows/trivy.yml)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/11858/badge)](https://www.bestpractices.dev/projects/11858)
 [![SLSA 3](https://slsa.dev/images/gh-badge-level3.svg)](https://slsa.dev)
 
@@ -21,7 +21,7 @@
 
 Analyzes firewall, SSH, fail2ban, Docker, kernel hardening, SSL certificates, network services, and more. Includes continuous monitoring with anomaly detection and EU Vulnerability Database integration.
 
-**Download:** Get the latest binary from [Releases](https://github.com/girste/chihuaudit/releases) — no compilation needed.
+**Download:** Get the latest binary from [Releases](https://github.com/girste/CHIHUAUDIT/releases) — no compilation needed.
 
 ## MCP Tools
 
@@ -73,7 +73,7 @@ docker run --rm --privileged \
 **Continuous monitoring daemon (with Discord webhooks):**
 ```bash
 # Clone repository for docker-compose
-git clone https://github.com/girste/chihuaudit
+git clone https://github.com/girste/CHIHUAUDIT
 cd chihuaudit
 
 # Configure Discord webhook (optional)
@@ -98,7 +98,7 @@ docker-compose down
 
 ```bash
 # Download binary
-wget https://github.com/girste/chihuaudit/releases/latest/download/chihuaudit_linux_amd64.tar.gz
+wget https://github.com/girste/CHIHUAUDIT/releases/latest/download/chihuaudit_linux_amd64.tar.gz
 tar xzf chihuaudit_linux_amd64.tar.gz
 chmod +x chihuaudit
 
@@ -113,15 +113,15 @@ make build && sudo ./bin/chihuaudit audit
 
 ## Security
 
-**Do not report vulnerabilities via public issues.** Open a [private security advisory](https://github.com/girste/chihuaudit/security/advisories/new) or DM [@girste](https://github.com/girste).
+**Do not report vulnerabilities via public issues.** Open a [private security advisory](https://github.com/girste/CHIHUAUDIT/security/advisories/new) or DM [@girste](https://github.com/girste).
 
 This tool requires sudo for read-only access to system info (firewall, logs, services). No write operations.
 
 ---
 
 [![Go](https://img.shields.io/badge/Go-1.23+-00ADD8?logo=go&logoColor=white)](https://go.dev)
-[![Release](https://img.shields.io/github/v/release/girste/chihuaudit)](https://github.com/girste/chihuaudit/releases)
-[![Downloads](https://img.shields.io/github/downloads/girste/chihuaudit/total)](https://github.com/girste/chihuaudit/releases)
+[![Release](https://img.shields.io/github/v/release/girste/chihuaudit)](https://github.com/girste/CHIHUAUDIT/releases)
+[![Downloads](https://img.shields.io/github/downloads/girste/chihuaudit/total)](https://github.com/girste/CHIHUAUDIT/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 # Test
