@@ -41,35 +41,35 @@ func IsInContainer() bool {
 // IsProcessRunning checks if a process with given name is running on the host
 func IsProcessRunning(processName string) bool {
 	procPath := HostPath("/proc")
-	
+
 	entries, err := os.ReadDir(procPath)
 	if err != nil {
 		return false
 	}
-	
+
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
 		}
-		
+
 		// Check if directory name is numeric (PID)
 		if entry.Name()[0] < '0' || entry.Name()[0] > '9' {
 			continue
 		}
-		
+
 		// Read cmdline to check process name
 		cmdlinePath := procPath + "/" + entry.Name() + "/cmdline"
 		data, err := os.ReadFile(cmdlinePath)
 		if err != nil {
 			continue
 		}
-		
+
 		cmdline := string(data)
 		if strings.Contains(cmdline, processName) {
 			return true
 		}
 	}
-	
+
 	return false
 }
 

@@ -37,7 +37,7 @@ func (a *UpdatesAnalyzer) analyzeDebian(ctx context.Context, result *Result) (*R
 	// Check last update time by reading apt lists timestamp
 	listsPath := system.HostPath("/var/lib/apt/lists")
 	lastUpdateTime := time.Time{}
-	
+
 	if entries, err := os.ReadDir(listsPath); err == nil {
 		for _, entry := range entries {
 			if strings.Contains(entry.Name(), "Packages") {
@@ -55,12 +55,12 @@ func (a *UpdatesAnalyzer) analyzeDebian(ctx context.Context, result *Result) (*R
 	if !lastUpdateTime.IsZero() {
 		daysSinceUpdate = int(time.Since(lastUpdateTime).Hours() / 24)
 	}
-	
+
 	// Try to get updates count - fallback to apt command if available
 	totalUpdates := 0
 	securityUpdates := 0
 	securityPackages := []string{}
-	
+
 	if system.CommandExists("apt") {
 		listResult, _ := system.RunCommand(ctx, system.TimeoutMedium, "apt", "list", "--upgradable")
 		if listResult != nil && listResult.Success {
@@ -87,7 +87,7 @@ func (a *UpdatesAnalyzer) analyzeDebian(ctx context.Context, result *Result) (*R
 	}
 
 	a.addUpdateIssues(result, totalUpdates, securityUpdates)
-	
+
 	// Warn if updates are very old
 	if daysSinceUpdate > 30 {
 		result.AddIssue(NewIssue(SeverityMedium, "Package lists not updated in "+strconv.Itoa(daysSinceUpdate)+" days", "Run apt-get update regularly"))
@@ -102,7 +102,7 @@ func (a *UpdatesAnalyzer) analyzeRHEL(ctx context.Context, result *Result) (*Res
 		system.HostPath("/var/cache/dnf"),
 		system.HostPath("/var/cache/yum"),
 	}
-	
+
 	lastUpdateTime := time.Time{}
 	for _, cachePath := range cachePaths {
 		if info, err := os.Stat(cachePath); err == nil {
@@ -111,7 +111,7 @@ func (a *UpdatesAnalyzer) analyzeRHEL(ctx context.Context, result *Result) (*Res
 			}
 		}
 	}
-	
+
 	daysSinceUpdate := 999
 	if !lastUpdateTime.IsZero() {
 		daysSinceUpdate = int(time.Since(lastUpdateTime).Hours() / 24)
@@ -120,7 +120,7 @@ func (a *UpdatesAnalyzer) analyzeRHEL(ctx context.Context, result *Result) (*Res
 	// Try yum/dnf commands if available
 	totalUpdates := 0
 	securityUpdates := 0
-	
+
 	if system.CommandExists("dnf") {
 		checkResult, _ := system.RunCommand(ctx, system.TimeoutVeryLong, "dnf", "check-update", "--security", "-q")
 		if checkResult != nil {
@@ -152,7 +152,7 @@ func (a *UpdatesAnalyzer) analyzeRHEL(ctx context.Context, result *Result) (*Res
 	}
 
 	a.addUpdateIssues(result, totalUpdates, securityUpdates)
-	
+
 	// Warn if updates are very old
 	if daysSinceUpdate > 30 {
 		result.AddIssue(NewIssue(SeverityMedium, "Package cache not updated in "+strconv.Itoa(daysSinceUpdate)+" days", "Run yum/dnf check-update regularly"))

@@ -54,7 +54,7 @@ func (a *FirewallAnalyzer) Analyze(ctx context.Context, cfg *config.Config) (*Re
 
 func (a *FirewallAnalyzer) analyzeUFW(ctx context.Context) (string, map[string]interface{}) {
 	ufwConfPath := system.HostPath("/etc/ufw/ufw.conf")
-	
+
 	// Check if UFW config exists
 	if !system.FileExists(ufwConfPath) {
 		return "", nil
@@ -76,7 +76,7 @@ func (a *FirewallAnalyzer) analyzeUFW(ctx context.Context) (string, map[string]i
 	userRulesPath := system.HostPath("/etc/ufw/user.rules")
 	rulesCount := 0
 	openPorts := []int{}
-	
+
 	if rulesData, err := os.ReadFile(userRulesPath); err == nil {
 		lines := strings.Split(string(rulesData), "\n")
 		for _, line := range lines {
