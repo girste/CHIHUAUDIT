@@ -1,5 +1,7 @@
 # Network Security Scan
 
+> **Note:** All data shown below is fictional and for demonstration purposes only.
+
 Network configuration and exposed services analysis.
 
 ```bash
@@ -7,7 +9,7 @@ Network configuration and exposed services analysis.
 scan_network_security
 
 # Or directly
-sudo ./bin/mcp-watchdog audit --scan=network
+sudo ./bin/chihuaudit audit --scan=network
 ```
 
 ## Output Example

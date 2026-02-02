@@ -1,13 +1,15 @@
 # Continuous Monitoring Daemon
 
+> **Note:** All data shown below is fictional and for demonstration purposes only.
+
 Real-time security monitoring with anomaly detection.
 
 ```bash
 # Start monitoring
-sudo ./bin/mcp-watchdog monitor
+sudo ./bin/chihuaudit monitor
 
 # Check status
-sudo ./bin/mcp-watchdog monitor-status
+sudo ./bin/chihuaudit monitor-status
 ```
 
 ## Daemon Status Output
@@ -76,7 +78,7 @@ sudo ./bin/mcp-watchdog monitor-status
   Auto-Remediation:
     ✅ Fail2ban triggered (IP banned for 24h)
     ✅ Webhook alert sent to #security channel
-    ✅ Event logged to /var/log/watchdog/anomalies.log
+    ✅ Event logged to /var/log/chihuaudit/anomalies.log
 
 ───────────────────────────────────────────────────────────────
   RECOMMENDATION

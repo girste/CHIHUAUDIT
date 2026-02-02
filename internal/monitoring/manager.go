@@ -160,10 +160,18 @@ func (m *MonitoringManager) Start(intervalSeconds int) *StartResult {
 		}
 	}
 
+	// Get project directory (parent of bin/ directory)
+	// execPath: /path/to/project/bin/chihuaudit -> projectDir: /path/to/project
+	binDir := filepath.Dir(execPath)
+	projectDir := filepath.Dir(binDir)
+
 	// Start daemon in background
 	cmd := exec.Command(execPath, "monitor",
 		"--interval", strconv.Itoa(intervalSeconds),
 		"--log-dir", m.logDir)
+
+	// Set working directory to project directory so whitelist is found
+	cmd.Dir = projectDir
 
 	// Detach from parent
 	cmd.SysProcAttr = &syscall.SysProcAttr{

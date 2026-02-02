@@ -1,8 +1,12 @@
 package monitoring
 
 import (
+	"context"
 	"fmt"
 	"sort"
+	"time"
+
+	"github.com/girste/chihuaudit/internal/config"
 )
 
 // Severity levels
@@ -158,9 +162,32 @@ func (d *AnomalyDetector) checkServices(baseline, current map[string]interface{}
 
 	if len(newPorts) > 0 {
 		sort.Ints(newPorts)
-		d.addAnomaly(SeverityMedium, "services",
-			fmt.Sprintf("New services listening: ports %v", newPorts),
-			map[string]interface{}{"ports": newPorts})
+
+		// Enrich port details with process information
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		enriched := EnrichPortDetails(ctx, newPorts)
+
+		// Filter out whitelisted processes
+		whitelist, _ := config.LoadWhitelist()
+		var suspicious []PortDetail
+		for _, detail := range enriched {
+			// Check if process is whitelisted based on name and bind address
+			if whitelist != nil && whitelist.IsProcessAllowed(detail.Process, detail.Bind) {
+				continue // Skip whitelisted process
+			}
+			suspicious = append(suspicious, detail)
+		}
+
+		// Only add anomaly if there are non-whitelisted ports
+		if len(suspicious) > 0 {
+			d.addAnomaly(SeverityMedium, "services",
+				FormatEnrichedMessage(suspicious),
+				map[string]interface{}{
+					"ports":    newPorts,
+					"enriched": suspicious,
+				})
+		}
 	}
 
 	// Large increase in exposed services

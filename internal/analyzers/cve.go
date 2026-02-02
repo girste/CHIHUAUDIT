@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/girste/mcp-cybersec-watchdog/internal/config"
-	"github.com/girste/mcp-cybersec-watchdog/internal/system"
+	"github.com/girste/chihuaudit/internal/config"
+	"github.com/girste/chihuaudit/internal/system"
 )
 
 type CVEAnalyzer struct{}

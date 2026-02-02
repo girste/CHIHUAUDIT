@@ -7,13 +7,14 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
-	"github.com/girste/mcp-cybersec-watchdog/internal/audit"
-	"github.com/girste/mcp-cybersec-watchdog/internal/config"
-	"github.com/girste/mcp-cybersec-watchdog/internal/notify"
-	"github.com/girste/mcp-cybersec-watchdog/internal/util"
+	"github.com/girste/chihuaudit/internal/audit"
+	"github.com/girste/chihuaudit/internal/config"
+	"github.com/girste/chihuaudit/internal/notify"
+	"github.com/girste/chihuaudit/internal/util"
 	"go.uber.org/zap"
 )
 
@@ -26,6 +27,7 @@ type SecurityMonitor struct {
 	baselineMgr     *BaselineManager
 	anomalyDetector *AnomalyDetector
 	bulletinGen     *BulletinGenerator
+	notifTracker    *NotificationTracker
 	logger          *zap.Logger
 	stopChan        chan struct{}
 }
@@ -45,6 +47,10 @@ func NewSecurityMonitor(intervalSeconds int, logDir, baselinePath string, verbos
 		baselinePath = filepath.Join(logDir, "baseline.json")
 	}
 
+	// Create notification tracker and load state
+	tracker := NewNotificationTracker(logDir)
+	_ = tracker.Load() // Ignore error on first run
+
 	return &SecurityMonitor{
 		interval:        time.Duration(intervalSeconds) * time.Second,
 		logDir:          logDir,
@@ -52,6 +58,7 @@ func NewSecurityMonitor(intervalSeconds int, logDir, baselinePath string, verbos
 		baselineMgr:     NewBaselineManager(baselinePath),
 		anomalyDetector: NewAnomalyDetector(),
 		bulletinGen:     NewBulletinGenerator(),
+		notifTracker:    tracker,
 		logger:          util.GetLogger(),
 		stopChan:        make(chan struct{}),
 	}
@@ -68,7 +75,12 @@ type CheckResult struct {
 func (m *SecurityMonitor) log(msg string) {
 	if m.verbose {
 		timestamp := time.Now().UTC().Format("2006-01-02 15:04:05")
-		fmt.Printf("[%s] %s\n", timestamp, msg)
+		// Use logger for consistency, fallback to stderr if logger unavailable
+		if m.logger != nil {
+			m.logger.Info(msg, zap.String("timestamp", timestamp))
+		} else {
+			fmt.Fprintf(os.Stderr, "[%s] %s\n", timestamp, msg)
+		}
 	}
 }
 
@@ -119,6 +131,9 @@ func (m *SecurityMonitor) RunOnce() (*CheckResult, error) {
 	// Add system health anomalies
 	anomalies = append(anomalies, detectSystemHealthAnomalies(systemHealth)...)
 
+	// Filter out whitelisted anomalies
+	anomalies = m.filterWhitelistedAnomalies(cfg, anomalies, currentSnapshot)
+
 	// Calculate baseline age
 	baselineTime, _ := time.Parse(time.RFC3339, baseline.Timestamp)
 	baselineAge := time.Since(baselineTime)
@@ -146,15 +161,15 @@ func (m *SecurityMonitor) RunOnce() (*CheckResult, error) {
 			m.log("CRITICAL anomalies detected - AI analysis recommended")
 			if m.verbose {
 				status = "critical"
-				fmt.Printf("\nCRITICAL ANOMALY DETECTED\n")
-				fmt.Printf("Run AI analysis: Use MCP tool 'analyze_anomaly' with file %s\n", anomalyFile)
+				fmt.Fprintf(os.Stderr, "\nCRITICAL ANOMALY DETECTED\n")
+				fmt.Fprintf(os.Stderr, "Run AI analysis: Use MCP tool 'analyze_anomaly' with file %s\n", anomalyFile)
 			}
 		} else if m.anomalyDetector.HasHigh() {
 			status = "high"
 			m.log("High severity anomalies detected - AI analysis recommended")
 			if m.verbose {
-				fmt.Printf("\nHIGH SEVERITY ANOMALY DETECTED\n")
-				fmt.Printf("Run AI analysis: Use MCP tool 'analyze_anomaly' with file %s\n", anomalyFile)
+				fmt.Fprintf(os.Stderr, "\nHIGH SEVERITY ANOMALY DETECTED\n")
+				fmt.Fprintf(os.Stderr, "Run AI analysis: Use MCP tool 'analyze_anomaly' with file %s\n", anomalyFile)
 			}
 		} else {
 			status = "medium"
@@ -314,9 +329,26 @@ func (m *SecurityMonitor) sendNotification(ctx context.Context, cfg *config.Conf
 		}
 	}
 
-	// Convert anomalies to alert issues
-	issues := make([]notify.AlertIssue, 0, len(anomalies))
+	// Filter anomalies through notification tracker (exponential backoff)
+	// Only notify if:
+	// - First time seeing this anomaly
+	// - Last notification was >= 24h ago
+	filteredAnomalies := []Anomaly{}
 	for _, a := range anomalies {
+		if m.notifTracker.ShouldNotify(a) {
+			filteredAnomalies = append(filteredAnomalies, a)
+		}
+	}
+
+	// If all anomalies were filtered out (already notified recently), skip
+	if len(filteredAnomalies) == 0 {
+		m.log("All anomalies already notified recently, skipping notification")
+		return
+	}
+
+	// Convert filtered anomalies to alert issues
+	issues := make([]notify.AlertIssue, 0, len(filteredAnomalies))
+	for _, a := range filteredAnomalies {
 		issues = append(issues, notify.AlertIssue{
 			Severity: a.Severity,
 			Message:  a.Message,
@@ -363,4 +395,72 @@ func (m *SecurityMonitor) sendNotification(ctx context.Context, cfg *config.Conf
 			m.log(fmt.Sprintf("Notification failed for %s: %s", f.Provider, f.Error))
 		}
 	}
+
+	// Save notification tracker state
+	if err := m.notifTracker.Save(); err != nil {
+		m.log(fmt.Sprintf("Warning: failed to save notification state: %v", err))
+	}
+}
+
+// filterWhitelistedAnomalies removes anomalies for whitelisted ports/services
+func (m *SecurityMonitor) filterWhitelistedAnomalies(cfg *config.Config, anomalies []Anomaly, currentSnapshot map[string]interface{}) []Anomaly {
+	if cfg.Whitelist == nil {
+		return anomalies
+	}
+
+	filtered := []Anomaly{}
+	for _, anomaly := range anomalies {
+		// Check if this is a "New services listening" anomaly
+		if anomaly.Category == "services" && strings.Contains(anomaly.Message, "Port ") {
+			// Extract port details from enriched data
+			if details, ok := anomaly.Details["enriched"].([]interface{}); ok && len(details) > 0 {
+				allWhitelisted := true
+				for _, d := range details {
+					if portDetail, ok := d.(map[string]interface{}); ok {
+						port := int(portDetail["port"].(float64))
+						bind := portDetail["bind"].(string)
+						process := ""
+						if p, ok := portDetail["process"].(string); ok {
+							process = p
+						}
+
+						// Check whitelist based on bind address and process
+						isWhitelisted := false
+
+						// First check if process is whitelisted (takes precedence)
+						if process != "" && process != "unknown" {
+							isWhitelisted = cfg.Whitelist.IsProcessAllowed(process, bind)
+						}
+
+						// If not whitelisted by process, check port-based whitelist
+						if !isWhitelisted {
+							if bind == "127.0.0.1" || strings.HasPrefix(bind, "127.") {
+								// Localhost port
+								isWhitelisted = cfg.Whitelist.IsLocalhostPortAllowed(port)
+							} else if bind == "0.0.0.0" || bind == "::" {
+								// Wildcard port
+								isWhitelisted = cfg.Whitelist.IsWildcardPortAllowed(port)
+							}
+						}
+
+						if !isWhitelisted {
+							allWhitelisted = false
+							break
+						}
+					}
+				}
+
+				// If all ports in this anomaly are whitelisted, skip it
+				if allWhitelisted {
+					m.log(fmt.Sprintf("Skipping whitelisted anomaly: %s", anomaly.Message))
+					continue
+				}
+			}
+		}
+
+		// Keep this anomaly
+		filtered = append(filtered, anomaly)
+	}
+
+	return filtered
 }

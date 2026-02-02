@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/girste/mcp-cybersec-watchdog/internal/config"
-	"github.com/girste/mcp-cybersec-watchdog/internal/system"
+	"github.com/girste/chihuaudit/internal/config"
+	"github.com/girste/chihuaudit/internal/system"
 )
 
 type DockerAnalyzer struct{}
@@ -63,15 +63,15 @@ func (a *DockerAnalyzer) Analyze(ctx context.Context, cfg *config.Config) (*Resu
 
 	// Add issues
 	if privilegedCount > 0 {
-		result.AddIssue(NewIssue(SeverityHigh, "Privileged containers detected: "+strconv.Itoa(privilegedCount), "Avoid running containers in privileged mode"))
+		result.AddIssue(NewIssue(SeverityHigh, strconv.Itoa(privilegedCount)+" privileged containers", "Drop privileges"))
 	}
 
 	if !rootless && runningCount > 0 {
-		result.AddIssue(NewIssue(SeverityMedium, "Docker is not running in rootless mode", "Consider enabling rootless mode for better security"))
+		result.AddIssue(NewIssue(SeverityMedium, "Docker not rootless", "Enable rootless mode"))
 	}
 
 	if runningCount > 20 {
-		result.AddIssue(NewIssue(SeverityLow, "Many containers running: "+strconv.Itoa(runningCount), "Large attack surface, ensure all are necessary"))
+		result.AddIssue(NewIssue(SeverityLow, strconv.Itoa(runningCount)+" containers running", "Review necessity"))
 	}
 
 	return result, nil

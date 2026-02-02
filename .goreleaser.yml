@@ -1,14 +1,14 @@
 version: 2
 
-project_name: mcp-watchdog
+project_name: chihuaudit
 
 before:
   hooks:
     - go mod tidy
 
 builds:
-  - main: ./cmd/mcp-watchdog
-    binary: mcp-watchdog
+  - main: ./cmd/chihuaudit
+    binary: chihuaudit
     env:
       - CGO_ENABLED=0
     goos:
@@ -22,6 +22,12 @@ builds:
       - -X main.version={{.Version}}
       - -X main.commit={{.ShortCommit}}
       - -X main.date={{.Date}}
+
+upx:
+  - enabled: true
+    compress: best
+    lzma: true
+    brute: false
 
 archives:
   - formats: [tar.gz]
@@ -65,7 +71,7 @@ changelog:
 release:
   github:
     owner: girste
-    name: mcp-cybersec-watchdog
+    name: chihuaudit
   name_template: "{{.Tag}}"
   prerelease: auto
   draft: false
@@ -76,32 +82,32 @@ release:
 
     | OS | Architecture | File | Use Case |
     |---|---|---|---|
-    | 🐧 Linux | Intel/AMD 64-bit | `mcp-watchdog_{{.Tag}}_linux_amd64.tar.gz` | Most Linux servers & desktops |
-    | 🐧 Linux | ARM 64-bit | `mcp-watchdog_{{.Tag}}_linux_arm64.tar.gz` | Raspberry Pi 4+, ARM servers |
-    | 🍎 macOS | Intel | `mcp-watchdog_{{.Tag}}_darwin_amd64.tar.gz` | macOS Intel chips |
-    | 🍎 macOS | Apple Silicon | `mcp-watchdog_{{.Tag}}_darwin_arm64.tar.gz` | M1/M2/M3/M4 Macs |
+    | 🐧 Linux | Intel/AMD 64-bit | `chihuaudit_{{.Tag}}_linux_amd64.tar.gz` | Most Linux servers & desktops |
+    | 🐧 Linux | ARM 64-bit | `chihuaudit_{{.Tag}}_linux_arm64.tar.gz` | Raspberry Pi 4+, ARM servers |
+    | 🍎 macOS | Intel | `chihuaudit_{{.Tag}}_darwin_amd64.tar.gz` | macOS Intel chips |
+    | 🍎 macOS | Apple Silicon | `chihuaudit_{{.Tag}}_darwin_arm64.tar.gz` | M1/M2/M3/M4 Macs |
 
     ### Quick Install (Linux/macOS)
 
     ```bash
     # Download (replace with your architecture)
-    wget https://github.com/girste/mcp-cybersec-watchdog/releases/download/{{.Tag}}/mcp-watchdog_{{.Tag}}_linux_amd64.tar.gz
+    wget https://github.com/girste/chihuaudit/releases/download/{{.Tag}}/chihuaudit_{{.Tag}}_linux_amd64.tar.gz
 
     # Extract
-    tar xzf mcp-watchdog_{{.Tag}}_linux_amd64.tar.gz
+    tar xzf chihuaudit_{{.Tag}}_linux_amd64.tar.gz
 
     # Run
-    ./mcp-watchdog --help
+    ./chihuaudit --help
 
     # Optional: Move to PATH
-    sudo mv mcp-watchdog /usr/local/bin/
+    sudo mv chihuaudit /usr/local/bin/
     ```
 
     ### Verify Download (Optional)
 
     ```bash
     # Download checksums
-    wget https://github.com/girste/mcp-cybersec-watchdog/releases/download/{{.Tag}}/checksums.txt
+    wget https://github.com/girste/chihuaudit/releases/download/{{.Tag}}/checksums.txt
 
     # Verify
     sha256sum -c checksums.txt --ignore-missing

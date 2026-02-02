@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/girste/mcp-cybersec-watchdog/internal/config"
-	"github.com/girste/mcp-cybersec-watchdog/internal/system"
+	"github.com/girste/chihuaudit/internal/config"
+	"github.com/girste/chihuaudit/internal/system"
 )
 
 type SSLAnalyzer struct{}
@@ -39,10 +39,10 @@ func (a *SSLAnalyzer) Analyze(ctx context.Context, cfg *config.Config) (*Result,
 	}
 
 	certDirs := []string{
-		"/etc/ssl/certs",
-		"/etc/pki/tls/certs",
-		"/etc/letsencrypt/live",
-		"/etc/caddy/certificates",
+		system.HostPath("/etc/ssl/certs"),
+		system.HostPath("/etc/pki/tls/certs"),
+		system.HostPath("/etc/letsencrypt/live"),
+		system.HostPath("/etc/caddy/certificates"),
 	}
 
 	var certificates []certInfo

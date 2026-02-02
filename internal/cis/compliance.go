@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/girste/mcp-cybersec-watchdog/internal/config"
+	"github.com/girste/chihuaudit/internal/config"
 )
 
 // RunCISAudit executes a CIS benchmark audit for Ubuntu 22.04 LTS

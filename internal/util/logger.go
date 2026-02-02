@@ -11,7 +11,7 @@ import (
 var defaultLogger *zap.Logger
 
 func init() {
-	defaultLogger = NewLogger("mcp-watchdog")
+	defaultLogger = NewLogger("chihuaudit")
 }
 
 // NewLogger creates a new logger with the specified name

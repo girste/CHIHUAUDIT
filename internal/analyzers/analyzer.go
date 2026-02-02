@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/girste/mcp-cybersec-watchdog/internal/config"
+	"github.com/girste/chihuaudit/internal/config"
 )
 
 // Severity levels for issues

@@ -6,22 +6,31 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
-	"github.com/girste/mcp-cybersec-watchdog/internal/audit"
-	"github.com/girste/mcp-cybersec-watchdog/internal/cis"
-	"github.com/girste/mcp-cybersec-watchdog/internal/config"
-	"github.com/girste/mcp-cybersec-watchdog/internal/monitoring"
-	"github.com/girste/mcp-cybersec-watchdog/internal/notify"
-	"github.com/girste/mcp-cybersec-watchdog/internal/scanners"
+	"github.com/girste/chihuaudit/internal/audit"
+	"github.com/girste/chihuaudit/internal/cis"
+	"github.com/girste/chihuaudit/internal/config"
+	"github.com/girste/chihuaudit/internal/metrics"
+	"github.com/girste/chihuaudit/internal/monitoring"
+	"github.com/girste/chihuaudit/internal/notify"
+	"github.com/girste/chihuaudit/internal/output"
+	"github.com/girste/chihuaudit/internal/scanners"
+	"github.com/girste/chihuaudit/internal/util"
+	"github.com/google/uuid"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"go.uber.org/zap"
 )
 
 // Server wraps the MCP server
 type Server struct {
-	mcp          *server.MCPServer
-	orchestrator *audit.Orchestrator
-	config       *config.Config
+	mcp           *server.MCPServer
+	orchestrator  *audit.Orchestrator
+	config        *config.Config
+	preloadedData map[string]interface{} // For serve mode (no sudo)
+	logger        *zap.Logger
+	metricsReg    *metrics.Registry
 }
 
 // NewServer creates a new MCP server
@@ -31,8 +40,18 @@ func NewServer() (*Server, error) {
 		return nil, err
 	}
 
+	logger := util.GetLogger()
+	metricsReg := metrics.GetRegistry()
+
+	// Start metrics HTTP server on localhost only (non-blocking)
+	if err := metrics.StartServer("127.0.0.1:9090", metricsReg); err != nil {
+		logger.Warn("Failed to start metrics server", zap.Error(err))
+	} else {
+		logger.Info("Metrics server started", zap.String("addr", "http://127.0.0.1:9090"))
+	}
+
 	mcpServer := server.NewMCPServer(
-		"mcp-cybersec-watchdog",
+		"chihuaudit",
 		"1.0.0",
 		server.WithLogging(),
 	)
@@ -41,9 +60,44 @@ func NewServer() (*Server, error) {
 		mcp:          mcpServer,
 		orchestrator: audit.NewOrchestrator(),
 		config:       cfg,
+		logger:       logger,
+		metricsReg:   metricsReg,
 	}
 
 	s.registerTools()
+
+	logger.Info("MCP server initialized", zap.String("version", "1.0.0"))
+
+	return s, nil
+}
+
+// NewServerWithData creates MCP server with pre-loaded audit data (no sudo mode)
+func NewServerWithData(auditData map[string]interface{}) (*Server, error) {
+	cfg, err := config.Load()
+	if err != nil {
+		// Non-critical in serve mode
+		cfg = &config.Config{}
+	}
+
+	logger := util.GetLogger()
+
+	mcpServer := server.NewMCPServer(
+		"chihuaudit",
+		"1.0.0",
+		server.WithLogging(),
+	)
+
+	s := &Server{
+		mcp:           mcpServer,
+		config:        cfg,
+		preloadedData: auditData,
+		logger:        logger,
+		// orchestrator intentionally nil (serve mode doesn't audit)
+	}
+
+	s.registerTools()
+
+	logger.Info("MCP server initialized in serve mode", zap.Bool("preloaded", auditData != nil))
 
 	return s, nil
 }
@@ -100,7 +154,7 @@ func (s *Server) registerTools() {
 			Properties: map[string]interface{}{
 				"interval_seconds": map[string]interface{}{
 					"type":        "number",
-					"description": "Check interval in seconds (default: 3600 = 1 hour, min: 300 = 5 min)",
+					"description": "Check interval in seconds (default: 3600 = 1 hour, min: 10, max: 86400 = 24 hours)",
 					"default":     3600,
 				},
 			},
@@ -126,27 +180,6 @@ func (s *Server) registerTools() {
 			Properties: map[string]interface{}{},
 		},
 	}, s.handleCleanupOldLogs)
-
-	// Scan app security
-	s.mcp.AddTool(mcp.Tool{
-		Name:        "scan_app_security",
-		Description: "Scan applications for security vulnerabilities in dependencies and code. Auto-detects tech stacks (Node.js, Python, Rust, Go, PHP, Java, Ruby, .NET). Checks: dependency CVEs, hardcoded secrets, insecure configurations. Use depth='quick' for fast dependency-only scan, 'standard' for deps+secrets+config, 'deep' for full analysis with detailed secret locations.",
-		InputSchema: mcp.ToolInputSchema{
-			Type: "object",
-			Properties: map[string]interface{}{
-				"path": map[string]interface{}{
-					"type":        "string",
-					"description": "Path to application directory (auto-detect all apps if omitted)",
-				},
-				"depth": map[string]interface{}{
-					"type":        "string",
-					"description": "Scan depth: 'quick' (deps only), 'standard' (deps+secrets+config), 'deep' (full SAST)",
-					"enum":        []string{"quick", "standard", "deep"},
-					"default":     "standard",
-				},
-			},
-		},
-	}, s.handleScanAppSecurity)
 
 	// Scan network security
 	s.mcp.AddTool(mcp.Tool{
@@ -334,7 +367,7 @@ func (s *Server) registerTools() {
 	// Manage whitelist
 	s.mcp.AddTool(mcp.Tool{
 		Name:        "manage_whitelist",
-		Description: "Manage the security whitelist for server-specific exceptions. Use this AI-driven tool to add/update whitelist entries when the user confirms certain findings are false positives. The whitelist is saved locally in .mcp-watchdog-whitelist.yaml (in .gitignore). Supports whitelisting: services on specific ports/binds, wildcard ports (0.0.0.0), and CIS control exceptions.",
+		Description: "Manage the security whitelist for server-specific exceptions. Use this AI-driven tool to add/update whitelist entries when the user confirms certain findings are false positives. The whitelist is saved locally in .chihuaudit-whitelist.yaml (in .gitignore). Supports whitelisting: services on specific ports/binds, wildcard ports (0.0.0.0), and CIS control exceptions.",
 		InputSchema: mcp.ToolInputSchema{
 			Type: "object",
 			Properties: map[string]interface{}{
@@ -382,30 +415,73 @@ func (s *Server) registerTools() {
 
 func (s *Server) getLogDir() string {
 	if os.Geteuid() == 0 {
-		return "/var/log/mcp-watchdog"
+		return "/var/log/chihuaudit"
 	}
-	return "/tmp/mcp-watchdog-" + string(rune(os.Getuid()))
+	return "/tmp/chihuaudit-" + string(rune(os.Getuid()))
 }
 
 func (s *Server) handleSecurityAudit(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	maskData := true
-	if arguments, ok := request.Params.Arguments.(map[string]interface{}); ok {
-		if v, ok := arguments["mask_data"].(bool); ok {
-			maskData = v
+	correlationID := uuid.New().String()
+	start := time.Now()
+
+	s.logger.Info("MCP tool call started",
+		zap.String("tool", "security_audit"),
+		zap.String("correlation_id", correlationID),
+	)
+
+	var rawReport map[string]interface{}
+
+	// Check if using pre-loaded data (serve mode)
+	if s.preloadedData != nil {
+		rawReport = s.preloadedData
+		s.logger.Debug("Using preloaded data", zap.String("correlation_id", correlationID))
+	} else {
+		// Normal mode: run audit (requires sudo)
+		maskData := true
+		if arguments, ok := request.Params.Arguments.(map[string]interface{}); ok {
+			if v, ok := arguments["mask_data"].(bool); ok {
+				maskData = v
+			}
+		}
+
+		s.logger.Debug("Running audit",
+			zap.Bool("mask_data", maskData),
+			zap.String("correlation_id", correlationID),
+		)
+
+		var err error
+		rawReport, err = s.orchestrator.RunAudit(ctx, s.config, maskData)
+		if err != nil {
+			s.logger.Error("Audit failed",
+				zap.Error(err),
+				zap.String("correlation_id", correlationID),
+				zap.Duration("duration", time.Since(start)),
+			)
+			return mcp.NewToolResultError(err.Error()), nil
 		}
 	}
 
-	report, err := s.orchestrator.RunAudit(ctx, s.config, maskData)
+	// Use v1.0 structured format (token-efficient)
+	formatter := output.NewStructuredFormatter()
+	structuredReport := formatter.FormatReportStructured(rawReport)
+
+	reportJSON, err := structuredReport.ToJSON()
 	if err != nil {
+		s.logger.Error("Failed to marshal report",
+			zap.Error(err),
+			zap.String("correlation_id", correlationID),
+		)
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
-	reportJSON, err := json.MarshalIndent(report, "", "  ")
-	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
-	}
+	s.logger.Info("MCP tool call completed",
+		zap.String("tool", "security_audit"),
+		zap.String("correlation_id", correlationID),
+		zap.Duration("duration", time.Since(start)),
+		zap.Int("response_size_bytes", len(reportJSON)),
+	)
 
-	return mcp.NewToolResultText(string(reportJSON)), nil
+	return mcp.NewToolResultText(reportJSON), nil
 }
 
 func (s *Server) handleAnalyzeAnomaly(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -426,8 +502,8 @@ func (s *Server) handleAnalyzeAnomaly(ctx context.Context, request mcp.CallToolR
 	}
 
 	allowedDirs := []string{
-		"/var/log/mcp-watchdog",
-		"/tmp/mcp-watchdog-",
+		"/var/log/chihuaudit",
+		"/tmp/chihuaudit-",
 	}
 
 	allowed := false
@@ -439,7 +515,7 @@ func (s *Server) handleAnalyzeAnomaly(ctx context.Context, request mcp.CallToolR
 	}
 
 	if !allowed {
-		return mcp.NewToolResultError("Access denied: anomaly file must be in /var/log/mcp-watchdog or /tmp/mcp-watchdog-*"), nil
+		return mcp.NewToolResultError("Access denied: anomaly file must be in /var/log/chihuaudit or /tmp/chihuaudit-*"), nil
 	}
 
 	// Check file extension
@@ -491,8 +567,8 @@ func (s *Server) handleStartMonitoring(ctx context.Context, request mcp.CallTool
 	}
 
 	// Validate interval
-	if interval < 300 {
-		return mcp.NewToolResultError("Minimum interval is 300 seconds (5 minutes)"), nil
+	if interval < 10 {
+		return mcp.NewToolResultError("Minimum interval is 10 seconds"), nil
 	}
 	if interval > 86400 {
 		return mcp.NewToolResultError("Maximum interval is 86400 seconds (24 hours)"), nil
@@ -516,25 +592,6 @@ func (s *Server) handleStopMonitoring(ctx context.Context, request mcp.CallToolR
 func (s *Server) handleCleanupOldLogs(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	manager := monitoring.NewMonitoringManager(s.getLogDir())
 	result := manager.CleanupOldLogs(50, 20)
-
-	resultJSON, _ := json.MarshalIndent(result, "", "  ")
-	return mcp.NewToolResultText(string(resultJSON)), nil
-}
-
-func (s *Server) handleScanAppSecurity(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	path := ""
-	depth := "standard"
-
-	if arguments, ok := request.Params.Arguments.(map[string]interface{}); ok {
-		if v, ok := arguments["path"].(string); ok {
-			path = v
-		}
-		if v, ok := arguments["depth"].(string); ok {
-			depth = v
-		}
-	}
-
-	result := scanners.ScanAppSecurity(ctx, path, depth)
 
 	resultJSON, _ := json.MarshalIndent(result, "", "  ")
 	return mcp.NewToolResultText(string(resultJSON)), nil
@@ -866,10 +923,10 @@ func (s *Server) handleManageWhitelist(ctx context.Context, request mcp.CallTool
 
 	case "save":
 		// Save whitelist to disk
-		if err := config.SaveWhitelist(s.config.Whitelist, ".mcp-watchdog-whitelist.yaml"); err != nil {
+		if err := config.SaveWhitelist(s.config.Whitelist, ".chihuaudit-whitelist.yaml"); err != nil {
 			return mcp.NewToolResultError("Failed to save whitelist: " + err.Error()), nil
 		}
-		return mcp.NewToolResultText("Whitelist saved to .mcp-watchdog-whitelist.yaml"), nil
+		return mcp.NewToolResultText("Whitelist saved to .chihuaudit-whitelist.yaml"), nil
 
 	default:
 		return mcp.NewToolResultError("Invalid action. Use 'get', 'add', or 'save'"), nil
@@ -879,7 +936,7 @@ func (s *Server) handleManageWhitelist(ctx context.Context, request mcp.CallTool
 func (s *Server) saveNotificationConfig() error {
 	// Find or create config file
 	home, _ := os.UserHomeDir()
-	configPath := filepath.Join(home, ".mcp-watchdog.yaml")
+	configPath := filepath.Join(home, ".chihuaudit.yaml")
 
 	// Read existing config if any
 	existingData, _ := os.ReadFile(configPath)

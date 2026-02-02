@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/girste/mcp-cybersec-watchdog/internal/system"
+	"github.com/girste/chihuaudit/internal/system"
 )
 
 // BackupVerificationResult is the result of a backup configuration audit
@@ -357,8 +357,12 @@ func findBackupDestinations(ctx context.Context) []BackupDest {
 
 	// Check common local backup directories
 	localDirs := []string{
-		"/backup", "/backups", "/var/backup", "/var/backups",
-		"/mnt/backup", "/mnt/backups",
+		system.HostPath("/backup"),
+		system.HostPath("/backups"),
+		system.HostPath("/var/backup"),
+		system.HostPath("/var/backups"),
+		system.HostPath("/mnt/backup"),
+		system.HostPath("/mnt/backups"),
 	}
 
 	for _, dir := range localDirs {

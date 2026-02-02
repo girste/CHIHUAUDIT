@@ -1,5 +1,5 @@
-// Package mcpwatchdog provides a Linux security audit tool.
+// Package chihuaudit provides a Linux security audit tool.
 //
-// MCP Cybersec Watchdog analyzes firewall, SSH, fail2ban, Docker,
+// Chihuaudit analyzes firewall, SSH, fail2ban, Docker,
 // kernel hardening, SSL certificates, network services, and more.
-package mcpwatchdog
+package chihuaudit

@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -32,9 +33,18 @@ type ServiceWhitelist struct {
 	Reason  string `yaml:"reason"`  // Why this is whitelisted
 }
 
+// ProcessWhitelist allows whitelisting processes by name regardless of port
+type ProcessWhitelist struct {
+	Name   string `yaml:"name"`   // Process name (exact match or prefix if ends with *)
+	Bind   string `yaml:"bind"`   // "127.0.0.1", "0.0.0.0", or "*" for any bind address
+	Reason string `yaml:"reason"` // Why this is whitelisted
+}
+
 // NetworkWhitelist contains network-related exceptions
 type NetworkWhitelist struct {
-	AllowedWildcardPorts []int `yaml:"allowedWildcardPorts"` // Ports allowed on 0.0.0.0
+	AllowedWildcardPorts  []int              `yaml:"allowedWildcardPorts"`  // Ports allowed on 0.0.0.0
+	AllowedLocalhostPorts []int              `yaml:"allowedLocalhostPorts"` // Ports allowed on 127.0.0.1
+	AllowedProcesses      []ProcessWhitelist `yaml:"allowedProcesses"`      // Processes allowed regardless of port
 }
 
 // CISWhitelist contains CIS benchmark exceptions
@@ -78,13 +88,32 @@ func LoadWhitelist() (*Whitelist, error) {
 	wl := &Whitelist{Version: "1.0"}
 
 	home, _ := os.UserHomeDir()
-	searchPaths := []string{
-		".mcp-watchdog-whitelist.yaml",
-		".mcp-watchdog-whitelist.yml",
-		filepath.Join(home, ".mcp-watchdog-whitelist.yaml"),
-		filepath.Join(home, ".mcp-watchdog-whitelist.yml"),
-		"/etc/mcp-watchdog/whitelist.yaml",
+	searchPaths := []string{}
+
+	// 1. Environment variable (Docker volume)
+	if configDir := os.Getenv("MCP_CONFIG_DIR"); configDir != "" {
+		searchPaths = append(searchPaths,
+			filepath.Join(configDir, ".chihuaudit-whitelist.yaml"),
+			filepath.Join(configDir, ".chihuaudit-whitelist.yml"),
+		)
 	}
+
+	// 2. Current directory
+	searchPaths = append(searchPaths,
+		".chihuaudit-whitelist.yaml",
+		".chihuaudit-whitelist.yml",
+	)
+
+	// 3. Home directory
+	if home != "" {
+		searchPaths = append(searchPaths,
+			filepath.Join(home, ".chihuaudit-whitelist.yaml"),
+			filepath.Join(home, ".chihuaudit-whitelist.yml"),
+		)
+	}
+
+	// 4. System-wide
+	searchPaths = append(searchPaths, "/etc/chihuaudit/whitelist.yaml")
 
 	for _, path := range searchPaths {
 		data, err := os.ReadFile(path)
@@ -104,7 +133,7 @@ func LoadWhitelist() (*Whitelist, error) {
 // SaveWhitelist saves the whitelist to the local directory
 func SaveWhitelist(wl *Whitelist, path string) error {
 	if path == "" {
-		path = ".mcp-watchdog-whitelist.yaml"
+		path = ".chihuaudit-whitelist.yaml"
 	}
 
 	data, err := yaml.Marshal(wl)
@@ -129,6 +158,42 @@ func (wl *Whitelist) IsServiceWhitelisted(port int, bind string) bool {
 func (wl *Whitelist) IsWildcardPortAllowed(port int) bool {
 	for _, p := range wl.Network.AllowedWildcardPorts {
 		if p == port {
+			return true
+		}
+	}
+	return false
+}
+
+// IsLocalhostPortAllowed checks if a port is allowed on localhost (127.0.0.1)
+func (wl *Whitelist) IsLocalhostPortAllowed(port int) bool {
+	for _, p := range wl.Network.AllowedLocalhostPorts {
+		if p == port {
+			return true
+		}
+	}
+	return false
+}
+
+// IsProcessAllowed checks if a process is allowed based on name and bind address
+func (wl *Whitelist) IsProcessAllowed(processName, bind string) bool {
+	for _, proc := range wl.Network.AllowedProcesses {
+		// Check process name match (support prefix matching with *)
+		nameMatch := false
+		if strings.HasSuffix(proc.Name, "*") {
+			// Prefix matching: "code*" matches "code", "code-abc123", etc.
+			prefix := strings.TrimSuffix(proc.Name, "*")
+			nameMatch = strings.HasPrefix(processName, prefix)
+		} else {
+			// Exact matching
+			nameMatch = proc.Name == processName
+		}
+
+		if !nameMatch {
+			continue
+		}
+
+		// Check bind address match (* means any)
+		if proc.Bind == "*" || proc.Bind == bind {
 			return true
 		}
 	}

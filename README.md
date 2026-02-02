@@ -1,27 +1,27 @@
-# MCP Cybersec Watchdog
+# Chihuaudit
 
 <div align="center">
 
 [![Mentioned in Awesome](https://awesome.re/mentioned-badge.svg)](https://github.com/punkpeye/awesome-mcp-servers)
 
-[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/girste/mcp-cybersec-watchdog/badge)](https://securityscorecards.dev/viewer/?uri=github.com/girste/mcp-cybersec-watchdog)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/girste/chihuaudit/badge)](https://securityscorecards.dev/viewer/?uri=github.com/girste/chihuaudit)
 
 </div>
 
-![MCP Cybersec Watchdog](docs/images/cover-watchdog-mcp.png)
+![Chihuaudit](docs/images/chihuaudit_cover.png)
 
-[![CI](https://github.com/girste/mcp-cybersec-watchdog/actions/workflows/ci.yml/badge.svg)](https://github.com/girste/mcp-cybersec-watchdog/actions)
-[![Lint](https://github.com/girste/mcp-cybersec-watchdog/actions/workflows/lint.yml/badge.svg)](https://github.com/girste/mcp-cybersec-watchdog/actions/workflows/lint.yml)
-[![CodeQL](https://github.com/girste/mcp-cybersec-watchdog/actions/workflows/codeql.yml/badge.svg)](https://github.com/girste/mcp-cybersec-watchdog/security/code-scanning)
-[![Trivy](https://github.com/girste/mcp-cybersec-watchdog/actions/workflows/trivy.yml/badge.svg)](https://github.com/girste/mcp-cybersec-watchdog/actions/workflows/trivy.yml)
+[![CI](https://github.com/girste/chihuaudit/actions/workflows/ci.yml/badge.svg)](https://github.com/girste/chihuaudit/actions)
+[![Lint](https://github.com/girste/chihuaudit/actions/workflows/lint.yml/badge.svg)](https://github.com/girste/chihuaudit/actions/workflows/lint.yml)
+[![CodeQL](https://github.com/girste/chihuaudit/actions/workflows/codeql.yml/badge.svg)](https://github.com/girste/chihuaudit/security/code-scanning)
+[![Trivy](https://github.com/girste/chihuaudit/actions/workflows/trivy.yml/badge.svg)](https://github.com/girste/chihuaudit/actions/workflows/trivy.yml)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/11858/badge)](https://www.bestpractices.dev/projects/11858)
 [![SLSA 3](https://slsa.dev/images/gh-badge-level3.svg)](https://slsa.dev)
 
-**Linux security audit tool for AI assistants.** Single 8.1MB static binary, zero dependencies.
+**MCP-based Linux Cybersecurity Tool.** Single 8.1MB static binary, zero dependencies.
 
 Analyzes firewall, SSH, fail2ban, Docker, kernel hardening, SSL certificates, network services, and more. Includes continuous monitoring with anomaly detection and EU Vulnerability Database integration.
 
-**Download:** Get the latest binary from [Releases](https://github.com/girste/mcp-cybersec-watchdog/releases) — no compilation needed.
+**Download:** Get the latest binary from [Releases](https://github.com/girste/chihuaudit/releases) — no compilation needed.
 
 ## MCP Tools
 
@@ -42,7 +42,7 @@ Analyzes firewall, SSH, fail2ban, Docker, kernel hardening, SSL certificates, ne
 ## Features
 
 ### AI-Driven Whitelist
-Eliminate false positives with AI-managed `.mcp-watchdog-whitelist.yaml`. Ask AI to identify false positives → automatic whitelisting → clean results. See `.mcp-watchdog-whitelist.example.yaml` for template.
+Eliminate false positives with AI-managed `.chihuaudit-whitelist.yaml`. Ask AI to identify false positives → automatic whitelisting → clean results. See `.chihuaudit-whitelist.example.yaml` for template.
 
 ### Discord/Slack Webhooks
 Customizable security alerts with rich embeds, severity colors, and detailed breakdowns.
@@ -51,32 +51,77 @@ Customizable security alerts with rich embeds, severity colors, and detailed bre
 
 ## Quick Start
 
+### Docker (Recommended for Production)
+
+**Pull from Docker Hub:**
+```bash
+docker pull girste/chihuaudit:latest
+```
+
+**One-shot security audit:**
+```bash
+docker run --rm --privileged \
+  -v /proc:/host/proc:ro \
+  -v /sys:/host/sys:ro \
+  -v /etc:/host/etc:ro \
+  -v /var/log:/host/var/log:ro \
+  -v /var/run/docker.sock:/var/run/docker.sock:ro \
+  --network host --pid host \
+  girste/chihuaudit:latest audit
+```
+
+**Continuous monitoring daemon (with Discord webhooks):**
+```bash
+# Clone repository for docker-compose
+git clone https://github.com/girste/chihuaudit
+cd chihuaudit
+
+# Configure Discord webhook (optional)
+cp .chihuaudit.example.yaml .chihuaudit.yaml
+# Edit .chihuaudit.yaml with your Discord webhook URL
+
+# Start monitoring daemon
+docker-compose up -d chihuaudit-monitor
+
+# Check logs
+docker-compose logs -f chihuaudit-monitor
+
+# Stop monitoring
+docker-compose down
+```
+
+**Environment variables:**
+- `MONITOR_INTERVAL`: Seconds between checks (default: 300 = 5 minutes)
+- `DOCKER_UID`/`DOCKER_GID`: User/group ID for file permissions (default: 1000:1000)
+
+### Binary Installation
+
 ```bash
 # Download binary
-wget https://github.com/girste/mcp-cybersec-watchdog/releases/latest/download/mcp-watchdog_linux_amd64.tar.gz
-tar xzf mcp-watchdog_linux_amd64.tar.gz
-chmod +x mcp-watchdog
+wget https://github.com/girste/chihuaudit/releases/latest/download/chihuaudit_linux_amd64.tar.gz
+tar xzf chihuaudit_linux_amd64.tar.gz
+chmod +x chihuaudit
 
 # Run audit
-sudo ./mcp-watchdog audit
+sudo ./chihuaudit audit
 
 # Or build from source
-make build && sudo ./bin/mcp-watchdog audit
+make build && sudo ./bin/chihuaudit audit
 ```
 
 📄 **[View all output examples](docs/outputs/)** - Full audit reports, CIS benchmarks, monitoring alerts, webhook notifications.
 
 ## Security
 
-**Do not report vulnerabilities via public issues.** Open a [private security advisory](https://github.com/girste/mcp-cybersec-watchdog/security/advisories/new) or DM [@girste](https://github.com/girste).
+**Do not report vulnerabilities via public issues.** Open a [private security advisory](https://github.com/girste/chihuaudit/security/advisories/new) or DM [@girste](https://github.com/girste).
 
 This tool requires sudo for read-only access to system info (firewall, logs, services). No write operations.
 
 ---
 
 [![Go](https://img.shields.io/badge/Go-1.23+-00ADD8?logo=go&logoColor=white)](https://go.dev)
-[![Release](https://img.shields.io/github/v/release/girste/mcp-cybersec-watchdog)](https://github.com/girste/mcp-cybersec-watchdog/releases)
-[![Downloads](https://img.shields.io/github/downloads/girste/mcp-cybersec-watchdog/total)](https://github.com/girste/mcp-cybersec-watchdog/releases)
+[![Release](https://img.shields.io/github/v/release/girste/chihuaudit)](https://github.com/girste/chihuaudit/releases)
+[![Downloads](https://img.shields.io/github/downloads/girste/chihuaudit/total)](https://github.com/girste/chihuaudit/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 # Test

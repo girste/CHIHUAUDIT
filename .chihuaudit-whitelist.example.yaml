@@ -1,5 +1,5 @@
-# MCP Cybersec Watchdog - Whitelist Configuration Example
-# Copy this file to .mcp-watchdog-whitelist.yaml and customize for your server
+# Chihuaudit - Whitelist Configuration Example
+# Copy this file to .chihuaudit-whitelist.yaml and customize for your server
 # This file is LOCAL and should NOT be committed (already in .gitignore)
 
 version: "1.0"

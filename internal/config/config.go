@@ -1,9 +1,11 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -14,11 +16,20 @@ type Config struct {
 	AnalyzerTimeout    int              `yaml:"analyzerTimeoutSeconds"`
 	MaxConcurrency     int              `yaml:"maxConcurrency"`
 	MaskData           bool             `yaml:"maskData"`
+	Timeouts           TimeoutConfig    `yaml:"timeouts"`
 	Monitoring         MonitoringConfig `yaml:"monitoring"`
 	Notifications      NotifyConfig     `yaml:"notifications"`
 	Whitelist          *Whitelist       `yaml:"-"` // Loaded separately, not from YAML
 	Ports              *PortPatterns    `yaml:"-"` // Pattern definitions
 	Processes          *ProcessPatterns `yaml:"-"` // Process patterns
+}
+
+// TimeoutConfig defines configurable timeout durations
+type TimeoutConfig struct {
+	Short    int `yaml:"short"`     // Short operations (default: 5s)
+	Medium   int `yaml:"medium"`    // Medium operations (default: 10s)
+	Long     int `yaml:"long"`      // Long operations (default: 30s)
+	VeryLong int `yaml:"very_long"` // Very long operations (default: 120s)
 }
 
 type MonitoringConfig struct {
@@ -76,20 +87,26 @@ func Default() *Config {
 		AnalyzerTimeout:    10,
 		MaxConcurrency:     0,
 		MaskData:           true,
+		Timeouts: TimeoutConfig{
+			Short:    5,
+			Medium:   10,
+			Long:     30,
+			VeryLong: 120,
+		},
 		Monitoring: MonitoringConfig{
 			Enabled: false, IntervalSeconds: 3600,
-			LogDir: "/var/log/mcp-watchdog", MaxBulletins: 50, MaxAnomalies: 20,
+			LogDir: "/var/log/chihuaudit", MaxBulletins: 50, MaxAnomalies: 20,
 		},
 		Notifications: NotifyConfig{
 			Enabled:      false,
 			OnlyOnIssues: true,
 			MinSeverity:  "high",
 			Discord: DiscordConfig{
-				Username:  "Security Watchdog",
+				Username:  "Chihuaudit",
 				AvatarURL: "",
 			},
 			Slack: SlackConfig{
-				Username: "Security Watchdog",
+				Username: "Chihuaudit",
 			},
 			GenericWebhook: WebhookConfig{
 				Method: "POST",
@@ -101,21 +118,52 @@ func Default() *Config {
 func Load() (*Config, error) {
 	cfg := Default()
 	home, _ := os.UserHomeDir()
-	searchPaths := []string{
-		".mcp-watchdog.yaml", ".mcp-watchdog.yml",
-		filepath.Join(home, ".mcp-watchdog.yaml"),
-		filepath.Join(home, ".mcp-watchdog.yml"),
-		"/etc/mcp-watchdog/config.yaml",
+
+	// Build search paths with priority order
+	searchPaths := []string{}
+
+	// 1. Environment variable (highest priority - for Docker)
+	if configDir := os.Getenv("MCP_CONFIG_DIR"); configDir != "" {
+		searchPaths = append(searchPaths,
+			filepath.Join(configDir, ".chihuaudit.yaml"),
+			filepath.Join(configDir, ".chihuaudit.yml"),
+		)
 	}
+
+	// 2. Current directory
+	searchPaths = append(searchPaths,
+		".chihuaudit.yaml", ".chihuaudit.yml",
+	)
+
+	// 3. Home directory
+	if home != "" {
+		searchPaths = append(searchPaths,
+			filepath.Join(home, ".chihuaudit.yaml"),
+			filepath.Join(home, ".chihuaudit.yml"),
+		)
+	}
+
+	// 4. System-wide config
+	searchPaths = append(searchPaths, "/etc/chihuaudit/config.yaml")
+	// Try each path in priority order
+	configLoaded := false
 	for _, path := range searchPaths {
 		data, err := os.ReadFile(path)
 		if err != nil {
 			continue
 		}
 		if err := yaml.Unmarshal(data, cfg); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("invalid config at %s: %w", path, err)
 		}
+		configLoaded = true
 		break
+	}
+
+	// Validate config if loaded
+	if configLoaded {
+		if err := cfg.Validate(); err != nil {
+			return nil, fmt.Errorf("config validation failed: %w", err)
+		}
 	}
 
 	// Load whitelist separately
@@ -142,4 +190,44 @@ func (c *Config) GetMaxConcurrency() int {
 		return runtime.NumCPU() * 2
 	}
 	return c.MaxConcurrency
+}
+
+// Validate checks config for errors
+func (c *Config) Validate() error {
+	// Validate Discord webhook
+	if c.Notifications.Discord.Enabled && c.Notifications.Discord.WebhookURL != "" {
+		url := strings.TrimSpace(c.Notifications.Discord.WebhookURL)
+		if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
+			return fmt.Errorf("invalid Discord webhook URL: must start with http:// or https://")
+		}
+	}
+
+	// Validate Slack webhook
+	if c.Notifications.Slack.Enabled && c.Notifications.Slack.WebhookURL != "" {
+		url := strings.TrimSpace(c.Notifications.Slack.WebhookURL)
+		if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
+			return fmt.Errorf("invalid Slack webhook URL: must start with http:// or https://")
+		}
+	}
+
+	// Validate generic webhook
+	if c.Notifications.GenericWebhook.Enabled && c.Notifications.GenericWebhook.URL != "" {
+		url := strings.TrimSpace(c.Notifications.GenericWebhook.URL)
+		if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
+			return fmt.Errorf("invalid generic webhook URL: must start with http:// or https://")
+		}
+	}
+
+	// Validate severity
+	validSeverities := map[string]bool{"critical": true, "high": true, "medium": true, "low": true, "info": true}
+	if !validSeverities[c.Notifications.MinSeverity] {
+		return fmt.Errorf("invalid min_severity: %s (must be: critical, high, medium, low, info)", c.Notifications.MinSeverity)
+	}
+
+	// Validate monitoring interval
+	if c.Monitoring.Enabled && (c.Monitoring.IntervalSeconds < 10 || c.Monitoring.IntervalSeconds > 86400) {
+		return fmt.Errorf("monitoring interval must be between 10 and 86400 seconds, got: %d", c.Monitoring.IntervalSeconds)
+	}
+
+	return nil
 }
