@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/girste/mcp-cybersec-watchdog/internal/config"
-	"github.com/girste/mcp-cybersec-watchdog/internal/system"
+	"github.com/girste/chihuaudit/internal/config"
+	"github.com/girste/chihuaudit/internal/system"
 )
 
 type UpdatesAnalyzer struct{}
@@ -110,12 +110,12 @@ func (a *UpdatesAnalyzer) analyzeRHEL(ctx context.Context, result *Result) (*Res
 
 func (a *UpdatesAnalyzer) addUpdateIssues(result *Result, total, security int) {
 	if security > 10 {
-		result.AddIssue(NewIssue(SeverityCritical, strconv.Itoa(security)+" critical security updates available", "Apply security updates immediately"))
+		result.AddIssue(NewIssue(SeverityCritical, strconv.Itoa(security)+" security updates pending", "apt upgrade"))
 	} else if security > 0 {
-		result.AddIssue(NewIssue(SeverityHigh, strconv.Itoa(security)+" security updates available", "Apply security updates soon"))
+		result.AddIssue(NewIssue(SeverityHigh, strconv.Itoa(security)+" security updates pending", "apt upgrade"))
 	}
 
 	if total > 50 {
-		result.AddIssue(NewIssue(SeverityMedium, strconv.Itoa(total)+" total updates available", "Keep system up to date"))
+		result.AddIssue(NewIssue(SeverityMedium, strconv.Itoa(total)+" updates pending", "apt upgrade"))
 	}
 }

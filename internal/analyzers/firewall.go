@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/girste/mcp-cybersec-watchdog/internal/config"
-	"github.com/girste/mcp-cybersec-watchdog/internal/system"
+	"github.com/girste/chihuaudit/internal/config"
+	"github.com/girste/chihuaudit/internal/system"
 )
 
 type FirewallAnalyzer struct{}
@@ -46,7 +46,7 @@ func (a *FirewallAnalyzer) Analyze(ctx context.Context, cfg *config.Config) (*Re
 		"type":   "none",
 		"active": false,
 	}
-	result.AddIssue(NewIssue(SeverityCritical, "No firewall detected", "Install and configure ufw, firewalld, or iptables"))
+	result.AddIssue(NewIssue(SeverityCritical, "No firewall", "Install ufw"))
 
 	return result, nil
 }

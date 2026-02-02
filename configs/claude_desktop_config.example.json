@@ -1,7 +1,7 @@
 {
   "mcpServers": {
-    "cybersec-watchdog": {
-      "command": "/path/to/mcp-watchdog",
+    "chihuaudit": {
+      "command": "/path/to/chihuaudit",
       "args": []
     }
   }

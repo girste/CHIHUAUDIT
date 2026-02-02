@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/girste/mcp-cybersec-watchdog/internal/config"
+	"github.com/girste/chihuaudit/internal/config"
 )
 
 func TestNewNotifier(t *testing.T) {

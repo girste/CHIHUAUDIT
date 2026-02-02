@@ -3,10 +3,11 @@ package system
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/girste/chihuaudit/internal/errors"
 )
 
 // CommandResult represents the result of a command execution
@@ -26,9 +27,11 @@ const (
 )
 
 // RunCommand executes a command with timeout
+// RunCommand executes a command with timeout and returns structured result.
+// When running in container with host PID namespace, commands execute on host.
 func RunCommand(ctx context.Context, timeout time.Duration, cmdParts ...string) (*CommandResult, error) {
 	if len(cmdParts) == 0 {
-		return nil, fmt.Errorf("no command specified")
+		return nil, errors.Wrap(errors.ErrInvalidInput, "no command specified")
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, timeout)
@@ -53,6 +56,10 @@ func RunCommand(ctx context.Context, timeout time.Duration, cmdParts ...string) 
 		result.ExitCode = exitErr.ExitCode()
 	} else if err == nil {
 		result.ExitCode = 0
+	}
+
+	if result.TimedOut {
+		return result, errors.Wrap(errors.ErrTimeoutExceeded, "command '%s' timed out after %v", cmdParts[0], timeout)
 	}
 
 	return result, nil
@@ -91,9 +98,25 @@ func RunCommandSudo(ctx context.Context, timeout time.Duration, cmdParts ...stri
 }
 
 // CommandExists checks if a command is available
+// Uses background context with short timeout for utility function
 func CommandExists(cmd string) bool {
-	_, err := exec.LookPath(cmd)
-	return err == nil
+	return CommandExistsWithContext(context.Background(), cmd)
+}
+
+// CommandExistsWithContext checks if a command is available with custom context
+func CommandExistsWithContext(ctx context.Context, cmd string) bool {
+	if !IsInContainer() {
+		// Native execution - use LookPath
+		_, err := exec.LookPath(cmd)
+		return err == nil
+	}
+
+	// In container - check on host using which
+	timeoutCtx, cancel := context.WithTimeout(ctx, TimeoutShort)
+	defer cancel()
+
+	result, err := RunCommand(timeoutCtx, TimeoutShort, "which", cmd)
+	return err == nil && result != nil && result.Success
 }
 
 // IsServiceActive checks if a systemd service is active

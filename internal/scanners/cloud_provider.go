@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/girste/mcp-cybersec-watchdog/internal/system"
+	"github.com/girste/chihuaudit/internal/system"
 )
 
 // CloudProviderInfo contains information about the cloud environment
@@ -535,10 +535,10 @@ func fetchDOMetadata(ctx context.Context, client *http.Client, path string) stri
 // detectByDMI checks DMI/SMBIOS for cloud provider hints
 func detectByDMI() string {
 	dmiPaths := []string{
-		"/sys/class/dmi/id/product_name",
-		"/sys/class/dmi/id/sys_vendor",
-		"/sys/class/dmi/id/board_vendor",
-		"/sys/class/dmi/id/chassis_vendor",
+		system.HostPath("/sys/class/dmi/id/product_name"),
+		system.HostPath("/sys/class/dmi/id/sys_vendor"),
+		system.HostPath("/sys/class/dmi/id/board_vendor"),
+		system.HostPath("/sys/class/dmi/id/chassis_vendor"),
 	}
 
 	cloudHints := map[string]string{

@@ -1,5 +1,7 @@
 # Security Audit - Full Output Example
 
+> **Note:** All data shown below is fictional and for demonstration purposes only.
+
 Complete system security analysis with all checks.
 
 ```

@@ -40,7 +40,7 @@ func GetOSInfo(ctx context.Context) *OSInfo {
 // GetDistro detects the Linux distribution
 func GetDistro(ctx context.Context) string {
 	// Try /etc/os-release
-	if data, err := os.ReadFile("/etc/os-release"); err == nil {
+	if data, err := os.ReadFile(HostPath("/etc/os-release")); err == nil {
 		lines := strings.Split(string(data), "\n")
 		for _, line := range lines {
 			if strings.HasPrefix(line, "ID=") {
@@ -57,14 +57,17 @@ func GetDistro(ctx context.Context) string {
 	}
 
 	// Fallback to checking specific files
-	if _, err := os.Stat("/etc/debian_version"); err == nil {
+	if _, err := os.Stat(HostPath("/etc/debian_version")); err == nil {
 		return "debian"
 	}
-	if _, err := os.Stat("/etc/redhat-release"); err == nil {
+	if _, err := os.Stat(HostPath("/etc/redhat-release")); err == nil {
 		return "rhel"
 	}
-	if _, err := os.Stat("/etc/arch-release"); err == nil {
+	if _, err := os.Stat(HostPath("/etc/arch-release")); err == nil {
 		return "arch"
+	}
+	if _, err := os.Stat(HostPath("/etc/SuSE-release")); err == nil {
+		return "opensuse"
 	}
 
 	return "unknown"
@@ -83,10 +86,20 @@ func normalizeDistro(distro string) string {
 		return "rhel"
 	case strings.Contains(distro, "fedora"):
 		return "fedora"
+	case strings.Contains(distro, "rocky"):
+		return "rocky"
+	case strings.Contains(distro, "alma"):
+		return "alma"
 	case strings.Contains(distro, "arch"):
 		return "arch"
+	case strings.Contains(distro, "manjaro"):
+		return "manjaro"
 	case strings.Contains(distro, "alpine"):
 		return "alpine"
+	case strings.Contains(distro, "suse"), strings.Contains(distro, "opensuse"):
+		return "opensuse"
+	case strings.Contains(distro, "gentoo"):
+		return "gentoo"
 	default:
 		return distro
 	}
@@ -97,15 +110,17 @@ func GetAuthLogPath(ctx context.Context) string {
 	distro := GetDistro(ctx)
 	switch distro {
 	case "ubuntu", "debian":
-		return "/var/log/auth.log"
-	case "rhel", "centos", "fedora":
-		return "/var/log/secure"
+		return HostPath("/var/log/auth.log")
+	case "rhel", "centos", "fedora", "rocky", "alma":
+		return HostPath("/var/log/secure")
+	case "arch", "manjaro":
+		return HostPath("/var/log/auth.log")
 	default:
 		// Try both and return the one that exists
-		if _, err := os.Stat("/var/log/auth.log"); err == nil {
-			return "/var/log/auth.log"
+		if _, err := os.Stat(HostPath("/var/log/auth.log")); err == nil {
+			return HostPath("/var/log/auth.log")
 		}
-		return "/var/log/secure"
+		return HostPath("/var/log/secure")
 	}
 }
 
@@ -116,7 +131,13 @@ func IsDebian(distro string) bool {
 
 // IsRHEL returns true if the system is RHEL-based
 func IsRHEL(distro string) bool {
-	return distro == "rhel" || distro == "centos" || distro == "fedora"
+	return distro == "rhel" || distro == "centos" || distro == "fedora" ||
+		distro == "rocky" || distro == "alma"
+}
+
+// IsArch returns true if the system is Arch-based
+func IsArch(distro string) bool {
+	return distro == "arch" || distro == "manjaro"
 }
 
 // IsServiceEnabled checks if a systemd service is enabled

@@ -1,9 +1,9 @@
-# MCP Cybersec Watchdog Configuration Example
+# Chihuaudit Configuration Example
 #
 # Copy this file to one of these locations:
-# - .mcp-watchdog.yaml (current directory)
-# - ~/.mcp-watchdog.yaml (home directory)
-# - /etc/mcp-watchdog/config.yaml (system-wide)
+# - .chihuaudit.yaml (current directory)
+# - ~/.chihuaudit.yaml (home directory)
+# - /etc/chihuaudit/config.yaml (system-wide)
 
 # Enable/disable specific analyzers
 checks:
@@ -33,7 +33,7 @@ maskData: true               # Mask IPs and hostnames in output
 monitoring:
   enabled: false
   intervalSeconds: 3600      # Check every hour (min: 300 = 5 minutes)
-  logDir: /var/log/mcp-watchdog
+  logDir: /var/log/chihuaudit
   maxBulletins: 50           # Keep last 50 bulletins
   maxAnomalies: 20           # Keep last 20 anomaly reports
 
@@ -48,7 +48,7 @@ notifications:
   discord:
     enabled: false
     webhookUrl: ""           # Get from Discord: Server Settings > Integrations > Webhooks
-    username: "Security Watchdog"
+    username: "Chihuaudit"
     avatarUrl: ""            # Optional custom avatar
 
   # Slack webhook (https://api.slack.com/messaging/webhooks)
@@ -56,7 +56,7 @@ notifications:
     enabled: false
     webhookUrl: ""           # Get from Slack: Apps > Incoming Webhooks
     channel: ""              # Optional: override default channel
-    username: "Security Watchdog"
+    username: "Chihuaudit"
 
   # Generic webhook (any HTTP endpoint)
   webhook:

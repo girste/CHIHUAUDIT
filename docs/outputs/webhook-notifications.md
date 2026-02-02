@@ -1,5 +1,7 @@
 # Webhook Notifications
 
+> **Note:** All data shown below is fictional and for demonstration purposes only.
+
 Discord and Slack integration for security alerts.
 
 ## Configuration
@@ -111,7 +113,7 @@ All security checks passed!
           "short": false
         }
       ],
-      "footer": "MCP Cybersec Watchdog",
+      "footer": "Chihuaudit",
       "ts": 1706201533
     }
   ]
@@ -155,13 +157,13 @@ Configure when to send alerts:
 
 ```bash
 # Alert only on issues
-sudo ./bin/mcp-watchdog audit --webhook --on-issues
+sudo ./bin/chihuaudit audit --webhook --on-issues
 
 # Alert always (for scheduled reports)
-sudo ./bin/mcp-watchdog audit --webhook
+sudo ./bin/chihuaudit audit --webhook
 
 # Alert only on critical/high severity
-sudo ./bin/mcp-watchdog audit --webhook --severity=high
+sudo ./bin/chihuaudit audit --webhook --severity=high
 ```
 
 ---

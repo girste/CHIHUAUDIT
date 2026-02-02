@@ -1,0 +1,14 @@
+.git
+.github
+bin/
+*.md
+!README.md
+docs/
+*.log
+.chihuaudit*.yaml
+tmp/
+.vscode/
+.idea/
+*.test
+coverage.out
+docker-volumes/

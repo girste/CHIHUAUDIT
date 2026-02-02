@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/girste/mcp-cybersec-watchdog/internal/config"
-	"github.com/girste/mcp-cybersec-watchdog/internal/system"
+	"github.com/girste/chihuaudit/internal/config"
+	"github.com/girste/chihuaudit/internal/system"
 )
 
 type SSHAnalyzer struct{}
@@ -20,7 +20,7 @@ func (a *SSHAnalyzer) Timeout() time.Duration { return system.TimeoutShort }
 func (a *SSHAnalyzer) Analyze(ctx context.Context, cfg *config.Config) (*Result, error) {
 	result := NewResult()
 
-	configPath := "/etc/ssh/sshd_config"
+	configPath := system.HostPath("/etc/ssh/sshd_config")
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		// Try with sudo
@@ -50,15 +50,15 @@ func (a *SSHAnalyzer) Analyze(ctx context.Context, cfg *config.Config) (*Result,
 
 	// Check for security issues
 	if permitRootLogin == "yes" {
-		result.AddIssue(NewIssue(SeverityHigh, "Root login is enabled via SSH", "Set PermitRootLogin to 'no' in /etc/ssh/sshd_config"))
+		result.AddIssue(NewIssue(SeverityHigh, "Root SSH enabled", "Set PermitRootLogin no"))
 	}
 
 	if passwordAuth == "yes" {
-		result.AddIssue(NewIssue(SeverityMedium, "Password authentication is enabled", "Consider using public key authentication only"))
+		result.AddIssue(NewIssue(SeverityMedium, "SSH password auth", "Use key-only"))
 	}
 
 	if port == "22" {
-		result.AddIssue(NewIssue(SeverityLow, "SSH is running on default port 22", "Consider changing to a non-standard port"))
+		result.AddIssue(NewIssue(SeverityLow, "SSH port 22", "Change port"))
 	}
 
 	return result, nil

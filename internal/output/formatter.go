@@ -54,17 +54,29 @@ type NegativeItem struct {
 
 // Formatter handles output formatting
 type Formatter struct {
-	aiMode  bool
-	format  string
-	verbose bool
+	aiMode     bool
+	format     string
+	verbose    bool
+	structured bool // Use v1.0 structured format (token-efficient)
 }
 
 // NewFormatter creates a new formatter
 func NewFormatter(format string, aiMode, verbose bool) *Formatter {
 	return &Formatter{
-		aiMode:  aiMode,
-		format:  format,
-		verbose: verbose,
+		aiMode:     aiMode,
+		format:     format,
+		verbose:    verbose,
+		structured: false, // Default to old format for CLI compatibility
+	}
+}
+
+// NewStructuredFormatter creates formatter that outputs v1.0 structured format
+func NewStructuredFormatter() *Formatter {
+	return &Formatter{
+		aiMode:     false,
+		format:     FormatJSON,
+		verbose:    false,
+		structured: true, // Use new token-efficient format
 	}
 }
 
@@ -93,6 +105,15 @@ func (f *Formatter) FormatReport(rawReport map[string]interface{}) *StandardRepo
 	}
 
 	return report
+}
+
+// FormatReportStructured converts raw audit report to v1.0 structured format (token-efficient)
+func (f *Formatter) FormatReportStructured(rawReport map[string]interface{}) *StructuredReport {
+	// First generate StandardReport
+	standardReport := f.FormatReport(rawReport)
+
+	// Convert to StructuredReport
+	return ConvertToStructured(standardReport)
 }
 
 func (f *Formatter) analyzeReport(report map[string]interface{}) ([]string, []NegativeItem, int) {

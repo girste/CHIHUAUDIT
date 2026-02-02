@@ -5,10 +5,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/girste/mcp-cybersec-watchdog/internal/analyzers"
-	"github.com/girste/mcp-cybersec-watchdog/internal/config"
-	"github.com/girste/mcp-cybersec-watchdog/internal/system"
-	"github.com/girste/mcp-cybersec-watchdog/internal/util"
+	"github.com/girste/chihuaudit/internal/analyzers"
+	"github.com/girste/chihuaudit/internal/config"
+	"github.com/girste/chihuaudit/internal/system"
+	"github.com/girste/chihuaudit/internal/util"
 	"go.uber.org/zap"
 )
 
@@ -55,15 +55,24 @@ func (o *Orchestrator) RunAudit(ctx context.Context, cfg *config.Config, maskDat
 
 	// Build report
 	report := make(map[string]interface{})
-	report["timestamp"] = time.Now().UTC().Format(time.RFC3339)
-	report["os"] = osInfo.System + " (" + osInfo.Distro + ")"
-	report["kernel"] = osInfo.Kernel
 
+	// Metadata section
+	metadata := make(map[string]interface{})
+	metadata["timestamp"] = time.Now().UTC().Format(time.RFC3339)
+	metadata["os"] = osInfo.System + " (" + osInfo.Distro + ")"
+	metadata["kernel"] = osInfo.Kernel
 	if maskData {
-		report["hostname"] = util.GetMaskedHostname()
+		metadata["hostname"] = util.GetMaskedHostname()
 	} else {
-		report["hostname"] = osInfo.Hostname
+		metadata["hostname"] = osInfo.Hostname
 	}
+	report["metadata"] = metadata
+
+	// Legacy top-level fields for backward compatibility
+	report["timestamp"] = metadata["timestamp"]
+	report["os"] = metadata["os"]
+	report["kernel"] = metadata["kernel"]
+	report["hostname"] = metadata["hostname"]
 
 	// Add analyzer results
 	for name, result := range results {

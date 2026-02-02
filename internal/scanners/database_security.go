@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/girste/mcp-cybersec-watchdog/internal/system"
+	"github.com/girste/chihuaudit/internal/system"
 )
 
 // DatabaseSecurityResult is the result of a database security scan

@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/girste/mcp-cybersec-watchdog/internal/system"
+	"github.com/girste/chihuaudit/internal/system"
 )
 
 const shodanTimeout = 10 * time.Second

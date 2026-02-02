@@ -1,0 +1,162 @@
+version: '3.8'
+
+services:
+  # One-shot audit service (run with: docker-compose run --rm chihuaudit-audit)
+  chihuaudit-audit:
+    build: .
+    image: chihuaudit:latest
+    container_name: chihuaudit-audit
+
+    # Host system access (read-only)
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /etc:/host/etc:ro
+      - /var/log:/host/var/log:ro
+      - /usr/bin:/host/usr/bin:ro
+      - /usr/sbin:/host/usr/sbin:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro  # Docker audit
+
+      # Persistent data volumes (writable)
+      - ./docker-volumes/config:/config:rw
+      - ./docker-volumes/logs:/logs:rw
+      - ./docker-volumes/data:/data:rw
+
+    # Network and PID namespace (host PID for system introspection)
+    network_mode: host
+    pid: host
+
+    # Security hardening
+    security_opt:
+      - no-new-privileges:true
+      - seccomp=./seccomp-profile.json
+
+    # Drop all capabilities, add only minimal needed
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_RAW          # Port scanning
+      - DAC_READ_SEARCH  # Read protected system files
+
+    # Read-only root filesystem
+    read_only: true
+
+    # Tmpfs for temporary files
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=100m
+
+    # Environment variables for config paths
+    environment:
+      - MCP_CONFIG_DIR=/config
+      - MCP_LOG_DIR=/logs
+      - MCP_DATA_DIR=/data
+
+    # Run as non-root (maps to host user - use UID:GID from environment or default 1000:1000)
+    user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+    # Health check
+    healthcheck:
+      test: ["/usr/local/bin/chihuaudit", "version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+    # Command (override as needed)
+    command: ["audit", "--format=json"]
+    profiles: ["tools"]  # Not started by default
+
+  # Continuous monitoring daemon (run with: docker-compose up -d chihuaudit-monitor)
+  chihuaudit-monitor:
+    build: .
+    image: chihuaudit:latest
+    container_name: chihuaudit-monitor
+    restart: unless-stopped
+
+    # Host system access (read-only)
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /etc:/host/etc:ro
+      - /var/log:/host/var/log:ro
+      - /usr/bin:/host/usr/bin:ro
+      - /usr/sbin:/host/usr/sbin:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+      # Persistent data volumes (writable)
+      - ./docker-volumes/config:/config:rw
+      - ./docker-volumes/logs:/logs:rw
+      - ./docker-volumes/data:/data:rw
+      
+      # Config file for Discord webhook (optional)
+      - ./.chihuaudit.yaml:/config/.chihuaudit.yaml:ro
+
+    # Network and PID namespace
+    network_mode: host
+    pid: host
+
+    # Security hardening
+    security_opt:
+      - no-new-privileges:true
+      - seccomp=./seccomp-profile.json
+
+    # Drop all capabilities, add only minimal needed
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_RAW
+      - DAC_READ_SEARCH
+
+    # Read-only root filesystem
+    read_only: true
+
+    # Tmpfs for temporary files
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=100m
+
+    # Environment variables
+    environment:
+      - MCP_CONFIG_DIR=/config
+      - MCP_LOG_DIR=/logs
+      - MCP_DATA_DIR=/data
+      - MONITOR_INTERVAL=${MONITOR_INTERVAL:-300}  # 5 minutes default
+
+    # Run as non-root
+    user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+    # Health check
+    healthcheck:
+      test: ["/usr/local/bin/chihuaudit", "version"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+    # Monitoring command with webhook support
+    command: 
+      - "monitor"
+      - "--interval"
+      - "${MONITOR_INTERVAL:-300}"
+      - "--log-dir"
+      - "/logs"
+      - "--webhook"

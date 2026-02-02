@@ -1,4 +1,4 @@
-# MCP Cybersec Watchdog - API Reference
+# Chihuaudit - API Reference
 
 Complete reference for the command-line interface and MCP tools.
 
@@ -10,7 +10,7 @@ Run a complete security audit with standardized output.
 
 **Usage:**
 ```bash
-mcp-watchdog audit [options]
+chihuaudit audit [options]
 ```
 
 **Options:**
@@ -25,7 +25,7 @@ mcp-watchdog audit [options]
 
 **Example:**
 ```bash
-sudo ./mcp-watchdog audit --format json > audit-report.json
+sudo ./chihuaudit audit --format json > audit-report.json
 ```
 
 ---
@@ -36,17 +36,17 @@ Start continuous security monitoring daemon.
 
 **Usage:**
 ```bash
-mcp-watchdog monitor [options]
+chihuaudit monitor [options]
 ```
 
 **Options:**
 - `--interval <seconds>` - Check interval (default: 300)
-- `--log-dir <path>` - Log directory (default: /var/log/mcp-watchdog)
+- `--log-dir <path>` - Log directory (default: /var/log/chihuaudit)
 - `--baseline <file>` - Baseline comparison file
 
 **Example:**
 ```bash
-sudo ./mcp-watchdog monitor --interval 600
+sudo ./chihuaudit monitor --interval 600
 ```
 
 ---
@@ -57,7 +57,7 @@ Check the status of the monitoring daemon.
 
 **Usage:**
 ```bash
-mcp-watchdog monitor-status
+chihuaudit monitor-status
 ```
 
 **Output:** JSON with daemon status, uptime, last check time, anomalies detected.
@@ -146,7 +146,7 @@ Control the monitoring daemon.
 ```json
 {
   "interval": 300,
-  "log_dir": "/var/log/mcp-watchdog"
+  "log_dir": "/var/log/chihuaudit"
 }
 ```
 
@@ -213,7 +213,7 @@ Configure Discord/Slack/custom webhook notifications.
 
 ## Configuration Files
 
-### `.mcp-watchdog.yaml`
+### `.chihuaudit.yaml`
 
 Main configuration file (optional).
 
@@ -228,12 +228,12 @@ notifications:
 # Monitoring settings
 monitoring:
   interval: 300
-  log_dir: /var/log/mcp-watchdog
+  log_dir: /var/log/chihuaudit
 ```
 
 ---
 
-### `.mcp-watchdog-whitelist.yaml`
+### `.chihuaudit-whitelist.yaml`
 
 Whitelist for false positives (AI-managed).
 
@@ -272,8 +272,8 @@ All CLI commands follow standard Unix exit codes:
 
 ## Environment Variables
 
-- `MCP_WATCHDOG_CONFIG` - Path to config file
-- `MCP_WATCHDOG_LOG_LEVEL` - Logging level (debug|info|warn|error)
+- `CHIHUAUDIT_CONFIG` - Path to config file
+- `CHIHUAUDIT_LOG_LEVEL` - Logging level (debug|info|warn|error)
 
 ## Notes
 
@@ -281,4 +281,4 @@ All CLI commands follow standard Unix exit codes:
 - MCP tools are called automatically by AI assistants
 - Configuration files are optional (sensible defaults provided)
 
-For more examples, see: https://github.com/girste/mcp-cybersec-watchdog/tree/main/docs/outputs
+For more examples, see: https://github.com/girste/chihuaudit/tree/main/docs/outputs

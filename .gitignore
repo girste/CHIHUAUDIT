@@ -5,7 +5,7 @@ bin/
 *.dll
 *.so
 *.dylib
-mcp-watchdog
+chihuaudit
 
 # Test binary, built with `go test -c`
 *.test
@@ -30,9 +30,10 @@ vendor/
 Thumbs.db
 
 # Config (local)
-.mcp-watchdog.yaml
-.mcp-watchdog-whitelist.yaml
+.chihuaudit.yaml
+.chihuaudit-whitelist.yaml
 claude_desktop_config.json
 
 # Logs
 *.log
+docker-volumes/

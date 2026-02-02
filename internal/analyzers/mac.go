@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/girste/mcp-cybersec-watchdog/internal/config"
-	"github.com/girste/mcp-cybersec-watchdog/internal/system"
+	"github.com/girste/chihuaudit/internal/config"
+	"github.com/girste/chihuaudit/internal/system"
 )
 
 type MACAnalyzer struct{}
@@ -45,7 +45,7 @@ func (a *MACAnalyzer) Analyze(ctx context.Context, cfg *config.Config) (*Result,
 
 func (a *MACAnalyzer) analyzeAppArmor(ctx context.Context) (string, map[string]interface{}) {
 	// Check if AppArmor is enabled via sysfs (works for both built-in and module)
-	if data, err := os.ReadFile("/sys/module/apparmor/parameters/enabled"); err == nil {
+	if data, err := os.ReadFile(system.HostPath("/sys/module/apparmor/parameters/enabled")); err == nil {
 		if strings.TrimSpace(string(data)) != "Y" {
 			return "", nil
 		}

@@ -11,7 +11,7 @@
 **Do not report security vulnerabilities through public GitHub issues.**
 
 Report via:
-- [Private Security Advisory](https://github.com/girste/mcp-cybersec-watchdog/security/advisories/new)
+- [Private Security Advisory](https://github.com/girste/chihuaudit/security/advisories/new)
 - DM [@girste](https://github.com/girste)
 
 Include: description, steps to reproduce, potential impact.

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/girste/mcp-cybersec-watchdog/internal/config"
+	"github.com/girste/chihuaudit/internal/config"
 )
 
 const (
@@ -273,7 +273,7 @@ func (n *Notifier) sendDiscord(ctx context.Context, alert *AlertPayload) error {
 				Color:       color,
 				Timestamp:   alert.Timestamp,
 				Fields:      fields,
-				Footer:      &discordFooter{Text: "MCP Cybersec Watchdog"},
+				Footer:      &discordFooter{Text: "Chihuaudit"},
 			},
 		},
 	}
@@ -352,7 +352,7 @@ func (n *Notifier) sendSlack(ctx context.Context, alert *AlertPayload) error {
 				Title:  alert.Title,
 				Text:   text,
 				Fields: fields,
-				Footer: "MCP Cybersec Watchdog",
+				Footer: "Chihuaudit",
 			},
 		},
 	}
@@ -428,7 +428,7 @@ func (n *Notifier) TestWebhook(ctx context.Context, provider string) error {
 		Status:    "ok",
 		Score:     95,
 		Title:     "Test Notification",
-		Summary:   "This is a test notification from MCP Cybersec Watchdog to verify webhook configuration.",
+		Summary:   "This is a test notification from Chihuaudit to verify webhook configuration.",
 		Positives: []string{"Webhook configuration verified", "Connection successful"},
 	}
 

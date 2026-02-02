@@ -1,4 +1,4 @@
-# Contributing to MCP Cybersec Watchdog
+# Contributing to Chihuaudit
 
 Thank you for your interest in contributing! This document explains how to contribute to this project.
 
@@ -7,13 +7,13 @@ Thank you for your interest in contributing! This document explains how to contr
 ### Reporting Bugs
 
 Found a bug? Please open an issue on GitHub:
-- **URL:** https://github.com/girste/mcp-cybersec-watchdog/issues/new
+- **URL:** https://github.com/girste/chihuaudit/issues/new
 - Include: OS version, Go version, steps to reproduce, expected vs actual behavior
 
 ### Suggesting Enhancements
 
 Have an idea? Open an issue with the `enhancement` label:
-- **URL:** https://github.com/girste/mcp-cybersec-watchdog/issues/new
+- **URL:** https://github.com/girste/chihuaudit/issues/new
 - Describe: the problem, your proposed solution, and use cases
 
 ### Pull Requests
@@ -89,8 +89,8 @@ Follow conventional commits:
 
 ```bash
 # Clone and install dependencies
-git clone https://github.com/girste/mcp-cybersec-watchdog.git
-cd mcp-cybersec-watchdog
+git clone https://github.com/girste/chihuaudit.git
+cd chihuaudit
 make deps
 
 # Build
@@ -112,7 +112,7 @@ make pre-release
 
 ## Questions?
 
-- Open a discussion: https://github.com/girste/mcp-cybersec-watchdog/discussions
+- Open a discussion: https://github.com/girste/chihuaudit/discussions
 - Contact: [@girste](https://github.com/girste)
 
 ---

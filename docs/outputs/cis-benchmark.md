@@ -1,9 +1,11 @@
 # CIS Benchmark - Ubuntu 22.04
 
+> **Note:** All data shown below is fictional and for demonstration purposes only.
+
 CIS compliance check output (60+ security controls).
 
 ```bash
-sudo ./bin/mcp-watchdog audit --cis
+sudo ./bin/chihuaudit audit --cis
 ```
 
 ## Output Example

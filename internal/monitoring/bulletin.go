@@ -21,7 +21,7 @@ func (g *BulletinGenerator) Generate(report map[string]interface{}, anomalies []
 
 	// Header
 	lines = append(lines, strings.Repeat("=", 70))
-	lines = append(lines, "MCP CYBERSEC WATCHDOG - Security Bulletin")
+	lines = append(lines, "CHIHUAUDIT - Security Bulletin")
 	lines = append(lines, fmt.Sprintf("Generated: %s", timestamp))
 	lines = append(lines, strings.Repeat("=", 70))
 	lines = append(lines, "")

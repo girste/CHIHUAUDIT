@@ -1,0 +1,31 @@
+# Chihuaudit Configuration Example
+# Copy this file to .chihuaudit.yaml and customize
+
+notifications:
+  enabled: true
+  onlyOnIssues: false  # If true, only send notifications when issues are found
+  minSeverity: "medium"  # Minimum severity to trigger notifications: low, medium, high, critical
+
+  # Discord webhook notifications
+  discord:
+    enabled: false  # Set to true to enable Discord notifications
+    webhookUrl: "https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_WEBHOOK_TOKEN"
+    username: "Chihuaudit"
+    avatarUrl: "https://raw.githubusercontent.com/girste/chihuaudit/main/docs/images/chihuaudit_propic.png"  # Optional: custom avatar URL
+
+  # Slack webhook notifications
+  slack:
+    enabled: false
+    webhookUrl: "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+    channel: "#security"
+    username: "Chihuaudit"
+    iconEmoji: ":shield:"
+
+  # Generic webhook (for custom integrations)
+  webhook:
+    enabled: false
+    url: "https://your-server.com/webhook"
+    method: "POST"
+    headers:
+      Content-Type: "application/json"
+      # Authorization: "Bearer YOUR_TOKEN"

@@ -1,6 +1,6 @@
 # Output Examples
 
-Real-world output examples from MCP Cybersec Watchdog.
+Real-world output examples from Chihuaudit.
 
 ## Available Examples
 
@@ -23,11 +23,11 @@ Real-world output examples from MCP Cybersec Watchdog.
 
 | Tool | Command | Output Format |
 |------|---------|---------------|
-| Full Audit | `sudo ./bin/mcp-watchdog audit` | Text (traffic light) |
-| JSON Output | `sudo ./bin/mcp-watchdog audit --format=json` | JSON |
-| CIS Benchmark | `sudo ./bin/mcp-watchdog audit --cis` | Text (compliance) |
+| Full Audit | `sudo ./bin/chihuaudit audit` | Text (traffic light) |
+| JSON Output | `sudo ./bin/chihuaudit audit --format=json` | JSON |
+| CIS Benchmark | `sudo ./bin/chihuaudit audit --cis` | Text (compliance) |
 | Network Scan | MCP: `scan_network_security` | Structured report |
-| Monitoring Status | `sudo ./bin/mcp-watchdog monitor-status` | Daemon stats |
+| Monitoring Status | `sudo ./bin/chihuaudit monitor-status` | Daemon stats |
 | Webhook Test | MCP: `test_webhook` | Live notification |
 
 ---
