@@ -100,9 +100,10 @@ func (a *MACAnalyzer) analyzeSELinux(ctx context.Context) (string, map[string]in
 	status := "disabled"
 	if err == nil {
 		enforce := strings.TrimSpace(string(enforceData))
-		if enforce == "1" {
+		switch enforce {
+		case "1":
 			status = "enforcing"
-		} else if enforce == "0" {
+		case "0":
 			status = "permissive"
 		}
 	}
