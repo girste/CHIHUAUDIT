@@ -72,7 +72,7 @@ release:
   github:
     owner: girste
     name: chihuaudit
-  name_template: "{{.Tag}}"
+  name_template: "V {{.Version}} Teacup"
   prerelease: auto
   draft: false
   header: |
