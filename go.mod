@@ -1,8 +1,8 @@
 module github.com/girste/chihuaudit
 
-go 1.23.0
+go 1.25.0
 
-toolchain go1.24.11
+toolchain go1.25.6
 
 require (
 	github.com/google/uuid v1.6.0
