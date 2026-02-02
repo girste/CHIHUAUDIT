@@ -13,11 +13,15 @@ Continuous monitoring with anomaly detection, Discord/Slack webhooks, and AI-dri
 
 ## Quick Start
 
-```bash
-# Pull the latest image
-docker pull steuuu/chihuaudit:latest
+### Pull Image
 
-# Run security audit
+```bash
+docker pull steuuu/chihuaudit:latest
+```
+
+### Run Security Audit
+
+```bash
 docker run --rm \
   --network host --pid host \
   -v /proc:/host/proc:ro \
@@ -28,6 +32,63 @@ docker run --rm \
   --tmpfs /tmp:rw,noexec,nosuid,size=100m \
   steuuu/chihuaudit:latest audit
 ```
+
+### Use as MCP Server (Claude Desktop)
+
+**Docker Compose (recommended):**
+
+```yaml
+services:
+  chihuaudit:
+    image: steuuu/chihuaudit:latest
+    network_mode: host
+    pid: host
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /etc:/host/etc:ro
+      - /var:/host/var:ro
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_RAW
+      - DAC_READ_SEARCH
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=100m
+    stdin_open: true
+```
+
+**Claude Desktop config** (`claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "chihuaudit": {
+      "command": "docker",
+      "args": ["compose", "run", "--rm", "chihuaudit"]
+    }
+  }
+}
+```
+
+## MCP Tools
+
+**`security_audit`** — Complete system security analysis  
+**`cis_audit`** — CIS Benchmark compliance check  
+**`scan_app_security`** — Ports, processes, containers  
+**`scan_network_security`** — Network & firewall rules  
+**`scan_database_security`** — Database exposure & hardening  
+**`scan_waf_cdn`** — WAF/CDN detection & SSL/TLS  
+**`verify_backup_config`** — Backup integrity verification  
+**`check_vulnerability_intel`** — CVE database lookup (EU Vulnerability Database)  
+**`start_monitoring`** / **`stop_monitoring`** / **`monitoring_status`** — Continuous monitoring daemon  
+**`analyze_anomaly`** — AI anomaly detection analysis  
+**`cleanup_old_logs`** — Log rotation  
+**`configure_webhook`** / **`test_webhook`** / **`get_notification_config`** — Discord/Slack/custom webhooks  
+**`manage_whitelist`** — AI-driven whitelist for false positives  
 
 ## Features
 
