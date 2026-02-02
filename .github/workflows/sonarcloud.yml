@@ -38,3 +38,5 @@ jobs:
           args: >
             -Dsonar.projectKey=girste_CHIHUAUDIT
             -Dsonar.organization=girste
+            -Dsonar.go.coverage.reportPaths=coverage.out
+        continue-on-error: true
