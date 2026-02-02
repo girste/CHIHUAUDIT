@@ -1,5 +1,5 @@
 # Multi-stage build for minimal image
-FROM golang:1.23-alpine@sha256:f0a8f311e13bb949e73548e67ab36055f7cfcbcd1f7892afea94c2fc1c63238b AS builder
+FROM golang:1.23-alpine@sha256:383395b794dffa5b53012a212365d40c8e37109a626ca30d6151c8348d380b5f AS builder
 
 # Install build dependencies
 RUN apk add --no-cache git make
@@ -21,7 +21,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH:-amd64} go build \
     ./cmd/chihuaudit
 
 # Final stage - minimal alpine
-FROM alpine:3.19@sha256:7d51dd030c5a0d692b8674c0b0f182ae44a4c5f0505a1235f35493e87e0cd3c2
+FROM alpine:3.19@sha256:6baf43584bcb78f2e5847d1de515f23499913ac9f12bdf834811a3145eb11ca1
 
 # Install runtime dependencies
 RUN apk add --no-cache ca-certificates
