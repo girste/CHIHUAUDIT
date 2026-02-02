@@ -155,7 +155,11 @@ func parseJailFile(filePath string, jailRegex *regexp.Regexp) []string {
 	if err != nil {
 		return jails
 	}
-	defer file.Close()
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil {
+			log.Warn("failed to close fail2ban log file")
+		}
+	}()
 
 	currentJail := ""
 	isEnabled := false

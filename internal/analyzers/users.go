@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/girste/chihuaudit/internal/config"
+	"github.com/girste/chihuaudit/internal/log"
 	"github.com/girste/chihuaudit/internal/system"
 )
 
@@ -28,7 +29,11 @@ func (a *UsersAnalyzer) Analyze(ctx context.Context, cfg *config.Config) (*Resul
 		result.Checked = false
 		return result, nil
 	}
-	defer passwdFile.Close()
+	defer func() {
+		if closeErr := passwdFile.Close(); closeErr != nil {
+			log.Warn("failed to close /etc/passwd")
+		}
+	}()
 
 	uidZeroUsers := []string{}
 	usersWithoutPassword := []string{}
@@ -73,7 +78,11 @@ func (a *UsersAnalyzer) Analyze(ctx context.Context, cfg *config.Config) (*Resul
 	shadowPath := system.HostPath("/etc/shadow")
 	shadowFile, err := os.Open(shadowPath)
 	if err == nil {
-		defer shadowFile.Close()
+		defer func() {
+			if closeErr := shadowFile.Close(); closeErr != nil {
+				log.Warn("failed to close /etc/shadow")
+			}
+		}()
 
 		shadowScanner := bufio.NewScanner(shadowFile)
 		for shadowScanner.Scan() {

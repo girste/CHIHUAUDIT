@@ -156,7 +156,9 @@ func TestHostExecutor_MetricsTracking(t *testing.T) {
 	}
 
 	// Execute a whitelisted command (might fail if not found, but metrics should update)
-	executor.RunHostCommand(ctx, TimeoutShort, "systemctl", "--version")
+	_, err := executor.RunHostCommand(ctx, TimeoutShort, "systemctl", "--version")
+	// Don't assert on error - command might not exist, but metrics should update
+	_ = err
 
 	metrics := executor.GetMetrics()
 	if metrics.TotalCalls != 1 {
@@ -164,7 +166,10 @@ func TestHostExecutor_MetricsTracking(t *testing.T) {
 	}
 
 	// Execute a non-whitelisted command
-	executor.RunHostCommand(ctx, TimeoutShort, "rm", "-rf", "/")
+	_, err = executor.RunHostCommand(ctx, TimeoutShort, "rm", "-rf", "/")
+	if err == nil {
+		t.Error("should reject non-whitelisted command")
+	}
 
 	metrics = executor.GetMetrics()
 	if metrics.TotalCalls != 2 {
@@ -232,7 +237,7 @@ func TestHostExecutor_MetricsConcurrency(t *testing.T) {
 	done := make(chan bool)
 	for i := 0; i < 10; i++ {
 		go func() {
-			executor.RunHostCommand(ctx, TimeoutShort, "cat", "/dev/null")
+			_, _ = executor.RunHostCommand(ctx, TimeoutShort, "cat", "/dev/null")
 			done <- true
 		}()
 	}
