@@ -53,15 +53,30 @@ func parseHexIP(hexIP string, isIPv6 bool) string {
 	return "::" // Simplified, full IPv6 parsing is complex
 }
 
-// readListeningPorts reads /proc/net/tcp and /proc/net/tcp6 to find listening ports
-func readListeningPorts() ([]map[string]interface{}, []int) {
+// readListeningPorts reads /proc/net/tcp and /proc/net/tcp6 from host to find listening ports
+func readListeningPorts(ctx context.Context) ([]map[string]interface{}, []int) {
 	exposedServices := []map[string]interface{}{}
 	listeningPorts := []int{}
-	
-	// Read IPv4 TCP
-	tcp4Path := system.HostPath("/proc/net/tcp")
-	if data, err := os.ReadFile(tcp4Path); err == nil {
-		scanner := bufio.NewScanner(strings.NewReader(string(data)))
+
+	// In container with network namespace separation, we need nsenter to access host network
+	// Try reading via nsenter first, fallback to direct file access
+	hostExec := system.GetHostExecutor()
+
+	// Read IPv4 TCP via nsenter
+	tcp4Result, err := hostExec.RunHostCommand(ctx, system.TimeoutShort, "cat", "/proc/net/tcp")
+	var tcp4Data string
+	if err == nil && tcp4Result != nil && tcp4Result.Success {
+		tcp4Data = tcp4Result.Stdout
+	} else {
+		// Fallback: direct file read (works in some container configurations)
+		tcp4Path := system.HostPath("/proc/net/tcp")
+		if data, err := os.ReadFile(tcp4Path); err == nil {
+			tcp4Data = string(data)
+		}
+	}
+
+	if tcp4Data != "" {
+		scanner := bufio.NewScanner(strings.NewReader(tcp4Data))
 		scanner.Scan() // Skip header
 		for scanner.Scan() {
 			fields := strings.Fields(scanner.Text())
@@ -73,32 +88,43 @@ func readListeningPorts() ([]map[string]interface{}, []int) {
 			if state != "0A" {
 				continue
 			}
-			
+
 			// Parse local_address (format: IP:PORT in hex)
 			localAddrParts := strings.Split(fields[1], ":")
 			if len(localAddrParts) != 2 {
 				continue
 			}
-			
+
 			port, err := parseHexPort(localAddrParts[1])
 			if err != nil {
 				continue
 			}
 			bindIP := parseHexIP(localAddrParts[0], false)
-			
+
 			listeningPorts = append(listeningPorts, port)
 			exposedServices = append(exposedServices, map[string]interface{}{
 				"port":    port,
 				"bind":    bindIP,
-				"process": "unknown", // We could read /proc/net/tcp inode and match to /proc/*/fd/* but complex
+				"process": "unknown",
 			})
 		}
 	}
-	
-	// Read IPv6 TCP
-	tcp6Path := system.HostPath("/proc/net/tcp6")
-	if data, err := os.ReadFile(tcp6Path); err == nil {
-		scanner := bufio.NewScanner(strings.NewReader(string(data)))
+
+	// Read IPv6 TCP via nsenter
+	tcp6Result, err := hostExec.RunHostCommand(ctx, system.TimeoutShort, "cat", "/proc/net/tcp6")
+	var tcp6Data string
+	if err == nil && tcp6Result != nil && tcp6Result.Success {
+		tcp6Data = tcp6Result.Stdout
+	} else {
+		// Fallback: direct file read
+		tcp6Path := system.HostPath("/proc/net/tcp6")
+		if data, err := os.ReadFile(tcp6Path); err == nil {
+			tcp6Data = string(data)
+		}
+	}
+
+	if tcp6Data != "" {
+		scanner := bufio.NewScanner(strings.NewReader(tcp6Data))
 		scanner.Scan() // Skip header
 		for scanner.Scan() {
 			fields := strings.Fields(scanner.Text())
@@ -109,18 +135,18 @@ func readListeningPorts() ([]map[string]interface{}, []int) {
 			if state != "0A" {
 				continue
 			}
-			
+
 			localAddrParts := strings.Split(fields[1], ":")
 			if len(localAddrParts) != 2 {
 				continue
 			}
-			
+
 			port, err := parseHexPort(localAddrParts[1])
 			if err != nil {
 				continue
 			}
 			bindIP := parseHexIP(localAddrParts[0], true)
-			
+
 			// Check if port already added (avoid duplicates)
 			exists := false
 			for _, existing := range listeningPorts {
@@ -139,25 +165,24 @@ func readListeningPorts() ([]map[string]interface{}, []int) {
 			}
 		}
 	}
-	
+
 	return exposedServices, listeningPorts
 }
 
 func (a *ServicesAnalyzer) Analyze(ctx context.Context, cfg *config.Config) (*Result, error) {
 	result := NewResult()
 
-	// Read listening ports from /proc/net/tcp and /proc/net/tcp6
-	exposedServices, listeningPorts := readListeningPorts()
+	// Read listening ports from host /proc/net/tcp and /proc/net/tcp6
+	exposedServices, listeningPorts := readListeningPorts(ctx)
 
-	// Failed services check - only if systemctl available (gracefully skip in container)
+	// Failed services check via HostExecutor
 	failedCount := 0
-	if system.CommandExists("systemctl") {
-		failedResult, _ := system.RunCommand(ctx, system.TimeoutShort, "systemctl", "list-units", "--failed", "--no-pager")
-		if failedResult != nil && failedResult.Success {
-			for _, line := range strings.Split(failedResult.Stdout, "\n") {
-				if strings.Contains(line, "failed") && strings.Contains(line, ".service") {
-					failedCount++
-				}
+	hostExec := system.GetHostExecutor()
+	failedResult, err := hostExec.RunHostCommand(ctx, system.TimeoutShort, "systemctl", "list-units", "--failed", "--no-pager")
+	if err == nil && failedResult != nil && failedResult.Success {
+		for _, line := range strings.Split(failedResult.Stdout, "\n") {
+			if strings.Contains(line, "failed") && strings.Contains(line, ".service") {
+				failedCount++
 			}
 		}
 	}

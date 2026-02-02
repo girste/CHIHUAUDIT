@@ -54,7 +54,7 @@ func (a *KernelAnalyzer) Analyze(ctx context.Context, cfg *config.Config) (*Resu
 		// Read directly from /proc/sys instead of using sysctl command
 		// Convert dot notation to path: net.ipv4.tcp_syncookies -> /proc/sys/net/ipv4/tcp_syncookies
 		paramPath := system.HostPath("/proc/sys/" + strings.ReplaceAll(param, ".", "/"))
-		
+
 		data, err := os.ReadFile(paramPath)
 		if err != nil {
 			// Parameter doesn't exist or not readable, skip it

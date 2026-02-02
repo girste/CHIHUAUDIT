@@ -33,6 +33,7 @@ Thumbs.db
 .chihuaudit.yaml
 .chihuaudit-whitelist.yaml
 claude_desktop_config.json
+.env
 
 # Logs
 *.log
