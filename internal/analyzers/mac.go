@@ -89,16 +89,23 @@ func (a *MACAnalyzer) analyzeAppArmor(ctx context.Context) (string, map[string]i
 }
 
 func (a *MACAnalyzer) analyzeSELinux(ctx context.Context) (string, map[string]interface{}) {
-	if !system.CommandExists("getenforce") {
+	// Check if SELinux is available by checking /sys/fs/selinux
+	selinuxPath := system.HostPath("/sys/fs/selinux/enforce")
+	if !system.FileExists(selinuxPath) {
 		return "", nil
 	}
 
-	result, _ := system.RunCommand(ctx, system.TimeoutShort, "getenforce")
-	if result == nil || !result.Success {
-		return "", nil
+	// Read enforcement status (0 = permissive, 1 = enforcing)
+	enforceData, err := os.ReadFile(selinuxPath)
+	status := "disabled"
+	if err == nil {
+		enforce := strings.TrimSpace(string(enforceData))
+		if enforce == "1" {
+			status = "enforcing"
+		} else if enforce == "0" {
+			status = "permissive"
+		}
 	}
-
-	status := strings.ToLower(strings.TrimSpace(result.Stdout))
 
 	data := map[string]interface{}{
 		"type":    "selinux",

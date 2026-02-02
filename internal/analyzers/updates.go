@@ -2,6 +2,8 @@ package analyzers
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -32,33 +34,46 @@ func (a *UpdatesAnalyzer) Analyze(ctx context.Context, cfg *config.Config) (*Res
 }
 
 func (a *UpdatesAnalyzer) analyzeDebian(ctx context.Context, result *Result) (*Result, error) {
-	// Update package list (can be slow)
-	updateResult, _ := system.RunCommandSudo(ctx, system.TimeoutVeryLong, "apt-get", "update", "-qq")
-	if updateResult == nil || !updateResult.Success {
-		result.Checked = false
-		return result, nil
+	// Check last update time by reading apt lists timestamp
+	listsPath := system.HostPath("/var/lib/apt/lists")
+	lastUpdateTime := time.Time{}
+	
+	if entries, err := os.ReadDir(listsPath); err == nil {
+		for _, entry := range entries {
+			if strings.Contains(entry.Name(), "Packages") {
+				fullPath := filepath.Join(listsPath, entry.Name())
+				if info, err := os.Stat(fullPath); err == nil {
+					if info.ModTime().After(lastUpdateTime) {
+						lastUpdateTime = info.ModTime()
+					}
+				}
+			}
+		}
 	}
 
-	// Get upgradable packages
-	listResult, _ := system.RunCommand(ctx, system.TimeoutMedium, "apt", "list", "--upgradable")
-	if listResult == nil || !listResult.Success {
-		result.Checked = false
-		return result, nil
+	daysSinceUpdate := 999
+	if !lastUpdateTime.IsZero() {
+		daysSinceUpdate = int(time.Since(lastUpdateTime).Hours() / 24)
 	}
-
+	
+	// Try to get updates count - fallback to apt command if available
 	totalUpdates := 0
 	securityUpdates := 0
 	securityPackages := []string{}
-
-	for _, line := range strings.Split(listResult.Stdout, "\n") {
-		if strings.Contains(line, "[upgradable") {
-			totalUpdates++
-			if strings.Contains(line, "-security") {
-				securityUpdates++
-				// Extract package name
-				parts := strings.Fields(line)
-				if len(parts) > 0 {
-					securityPackages = append(securityPackages, parts[0])
+	
+	if system.CommandExists("apt") {
+		listResult, _ := system.RunCommand(ctx, system.TimeoutMedium, "apt", "list", "--upgradable")
+		if listResult != nil && listResult.Success {
+			for _, line := range strings.Split(listResult.Stdout, "\n") {
+				if strings.Contains(line, "[upgradable") {
+					totalUpdates++
+					if strings.Contains(line, "-security") {
+						securityUpdates++
+						parts := strings.Fields(line)
+						if len(parts) > 0 {
+							securityPackages = append(securityPackages, parts[0])
+						}
+					}
 				}
 			}
 		}
@@ -68,32 +83,64 @@ func (a *UpdatesAnalyzer) analyzeDebian(ctx context.Context, result *Result) (*R
 		"totalUpdates":     totalUpdates,
 		"securityUpdates":  securityUpdates,
 		"securityPackages": securityPackages,
+		"daysSinceUpdate":  daysSinceUpdate,
 	}
 
 	a.addUpdateIssues(result, totalUpdates, securityUpdates)
+	
+	// Warn if updates are very old
+	if daysSinceUpdate > 30 {
+		result.AddIssue(NewIssue(SeverityMedium, "Package lists not updated in "+strconv.Itoa(daysSinceUpdate)+" days", "Run apt-get update regularly"))
+	}
 
 	return result, nil
 }
 
 func (a *UpdatesAnalyzer) analyzeRHEL(ctx context.Context, result *Result) (*Result, error) {
-	// Check for updates
-	checkResult, _ := system.RunCommandSudo(ctx, system.TimeoutVeryLong, "yum", "check-update", "--security")
+	// Check last update by reading yum/dnf cache timestamp
+	cachePaths := []string{
+		system.HostPath("/var/cache/dnf"),
+		system.HostPath("/var/cache/yum"),
+	}
+	
+	lastUpdateTime := time.Time{}
+	for _, cachePath := range cachePaths {
+		if info, err := os.Stat(cachePath); err == nil {
+			if info.ModTime().After(lastUpdateTime) {
+				lastUpdateTime = info.ModTime()
+			}
+		}
+	}
+	
+	daysSinceUpdate := 999
+	if !lastUpdateTime.IsZero() {
+		daysSinceUpdate = int(time.Since(lastUpdateTime).Hours() / 24)
+	}
 
-	// yum check-update returns 100 if updates available, 0 if none
+	// Try yum/dnf commands if available
 	totalUpdates := 0
 	securityUpdates := 0
-
-	if checkResult != nil {
-		lines := strings.Split(checkResult.Stdout, "\n")
-		for _, line := range lines {
-			line = strings.TrimSpace(line)
-			if line == "" || strings.HasPrefix(line, "Loaded") || strings.HasPrefix(line, "Last") {
-				continue
+	
+	if system.CommandExists("dnf") {
+		checkResult, _ := system.RunCommand(ctx, system.TimeoutVeryLong, "dnf", "check-update", "--security", "-q")
+		if checkResult != nil {
+			for _, line := range strings.Split(checkResult.Stdout, "\n") {
+				line = strings.TrimSpace(line)
+				if line != "" && !strings.HasPrefix(line, "Last") && strings.Contains(line, ".") {
+					totalUpdates++
+					securityUpdates++
+				}
 			}
-			// Lines with package updates
-			if strings.Contains(line, ".") && !strings.HasPrefix(line, "#") {
-				totalUpdates++
-				securityUpdates++ // yum check-update --security only shows security updates
+		}
+	} else if system.CommandExists("yum") {
+		checkResult, _ := system.RunCommandSudo(ctx, system.TimeoutVeryLong, "yum", "check-update", "--security")
+		if checkResult != nil {
+			for _, line := range strings.Split(checkResult.Stdout, "\n") {
+				line = strings.TrimSpace(line)
+				if line != "" && !strings.HasPrefix(line, "Loaded") && !strings.HasPrefix(line, "Last") && strings.Contains(line, ".") && !strings.HasPrefix(line, "#") {
+					totalUpdates++
+					securityUpdates++
+				}
 			}
 		}
 	}
@@ -101,9 +148,15 @@ func (a *UpdatesAnalyzer) analyzeRHEL(ctx context.Context, result *Result) (*Res
 	result.Data = map[string]interface{}{
 		"totalUpdates":    totalUpdates,
 		"securityUpdates": securityUpdates,
+		"daysSinceUpdate": daysSinceUpdate,
 	}
 
 	a.addUpdateIssues(result, totalUpdates, securityUpdates)
+	
+	// Warn if updates are very old
+	if daysSinceUpdate > 30 {
+		result.AddIssue(NewIssue(SeverityMedium, "Package cache not updated in "+strconv.Itoa(daysSinceUpdate)+" days", "Run yum/dnf check-update regularly"))
+	}
 
 	return result, nil
 }

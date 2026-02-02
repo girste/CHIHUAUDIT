@@ -1,8 +1,10 @@
 package analyzers
 
 import (
+	"bufio"
 	"context"
-	"regexp"
+	"encoding/hex"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -17,96 +19,145 @@ func (a *ServicesAnalyzer) Name() string           { return "services" }
 func (a *ServicesAnalyzer) RequiresSudo() bool     { return true }
 func (a *ServicesAnalyzer) Timeout() time.Duration { return system.TimeoutMedium }
 
-// isLocalhostBinding checks if the bind address is localhost-only
-func isLocalhostBinding(addr string) bool {
-	return addr == "127.0.0.1" || addr == "::1" || addr == "localhost" || addr == ""
+// parseHexPort converts hex port from /proc/net/tcp to decimal
+func parseHexPort(hexPort string) (int, error) {
+	decoded, err := hex.DecodeString(hexPort)
+	if err != nil {
+		return 0, err
+	}
+	if len(decoded) != 2 {
+		return 0, strconv.ErrRange
+	}
+	// Big-endian
+	port := int(decoded[0])*256 + int(decoded[1])
+	return port, nil
+}
+
+// parseHexIP converts hex IP from /proc/net/tcp to string
+func parseHexIP(hexIP string, isIPv6 bool) string {
+	if !isIPv6 {
+		// IPv4: Little-endian 4 bytes
+		decoded, err := hex.DecodeString(hexIP)
+		if err != nil || len(decoded) != 4 {
+			return "0.0.0.0"
+		}
+		return strconv.Itoa(int(decoded[3])) + "." + strconv.Itoa(int(decoded[2])) + "." + strconv.Itoa(int(decoded[1])) + "." + strconv.Itoa(int(decoded[0]))
+	}
+	// IPv6: Complex, return :: for now (most common is ::)
+	if hexIP == "00000000000000000000000000000000" {
+		return "::"
+	}
+	if hexIP == "00000000000000000000000001000000" {
+		return "::1"
+	}
+	return "::" // Simplified, full IPv6 parsing is complex
+}
+
+// readListeningPorts reads /proc/net/tcp and /proc/net/tcp6 to find listening ports
+func readListeningPorts() ([]map[string]interface{}, []int) {
+	exposedServices := []map[string]interface{}{}
+	listeningPorts := []int{}
+	
+	// Read IPv4 TCP
+	tcp4Path := system.HostPath("/proc/net/tcp")
+	if data, err := os.ReadFile(tcp4Path); err == nil {
+		scanner := bufio.NewScanner(strings.NewReader(string(data)))
+		scanner.Scan() // Skip header
+		for scanner.Scan() {
+			fields := strings.Fields(scanner.Text())
+			if len(fields) < 4 {
+				continue
+			}
+			// Check state: 0A = LISTEN (10 in decimal)
+			state := fields[3]
+			if state != "0A" {
+				continue
+			}
+			
+			// Parse local_address (format: IP:PORT in hex)
+			localAddrParts := strings.Split(fields[1], ":")
+			if len(localAddrParts) != 2 {
+				continue
+			}
+			
+			port, err := parseHexPort(localAddrParts[1])
+			if err != nil {
+				continue
+			}
+			bindIP := parseHexIP(localAddrParts[0], false)
+			
+			listeningPorts = append(listeningPorts, port)
+			exposedServices = append(exposedServices, map[string]interface{}{
+				"port":    port,
+				"bind":    bindIP,
+				"process": "unknown", // We could read /proc/net/tcp inode and match to /proc/*/fd/* but complex
+			})
+		}
+	}
+	
+	// Read IPv6 TCP
+	tcp6Path := system.HostPath("/proc/net/tcp6")
+	if data, err := os.ReadFile(tcp6Path); err == nil {
+		scanner := bufio.NewScanner(strings.NewReader(string(data)))
+		scanner.Scan() // Skip header
+		for scanner.Scan() {
+			fields := strings.Fields(scanner.Text())
+			if len(fields) < 4 {
+				continue
+			}
+			state := fields[3]
+			if state != "0A" {
+				continue
+			}
+			
+			localAddrParts := strings.Split(fields[1], ":")
+			if len(localAddrParts) != 2 {
+				continue
+			}
+			
+			port, err := parseHexPort(localAddrParts[1])
+			if err != nil {
+				continue
+			}
+			bindIP := parseHexIP(localAddrParts[0], true)
+			
+			// Check if port already added (avoid duplicates)
+			exists := false
+			for _, existing := range listeningPorts {
+				if existing == port {
+					exists = true
+					break
+				}
+			}
+			if !exists {
+				listeningPorts = append(listeningPorts, port)
+				exposedServices = append(exposedServices, map[string]interface{}{
+					"port":    port,
+					"bind":    bindIP,
+					"process": "unknown",
+				})
+			}
+		}
+	}
+	
+	return exposedServices, listeningPorts
 }
 
 func (a *ServicesAnalyzer) Analyze(ctx context.Context, cfg *config.Config) (*Result, error) {
 	result := NewResult()
 
-	// Get listening ports with ss
-	ssResult, _ := system.RunCommandSudo(ctx, system.TimeoutShort, "ss", "-tulpn")
-	if ssResult == nil || !ssResult.Success {
-		result.Checked = false
-		return result, nil
-	}
+	// Read listening ports from /proc/net/tcp and /proc/net/tcp6
+	exposedServices, listeningPorts := readListeningPorts()
 
-	exposedServices := []map[string]interface{}{}
-	listeningPorts := []int{}
-
-	// Parse ss output
-	for _, line := range strings.Split(ssResult.Stdout, "\n") {
-		if !strings.Contains(line, "LISTEN") && !strings.Contains(line, "UNCONN") {
-			continue
-		}
-
-		// Extract local address and port
-		fields := strings.Fields(line)
-		if len(fields) < 5 {
-			continue
-		}
-
-		localAddr := fields[4]
-
-		// Parse address:port, handling both IPv4 and IPv6 formats
-		// IPv4: 127.0.0.1:5432 or 0.0.0.0:5432
-		// IPv6: [::1]:5432 or [::]:5432 or :::5432
-		var bindAddr string
-		var portStr string
-
-		if strings.HasPrefix(localAddr, "[") {
-			// IPv6 with brackets: [::1]:5432
-			closeBracket := strings.Index(localAddr, "]")
-			if closeBracket != -1 {
-				bindAddr = localAddr[1:closeBracket]
-				remainingParts := strings.Split(localAddr[closeBracket+1:], ":")
-				if len(remainingParts) > 1 {
-					portStr = remainingParts[1]
-				}
-			}
-		} else {
-			// IPv4 or IPv6 without brackets
-			parts := strings.Split(localAddr, ":")
-			if len(parts) >= 2 {
-				portStr = parts[len(parts)-1]
-				bindAddr = strings.Join(parts[:len(parts)-1], ":")
-			}
-		}
-
-		port, err := strconv.Atoi(portStr)
-		if err != nil {
-			continue
-		}
-
-		listeningPorts = append(listeningPorts, port)
-
-		// Extract process info if available
-		process := "unknown"
-		if len(fields) > 6 {
-			processField := fields[6]
-			if strings.Contains(processField, "\"") {
-				processRegex := regexp.MustCompile(`"([^"]+)"`)
-				if match := processRegex.FindStringSubmatch(processField); len(match) > 1 {
-					process = match[1]
-				}
-			}
-		}
-
-		exposedServices = append(exposedServices, map[string]interface{}{
-			"port":    port,
-			"bind":    bindAddr,
-			"process": process,
-		})
-	}
-
-	// Check for failed services
-	failedResult, _ := system.RunCommand(ctx, system.TimeoutShort, "systemctl", "list-units", "--failed", "--no-pager")
+	// Failed services check - only if systemctl available (gracefully skip in container)
 	failedCount := 0
-	if failedResult != nil && failedResult.Success {
-		for _, line := range strings.Split(failedResult.Stdout, "\n") {
-			if strings.Contains(line, "failed") {
-				failedCount++
+	if system.CommandExists("systemctl") {
+		failedResult, _ := system.RunCommand(ctx, system.TimeoutShort, "systemctl", "list-units", "--failed", "--no-pager")
+		if failedResult != nil && failedResult.Success {
+			for _, line := range strings.Split(failedResult.Stdout, "\n") {
+				if strings.Contains(line, "failed") && strings.Contains(line, ".service") {
+					failedCount++
+				}
 			}
 		}
 	}
@@ -133,8 +184,8 @@ func (a *ServicesAnalyzer) Analyze(ctx context.Context, cfg *config.Config) (*Re
 		bindAddr, _ := svc["bind"].(string)
 		processName, _ := svc["process"].(string)
 
-		// Skip localhost bindings (always safe)
-		if isLocalhostBinding(bindAddr) {
+		// Skip localhost bindings (127.0.0.1, ::1)
+		if bindAddr == "127.0.0.1" || bindAddr == "::1" {
 			continue
 		}
 

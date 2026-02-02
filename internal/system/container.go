@@ -37,3 +37,44 @@ func HostPath(path string) string {
 func IsInContainer() bool {
 	return hostRoot != ""
 }
+
+// IsProcessRunning checks if a process with given name is running on the host
+func IsProcessRunning(processName string) bool {
+	procPath := HostPath("/proc")
+	
+	entries, err := os.ReadDir(procPath)
+	if err != nil {
+		return false
+	}
+	
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		
+		// Check if directory name is numeric (PID)
+		if entry.Name()[0] < '0' || entry.Name()[0] > '9' {
+			continue
+		}
+		
+		// Read cmdline to check process name
+		cmdlinePath := procPath + "/" + entry.Name() + "/cmdline"
+		data, err := os.ReadFile(cmdlinePath)
+		if err != nil {
+			continue
+		}
+		
+		cmdline := string(data)
+		if strings.Contains(cmdline, processName) {
+			return true
+		}
+	}
+	
+	return false
+}
+
+// FileExists checks if a file exists on the host
+func FileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
