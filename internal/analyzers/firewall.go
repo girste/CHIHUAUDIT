@@ -2,6 +2,7 @@ package analyzers
 
 import (
 	"context"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -52,103 +53,109 @@ func (a *FirewallAnalyzer) Analyze(ctx context.Context, cfg *config.Config) (*Re
 }
 
 func (a *FirewallAnalyzer) analyzeUFW(ctx context.Context) (string, map[string]interface{}) {
-	if !system.CommandExists("ufw") {
-		return "", nil
-	}
-
-	result, err := system.RunCommandSudo(ctx, system.TimeoutShort, "ufw", "status", "verbose")
-	if err != nil || result == nil || !result.Success {
+	ufwConfPath := system.HostPath("/etc/ufw/ufw.conf")
+	
+	// Check if UFW config exists
+	if !system.FileExists(ufwConfPath) {
 		return "", nil
 	}
 
 	data := make(map[string]interface{})
 	data["type"] = "ufw"
 
-	active := strings.Contains(strings.ToLower(result.Stdout), "status: active")
+	// Read UFW config to check if enabled
+	configData, err := os.ReadFile(ufwConfPath)
+	active := false
+	if err == nil {
+		configStr := string(configData)
+		active = strings.Contains(configStr, "ENABLED=yes")
+	}
 	data["active"] = active
 
-	// Extract default policy
-	defaultPolicy := "unknown"
-	if match := regexp.MustCompile(`Default: deny \(incoming\)`).FindString(result.Stdout); match != "" {
-		defaultPolicy = "deny"
-	} else if match := regexp.MustCompile(`Default: allow \(incoming\)`).FindString(result.Stdout); match != "" {
-		defaultPolicy = "allow"
-	}
-	data["defaultPolicy"] = defaultPolicy
-
-	// Count rules
+	// Try to read user rules to count them and extract ports
+	userRulesPath := system.HostPath("/etc/ufw/user.rules")
 	rulesCount := 0
-	for _, line := range strings.Split(result.Stdout, "\n") {
-		if strings.Contains(line, "ALLOW") || strings.Contains(line, "DENY") {
-			rulesCount++
-		}
-	}
-	data["rulesCount"] = rulesCount
-
-	// Extract open ports
 	openPorts := []int{}
-	portRegex := regexp.MustCompile(`(\d+)(?:/tcp|/udp)?\s+ALLOW`)
-	matches := portRegex.FindAllStringSubmatch(result.Stdout, -1)
-	for _, match := range matches {
-		if len(match) > 1 {
-			if port, err := strconv.Atoi(match[1]); err == nil {
-				openPorts = append(openPorts, port)
+	
+	if rulesData, err := os.ReadFile(userRulesPath); err == nil {
+		lines := strings.Split(string(rulesData), "\n")
+		for _, line := range lines {
+			// Skip comments and empty lines
+			line = strings.TrimSpace(line)
+			if line == "" || strings.HasPrefix(line, "#") {
+				continue
+			}
+			// Count iptables rules
+			if strings.HasPrefix(line, "-A") {
+				rulesCount++
+				// Try to extract port numbers
+				portRegex := regexp.MustCompile(`--dport (\d+)`)
+				if matches := portRegex.FindStringSubmatch(line); len(matches) > 1 {
+					if port, err := strconv.Atoi(matches[1]); err == nil {
+						openPorts = append(openPorts, port)
+					}
+				}
 			}
 		}
 	}
+
+	data["rulesCount"] = rulesCount
 	data["openPorts"] = openPorts
+	data["defaultPolicy"] = "deny" // UFW defaults to deny
 
 	return "ufw", data
 }
 
 func (a *FirewallAnalyzer) analyzeFirewalld(ctx context.Context) (string, map[string]interface{}) {
-	if !system.CommandExists("firewall-cmd") {
-		return "", nil
-	}
-
-	result, err := system.RunCommandSudo(ctx, system.TimeoutShort, "firewall-cmd", "--state")
-	if err != nil || result == nil {
+	// Check if firewalld is running by looking for the process
+	if !system.IsProcessRunning("firewalld") {
 		return "", nil
 	}
 
 	data := make(map[string]interface{})
 	data["type"] = "firewalld"
-	data["active"] = result.Success && strings.TrimSpace(result.Stdout) == "running"
+	data["active"] = true
 
-	// Get services
-	if servicesResult, _ := system.RunCommandSudo(ctx, system.TimeoutShort, "firewall-cmd", "--list-services"); servicesResult != nil && servicesResult.Success {
-		services := strings.Fields(servicesResult.Stdout)
-		data["services"] = services
-		data["rulesCount"] = len(services)
+	// Try to get services if firewall-cmd is available
+	if system.CommandExists("firewall-cmd") {
+		if servicesResult, _ := system.RunCommandSudo(ctx, system.TimeoutShort, "firewall-cmd", "--list-services"); servicesResult != nil && servicesResult.Success {
+			services := strings.Fields(servicesResult.Stdout)
+			data["services"] = services
+			data["rulesCount"] = len(services)
+		}
 	}
 
 	return "firewalld", data
 }
 
 func (a *FirewallAnalyzer) analyzeIptables(ctx context.Context) (string, map[string]interface{}) {
-	if !system.CommandExists("iptables") {
-		return "", nil
-	}
-
-	result, err := system.RunCommandSudo(ctx, system.TimeoutShort, "iptables", "-L", "-n")
-	if err != nil || result == nil || !result.Success {
+	// Check if iptables is loaded by reading /proc/net/ip_tables_names
+	tablesPath := system.HostPath("/proc/net/ip_tables_names")
+	tablesData, err := os.ReadFile(tablesPath)
+	if err != nil || len(tablesData) == 0 {
+		// No iptables tables loaded
 		return "", nil
 	}
 
 	data := make(map[string]interface{})
 	data["type"] = "iptables"
+	data["active"] = true
 
-	// Count non-header lines as rules
-	rulesCount := 0
-	for _, line := range strings.Split(result.Stdout, "\n") {
-		line = strings.TrimSpace(line)
-		if line != "" && !strings.HasPrefix(line, "Chain") && !strings.HasPrefix(line, "target") {
-			rulesCount++
+	// Try to count rules if iptables command is available
+	if system.CommandExists("iptables") {
+		result, err := system.RunCommandSudo(ctx, system.TimeoutShort, "iptables", "-L", "-n")
+		if err == nil && result != nil && result.Success {
+			// Count non-header lines as rules
+			rulesCount := 0
+			for _, line := range strings.Split(result.Stdout, "\n") {
+				line = strings.TrimSpace(line)
+				if line != "" && !strings.HasPrefix(line, "Chain") && !strings.HasPrefix(line, "target") {
+					rulesCount++
+				}
+			}
+			data["rulesCount"] = rulesCount
 		}
 	}
-
-	data["active"] = rulesCount > 0
-	data["rulesCount"] = rulesCount
 
 	return "iptables", data
 }
