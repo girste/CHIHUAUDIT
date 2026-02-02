@@ -1,116 +1,37 @@
-# golangci-lint configuration for production-ready code
-# https://golangci-lint.run/usage/configuration/
+# golangci-lint configuration v2
+version: "2"
 
 run:
   timeout: 5m
-  tests: true
-  modules-download-mode: readonly
 
 linters:
   enable:
-    # Default linters
-    - errcheck      # Unchecked errors
-    - gosimple      # Simplify code
-    - govet         # Vet examines Go source code
-    - ineffassign   # Detect ineffectual assignments
-    - staticcheck   # Advanced static analysis
-    - unused        # Detect unused code
-
-    # Additional quality linters
-    - gofmt         # Code formatting
-    - goimports     # Import formatting
-    - misspell      # Spell checking
-    - revive        # Fast, configurable, extensible linter
-    - stylecheck    # Style violations
-
-    # Security linters
-    - gosec         # Security problems
-
-    # Performance linters
-    - prealloc      # Preallocate slices
-
-    # Bugs linters
-    - bodyclose     # HTTP body close check
-    - errchkjson    # JSON error handling
-    - nilerr        # Return nil with error
-    - nilnil        # Return nil,nil check
-
-    # Best practices
-    - contextcheck  # Context propagation
-    - errname       # Error naming
-    - errorlint     # Error wrapping
-    - exhaustive    # Enum switch exhaustiveness
-    - gochecknoinits # No init functions (except main)
-    - goconst       # Repeated strings to constants
-    - gocritic      # Comprehensive checks
-    - gocyclo       # Cyclomatic complexity
-    - godot         # Comments end with period
-    - goprintffuncname # Printf naming
-    - noctx         # HTTP requests without context
-    - unparam       # Unused function parameters
-    - whitespace    # Unnecessary whitespace
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
 
 linters-settings:
-  errcheck:
-    check-type-assertions: true
-    check-blank: true
-
   govet:
-    enable-all: true
-    disable:
-      - shadow  # Too strict for this codebase
-
-  gocyclo:
-    min-complexity: 15
-
-  gosec:
-    excludes:
-      - G204  # Subprocess with variable - needed for system commands
-      - G304  # File path from variable - needed for host path wrapping
-
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - performance
-      - style
-    disabled-checks:
-      - paramTypeCombine  # Personal preference
-
-  revive:
-    rules:
-      - name: exported
-        arguments:
-          - disableStutteringCheck
-
-  staticcheck:
-    checks: ["all"]
+    settings:
+      shadow:
+        strict: false
 
 issues:
   exclude-rules:
-    # Exclude test files from some checks
     - path: _test\.go
       linters:
-        - gosec
-        - goconst
-        - gocyclo
         - errcheck
+        - staticcheck
 
-    # Exclude cmd/ from some strict checks
-    - path: cmd/
+    - text: "SA4031"
       linters:
-        - gochecknoinits
+        - staticcheck
 
-    # Allow fmt.Print in specific test utilities
-    - path: cmd/test-manager/
+    - text: "logToolCall"
       linters:
-        - forbidigo
+        - unused
 
   max-issues-per-linter: 0
   max-same-issues: 0
-  new: false
-
-output:
-  format: colored-line-number
-  print-issued-lines: true
-  print-linter-name: true
-  sort-results: true

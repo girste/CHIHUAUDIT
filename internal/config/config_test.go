@@ -37,7 +37,5 @@ func TestDefaultWhitelist(t *testing.T) {
 
 func TestConfigStruct(t *testing.T) {
 	cfg := &Config{}
-	if cfg == nil {
-		t.Fatal("Config is nil")
-	}
+	_ = cfg // Verify Config struct can be instantiated
 }

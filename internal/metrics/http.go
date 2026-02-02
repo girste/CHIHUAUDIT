@@ -31,7 +31,7 @@ func (h *HTTPHandler) HandleHealth(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(health)
+	_ = json.NewEncoder(w).Encode(health)
 }
 
 // HandleReady returns readiness status
@@ -43,7 +43,7 @@ func (h *HTTPHandler) HandleReady(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(ready)
+	_ = json.NewEncoder(w).Encode(ready)
 }
 
 // HandleMetrics returns Prometheus-format metrics
@@ -52,7 +52,7 @@ func (h *HTTPHandler) HandleMetrics(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/plain; version=0.0.4")
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprint(w, metrics)
+	_, _ = fmt.Fprint(w, metrics)
 }
 
 // StartServer starts the HTTP server for metrics (non-blocking)

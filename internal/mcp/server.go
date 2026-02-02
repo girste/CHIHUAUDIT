@@ -420,30 +420,6 @@ func (s *Server) getLogDir() string {
 	return "/tmp/chihuaudit-" + string(rune(os.Getuid()))
 }
 
-// logToolCall logs MCP tool calls with correlation ID and timing
-func (s *Server) logToolCall(toolName, correlationID string, start time.Time, err error, extraFields ...zap.Field) {
-	duration := time.Since(start)
-	fields := []zap.Field{
-		zap.String("tool", toolName),
-		zap.String("correlation_id", correlationID),
-		zap.Duration("duration_ms", duration),
-	}
-	fields = append(fields, extraFields...)
-
-	// Record metrics
-	labels := map[string]string{"tool": toolName}
-	s.metricsReg.Counter("mcp_tool_calls_total", labels).Inc()
-	s.metricsReg.Histogram("mcp_tool_duration_seconds", labels).Observe(duration.Seconds())
-
-	if err != nil {
-		fields = append(fields, zap.Error(err))
-		s.metricsReg.Counter("mcp_tool_errors_total", labels).Inc()
-		s.logger.Error("MCP tool call failed", fields...)
-	} else {
-		s.logger.Info("MCP tool call completed", fields...)
-	}
-}
-
 func (s *Server) handleSecurityAudit(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	correlationID := uuid.New().String()
 	start := time.Now()
