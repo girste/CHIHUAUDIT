@@ -6,34 +6,16 @@
 [![Lint](https://github.com/girste/CHIHUAUDIT/actions/workflows/lint.yml/badge.svg)](https://github.com/girste/CHIHUAUDIT/actions/workflows/lint.yml)
 [![CodeQL](https://github.com/girste/CHIHUAUDIT/actions/workflows/codeql.yml/badge.svg)](https://github.com/girste/CHIHUAUDIT/security/code-scanning)
 [![Trivy](https://github.com/girste/CHIHUAUDIT/actions/workflows/trivy.yml/badge.svg)](https://github.com/girste/CHIHUAUDIT/actions/workflows/trivy.yml)
-[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/11858/badge)](https://www.bestpractices.dev/projects/11858)
-[![Mentioned in Awesome](https://awesome.re/mentioned-badge.svg)](https://github.com/punkpeye/awesome-mcp-servers)
-
-<div align="center">
 
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/girste/CHIHUAUDIT/badge)](https://securityscorecards.dev/viewer/?uri=github.com/girste/CHIHUAUDIT)
-[![Docker Pulls](https://img.shields.io/docker/pulls/steuuu/chihuaudit)](https://hub.docker.com/r/steuuu/chihuaudit)
-
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/11858/badge)](https://www.bestpractices.dev/projects/11858)
 [![SLSA 3](https://slsa.dev/images/gh-badge-level3.svg)](https://slsa.dev)
 [![Go Report Card](https://goreportcard.com/badge/github.com/girste/chihuaudit)](https://goreportcard.com/report/github.com/girste/chihuaudit)
 
-</div>
+[![Mentioned in Awesome](https://awesome.re/mentioned-badge.svg)](https://github.com/punkpeye/awesome-mcp-servers)
+[![Docker Pulls](https://img.shields.io/docker/pulls/steuuu/chihuaudit)](https://hub.docker.com/r/steuuu/chihuaudit)
 
-Single full system checkup or ontinuous monitoring with anomaly detection, Discord/Slack webhooks.
-
-## Quick Start
-
-**Download binary:**
-```bash
-curl -sSfL https://github.com/girste/CHIHUAUDIT/releases/latest/download/chihuaudit_linux_amd64 -o chihuaudit
-chmod +x chihuaudit
-./chihuaudit audit
-```
-
-**Pull Docker image:**
-```bash
-docker pull steuuu/chihuaudit:latest
-```
+Single full system checkup or continuous monitoring with anomaly detection, Discord/Slack webhooks.
 
 ## Tools
 
@@ -57,9 +39,9 @@ Real-time security notifications with severity-based anomaly detection. Detects 
 
 **Examples:** [Discord Alert](docs/images/screen-discord.png) | [Full Audit Output](docs/outputs/)
 
-## Docker Usage
+## Installation
 
-**Binary on host (recommended):**
+**Docker (recommended):**
 ```bash
 docker pull steuuu/chihuaudit:latest
 ```
@@ -69,7 +51,14 @@ docker pull steuuu/chihuaudit:latest
 docker pull ghcr.io/girste/chihuaudit:latest
 ```
 
-Full configuration in [Docker Documentation](DOCKER_RELEASE.md).
+**Binary release:**
+```bash
+curl -sSfL https://github.com/girste/CHIHUAUDIT/releases/latest/download/chihuaudit_linux_amd64 -o chihuaudit
+chmod +x chihuaudit
+./chihuaudit audit
+```
+
+**Latest release:** [v0.0.1 Teacup](https://github.com/girste/CHIHUAUDIT/releases/latest)
 
 ## Security
 
@@ -83,4 +72,11 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, code standards, an
 
 ---
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+<div align="center">
+
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
+
+**Dual Licensed:** [AGPL-3.0](LICENSE) for open source use  
+Commercial licensing available — Contact: **me@girste.com**
+
+</div>
