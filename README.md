@@ -74,9 +74,30 @@ Real-time security notifications with severity-based anomaly detection. Each ale
 
 ## Installation
 
+### Binary (Recommended)
+
+```bash
+# Download v0.0.6-teacup (Latest)
+wget https://github.com/girste/CHIHUAUDIT/releases/download/v0.0.6-teacup/chihuaudit_0.0.6-teacup_linux_amd64.tar.gz
+tar -xzf chihuaudit_0.0.6-teacup_linux_amd64.tar.gz
+chmod +x chihuaudit
+sudo mv chihuaudit /usr/local/bin/
+
+# Verify installation
+chihuaudit --version
+# Output: chihuaudit version 0.0.6-teacup
+```
+
+### Docker
+
 **Docker (recommended):**
 ```bash
-docker pull steuuu/chihuaudit:latest
+docker pull girste/chihuaudit:0.0.6-teacup
+docker run --rm \
+  --cap-add=NET_RAW \
+  --cap-add=DAC_READ_SEARCH \
+  -v /etc:/host/etc:ro \
+  girste/chihuaudit:0.0.6-teacup audit
 ```
 
 **GitHub Container Registry:**
