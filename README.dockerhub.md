@@ -69,7 +69,7 @@ Signed with: Cosign (SLSA Level 3)
 ## License
 
 **Dual Licensed:**
-- **AGPL-3.0** for open source use
+- **MIT License** — Free and open source
 - **Commercial license** available for proprietary use
 
 Contact: **me@girste.com**

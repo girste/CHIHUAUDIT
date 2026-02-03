@@ -23,7 +23,7 @@
 <!-- Version & License -->
 [![Go Version](https://img.shields.io/github/go-mod/go-version/girste/chihuaudit)](https://go.dev/)
 [![Latest Release](https://img.shields.io/github/v/release/girste/chihuaudit)](https://github.com/girste/chihuaudit/releases)
-[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 **System Configuration Drift Detection for Linux Servers**
 
@@ -109,9 +109,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, code standards, an
 
 <div align="center">
 
-[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-**Dual Licensed:** [AGPL-3.0](LICENSE) for open source use  
-Commercial licensing available — Contact: **me@girste.com**
+**MIT License** — Free and open source  
+Contact: **me@girste.com**
 
 </div>

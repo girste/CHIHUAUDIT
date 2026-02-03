@@ -29,19 +29,8 @@ upx:
     lzma: true
     brute: false
 
-dockers:
-  - image_templates:
-      - "girste/chihuaudit:{{ .Tag }}"
-      - "girste/chihuaudit:latest"
-    dockerfile: Dockerfile
-    build_flag_templates:
-      - "--pull"
-      - "--label=org.opencontainers.image.created={{.Date}}"
-      - "--label=org.opencontainers.image.title={{.ProjectName}}"
-      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-      - "--label=org.opencontainers.image.version={{.Version}}"
-      - "--platform=linux/amd64"
-    skip_push: false
+# Docker build is handled by separate docker.yml workflow
+# dockers section removed to avoid conflicts
 
 archives:
   - formats: [tar.gz]
