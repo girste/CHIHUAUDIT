@@ -112,12 +112,12 @@ chmod +x chihuaudit
 ./chihuaudit audit
 ```
 
-**Latest release:** [v0.0.1 Teacup](https://github.com/girste/CHIHUAUDIT/releases/latest)
+**Latest release:** [v0.0.6-teacup](https://github.com/girste/CHIHUAUDIT/releases/latest)
 
 ## Security
 
 **Reporting vulnerabilities:** See [SECURITY.md](.github/SECURITY.md)  
-**Supported versions:** v0.0.1+  
+**Supported versions:** v0.0.6+  
 **SLSA Level 3** supply chain security  
 
 ## Contributing
