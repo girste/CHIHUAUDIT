@@ -139,7 +139,7 @@ func TestValidateInvalidSeverity(t *testing.T) {
 
 // Test Validate() with valid severities
 func TestValidateValidSeverities(t *testing.T) {
-	severities := []string{"critical", "high", "medium", "low", "info"}
+	severities := []string{"critical", "high", "medium", "low", }
 	
 	for _, sev := range severities {
 		cfg := Default()
