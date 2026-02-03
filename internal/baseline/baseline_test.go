@@ -218,3 +218,4 @@ t.Error("Expected error loading non-existent file")
 }
 
 func TestGetDefaultPath(t *testing.T) {
+}
