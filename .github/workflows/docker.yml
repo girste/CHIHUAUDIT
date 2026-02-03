@@ -196,7 +196,7 @@ jobs:
 
       - name: Get tag version
         id: get_version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
       - name: Sign Docker Hub image
         run: |
