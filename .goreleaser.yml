@@ -29,6 +29,20 @@ upx:
     lzma: true
     brute: false
 
+dockers:
+  - image_templates:
+      - "girste/chihuaudit:{{ .Tag }}"
+      - "girste/chihuaudit:latest"
+    dockerfile: Dockerfile
+    build_flag_templates:
+      - "--pull"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--platform=linux/amd64"
+    skip_push: false
+
 archives:
   - formats: [tar.gz]
     name_template: >-
@@ -70,7 +84,7 @@ changelog:
 
 release:
   github:
-    owner: girste
+    owner: "{{ .Env.GITHUB_REPOSITORY_OWNER }}"
     name: chihuaudit
   name_template: "V {{.Version}} Teacup"
   prerelease: auto
@@ -91,7 +105,7 @@ release:
 
     ```bash
     # Download (replace with your architecture)
-    wget https://github.com/girste/chihuaudit/releases/download/{{.Tag}}/chihuaudit_{{.Tag}}_linux_amd64.tar.gz
+    wget https://github.com/{{ .Env.GITHUB_REPOSITORY_OWNER }}/chihuaudit/releases/download/{{.Tag}}/chihuaudit_{{.Tag}}_linux_amd64.tar.gz
 
     # Extract
     tar xzf chihuaudit_{{.Tag}}_linux_amd64.tar.gz
@@ -107,7 +121,7 @@ release:
 
     ```bash
     # Download checksums
-    wget https://github.com/girste/chihuaudit/releases/download/{{.Tag}}/checksums.txt
+    wget https://github.com/{{ .Env.GITHUB_REPOSITORY_OWNER }}/chihuaudit/releases/download/{{.Tag}}/checksums.txt
 
     # Verify
     sha256sum -c checksums.txt --ignore-missing

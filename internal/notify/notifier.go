@@ -40,6 +40,7 @@ type AlertPayload struct {
 
 // AlertIssue represents a single security issue
 type AlertIssue struct {
+	Code     string `json:"code,omitempty"`     // Alert code (e.g., "FW-001", "SSH-003")
 	Severity string `json:"severity"`
 	Message  string `json:"message"`
 	Category string `json:"category,omitempty"`
@@ -216,8 +217,11 @@ func (n *Notifier) sendDiscord(ctx context.Context, alert *AlertPayload) error {
 		low := []string{}
 
 		for _, issue := range alert.Issues {
-			// Just the message, no category prefix
+			// Format: [CODE] Message
 			issueText := issue.Message
+			if issue.Code != "" {
+				issueText = fmt.Sprintf("[%s] %s", issue.Code, issue.Message)
+			}
 			switch strings.ToLower(issue.Severity) {
 			case "critical":
 				critical = append(critical, issueText)
@@ -331,7 +335,11 @@ func (n *Notifier) sendSlack(ctx context.Context, alert *AlertPayload) error {
 				text += fmt.Sprintf("\n... and %d more", len(alert.Issues)-5)
 				break
 			}
-			text += fmt.Sprintf("\n• [%s] %s", strings.ToUpper(issue.Severity), issue.Message)
+			issueText := issue.Message
+			if issue.Code != "" {
+				issueText = fmt.Sprintf("[%s] %s", issue.Code, issue.Message)
+			}
+			text += fmt.Sprintf("\n• [%s] %s", strings.ToUpper(issue.Severity), issueText)
 		}
 	}
 

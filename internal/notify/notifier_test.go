@@ -161,7 +161,7 @@ func TestSendDiscord(t *testing.T) {
 		Title:     "Test Alert",
 		Summary:   "This is a test",
 		Issues: []AlertIssue{
-			{Severity: "critical", Message: "Test issue"},
+			{Code: "FW-001", Severity: "critical", Message: "Test issue"},
 		},
 		Positives: []string{"Test positive"},
 	}

@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/girste/chihuaudit/internal/audit"
-	"github.com/girste/chihuaudit/internal/cis"
 	"github.com/girste/chihuaudit/internal/config"
 	"github.com/girste/chihuaudit/internal/metrics"
 	"github.com/girste/chihuaudit/internal/monitoring"
@@ -181,38 +180,6 @@ func (s *Server) registerTools() {
 		},
 	}, s.handleCleanupOldLogs)
 
-	// Scan network security
-	s.mcp.AddTool(mcp.Tool{
-		Name:        "scan_network_security",
-		Description: "Analyze network security posture and attack surface. LOCAL scope: port bindings, wildcard listeners (0.0.0.0), risky exposed services, IPv6. EXTERNAL scope: public IP detection, open port scan, SSL/TLS analysis, DNS security (SPF/DMARC/CAA). ATTACKER_VIEW: compare local vs external visibility using Shodan InternetDB (free, no API key), check IP reputation. CLOUD_CONTEXT: detect AWS/GCP/Azure and analyze security groups. Use scope='local' for safe internal checks, 'external' for internet-facing analysis, 'both' for complete audit.",
-		InputSchema: mcp.ToolInputSchema{
-			Type: "object",
-			Properties: map[string]interface{}{
-				"scope": map[string]interface{}{
-					"type":        "string",
-					"description": "Scan scope: 'local' (safe), 'external' (requires public access), 'both' (complete)",
-					"enum":        []string{"local", "external", "both"},
-					"default":     "local",
-				},
-				"deep": map[string]interface{}{
-					"type":        "boolean",
-					"description": "Enable deep analysis (SSL/TLS ciphers, DNS records) - only for external scope",
-					"default":     false,
-				},
-				"attacker_view": map[string]interface{}{
-					"type":        "boolean",
-					"description": "Compare local ports vs externally visible ports using Shodan InternetDB. Checks IP reputation via DNSBL. Identifies discrepancies and known vulnerabilities.",
-					"default":     false,
-				},
-				"cloud_context": map[string]interface{}{
-					"type":        "boolean",
-					"description": "Detect cloud provider (AWS/GCP/Azure/DigitalOcean) via metadata endpoints. Analyze security groups if AWS CLI available. Compare cloud firewall with local listeners.",
-					"default":     false,
-				},
-			},
-		},
-	}, s.handleScanNetworkSecurity)
-
 	// Verify backup config
 	s.mcp.AddTool(mcp.Tool{
 		Name:        "verify_backup_config",
@@ -222,83 +189,6 @@ func (s *Server) registerTools() {
 			Properties: map[string]interface{}{},
 		},
 	}, s.handleVerifyBackupConfig)
-
-	// Scan database security
-	s.mcp.AddTool(mcp.Tool{
-		Name:        "scan_database_security",
-		Description: "Audit database security configuration for running databases. Auto-detects MySQL/MariaDB, PostgreSQL, MongoDB, Redis. Checks: default credentials, weak passwords, remote access (0.0.0.0), authentication disabled, dangerous commands enabled, user privileges. Use db_type='auto' for auto-detection or specify 'mysql', 'postgresql', 'mongodb', 'redis'.",
-		InputSchema: mcp.ToolInputSchema{
-			Type: "object",
-			Properties: map[string]interface{}{
-				"db_type": map[string]interface{}{
-					"type":        "string",
-					"description": "Database type: 'auto' (detect all), 'mysql', 'postgresql', 'mongodb', 'redis'",
-					"enum":        []string{"auto", "mysql", "postgresql", "mongodb", "redis"},
-					"default":     "auto",
-				},
-			},
-		},
-	}, s.handleScanDatabaseSecurity)
-
-	// Check vulnerability intel
-	s.mcp.AddTool(mcp.Tool{
-		Name:        "check_vulnerability_intel",
-		Description: "Check if CVEs have known exploits or are actively exploited in the wild. Uses free public APIs: CISA KEV (Known Exploited Vulnerabilities), NVD (National Vulnerability Database). NO registration or API keys required. Identifies critical-risk CVEs that are being actively exploited and require immediate patching.",
-		InputSchema: mcp.ToolInputSchema{
-			Type: "object",
-			Properties: map[string]interface{}{
-				"cve_ids": map[string]interface{}{
-					"type":        "array",
-					"items":       map[string]interface{}{"type": "string"},
-					"description": "List of CVE IDs to check (e.g., ['CVE-2024-1234', 'CVE-2023-5678'])",
-				},
-			},
-			Required: []string{"cve_ids"},
-		},
-	}, s.handleCheckVulnerabilityIntel)
-
-	// Scan WAF/CDN detection
-	s.mcp.AddTool(mcp.Tool{
-		Name:        "scan_waf_cdn",
-		Description: "Detect WAF (Web Application Firewall) and CDN protection for a domain. Identifies: Cloudflare, AWS CloudFront/WAF, Akamai, Azure CDN/Front Door, Fastly, Imperva/Incapsula, Sucuri, Google Cloud CDN, StackPath, KeyCDN, BunnyCDN, DDoS-Guard. Detection methods: HTTP response headers, DNS CNAME chain analysis, IP range matching, cookie inspection. Returns security posture analysis with protection status and recommendations.",
-		InputSchema: mcp.ToolInputSchema{
-			Type: "object",
-			Properties: map[string]interface{}{
-				"domain": map[string]interface{}{
-					"type":        "string",
-					"description": "Domain to analyze (e.g., 'example.com'). Do not include protocol (http/https).",
-				},
-				"include_headers": map[string]interface{}{
-					"type":        "boolean",
-					"description": "Include raw HTTP response headers in output for manual inspection (default: false)",
-					"default":     false,
-				},
-			},
-			Required: []string{"domain"},
-		},
-	}, s.handleScanWAFCDN)
-
-	// CIS Benchmark audit
-	s.mcp.AddTool(mcp.Tool{
-		Name:        "cis_audit",
-		Description: "Run CIS Benchmark compliance audit. Currently supports Ubuntu 22.04 LTS Level 1 (60 scored controls). Checks filesystem hardening, network security, logging/auditing, access control, and system maintenance. Returns compliance percentage and detailed control results with remediation guidance.",
-		InputSchema: mcp.ToolInputSchema{
-			Type: "object",
-			Properties: map[string]interface{}{
-				"level": map[string]interface{}{
-					"type":        "integer",
-					"description": "CIS Level (1 or 2). Level 1 provides essential security. Level 2 adds defense-in-depth. Currently only Level 1 is implemented. Default: 1",
-					"default":     1,
-					"enum":        []int{1, 2},
-				},
-				"include_all_controls": map[string]interface{}{
-					"type":        "boolean",
-					"description": "Include all controls in output (not just failed). Default: false",
-					"default":     false,
-				},
-			},
-		},
-	}, s.handleCISAudit)
 
 	// Configure webhook notifications
 	s.mcp.AddTool(mcp.Tool{
@@ -597,127 +487,10 @@ func (s *Server) handleCleanupOldLogs(ctx context.Context, request mcp.CallToolR
 	return mcp.NewToolResultText(string(resultJSON)), nil
 }
 
-func (s *Server) handleScanNetworkSecurity(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	scope := "local"
-	deep := false
-	attackerView := false
-	cloudContext := false
-
-	if arguments, ok := request.Params.Arguments.(map[string]interface{}); ok {
-		if v, ok := arguments["scope"].(string); ok {
-			scope = v
-		}
-		if v, ok := arguments["deep"].(bool); ok {
-			deep = v
-		}
-		if v, ok := arguments["attacker_view"].(bool); ok {
-			attackerView = v
-		}
-		if v, ok := arguments["cloud_context"].(bool); ok {
-			cloudContext = v
-		}
-	}
-
-	result := scanners.ScanNetworkSecurity(ctx, scope, deep, attackerView, cloudContext)
-
-	resultJSON, _ := json.MarshalIndent(result, "", "  ")
-	return mcp.NewToolResultText(string(resultJSON)), nil
-}
-
 func (s *Server) handleVerifyBackupConfig(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	result := scanners.VerifyBackupConfig(ctx)
 
 	resultJSON, _ := json.MarshalIndent(result, "", "  ")
-	return mcp.NewToolResultText(string(resultJSON)), nil
-}
-
-func (s *Server) handleScanDatabaseSecurity(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	dbType := "auto"
-
-	if arguments, ok := request.Params.Arguments.(map[string]interface{}); ok {
-		if v, ok := arguments["db_type"].(string); ok {
-			dbType = v
-		}
-	}
-
-	result := scanners.ScanDatabaseSecurity(ctx, dbType)
-
-	resultJSON, _ := json.MarshalIndent(result, "", "  ")
-	return mcp.NewToolResultText(string(resultJSON)), nil
-}
-
-func (s *Server) handleCheckVulnerabilityIntel(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	arguments, ok := request.Params.Arguments.(map[string]interface{})
-	if !ok {
-		return mcp.NewToolResultError("Invalid arguments"), nil
-	}
-
-	cveIDsRaw, ok := arguments["cve_ids"].([]interface{})
-	if !ok {
-		return mcp.NewToolResultError("cve_ids parameter required"), nil
-	}
-
-	var cveIDs []string
-	for _, id := range cveIDsRaw {
-		if s, ok := id.(string); ok {
-			cveIDs = append(cveIDs, s)
-		}
-	}
-
-	result := scanners.CheckVulnerabilityIntel(ctx, cveIDs)
-
-	resultJSON, _ := json.MarshalIndent(result, "", "  ")
-	return mcp.NewToolResultText(string(resultJSON)), nil
-}
-
-func (s *Server) handleScanWAFCDN(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	arguments, ok := request.Params.Arguments.(map[string]interface{})
-	if !ok {
-		return mcp.NewToolResultError("Invalid arguments"), nil
-	}
-
-	domain, ok := arguments["domain"].(string)
-	if !ok || domain == "" {
-		return mcp.NewToolResultError("domain parameter required"), nil
-	}
-
-	includeHeaders := false
-	if v, ok := arguments["include_headers"].(bool); ok {
-		includeHeaders = v
-	}
-
-	result := scanners.ScanWAFCDN(ctx, domain, includeHeaders)
-
-	resultJSON, _ := json.MarshalIndent(result, "", "  ")
-	return mcp.NewToolResultText(string(resultJSON)), nil
-}
-
-func (s *Server) handleCISAudit(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	level := 1
-	includeAllControls := false
-
-	if arguments, ok := request.Params.Arguments.(map[string]interface{}); ok {
-		if v, ok := arguments["level"].(float64); ok {
-			level = int(v)
-		}
-		if v, ok := arguments["include_all_controls"].(bool); ok {
-			includeAllControls = v
-		}
-	}
-
-	// Validate level
-	if level != 1 && level != 2 {
-		level = 1
-	}
-
-	// Run CIS audit with compact output by default
-	result := cis.RunCISAudit(ctx, level, includeAllControls, s.config.Whitelist)
-
-	resultJSON, err := json.MarshalIndent(result, "", "  ")
-	if err != nil {
-		return mcp.NewToolResultError("Failed to marshal CIS result: " + err.Error()), nil
-	}
-
 	return mcp.NewToolResultText(string(resultJSON)), nil
 }
 
