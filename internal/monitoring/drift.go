@@ -138,10 +138,11 @@ func (m *DriftMonitor) CheckDrift(ctx context.Context, cfg *config.Config) (*Dri
 		if m.verbose {
 			fmt.Println("\n" + bulletin + "\n")
 			
-			if status == "critical" {
+			switch status {
+			case "critical":
 				fmt.Fprintf(os.Stderr, "\n🔴 CRITICAL DRIFT DETECTED\n")
 				fmt.Fprintf(os.Stderr, "Review drift report: %s\n", driftFile)
-			} else if status == "high" {
+			case "high":
 				fmt.Fprintf(os.Stderr, "\n🟠 HIGH SEVERITY DRIFT DETECTED\n")
 				fmt.Fprintf(os.Stderr, "Review drift report: %s\n", driftFile)
 			}

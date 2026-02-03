@@ -67,12 +67,13 @@ func (a *CVEAnalyzer) Analyze(ctx context.Context, cfg *config.Config) (*Result,
 	}
 
 	// Scan for CVEs using European database (GCVE)
+scanLoop:
 	for _, pkg := range packages {
 		// Check context for cancellation
 		select {
 		case <-ctx.Done():
 			// Timeout or cancellation - return what we have so far
-			break
+			break scanLoop
 		default:
 		}
 

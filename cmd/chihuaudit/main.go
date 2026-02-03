@@ -951,13 +951,14 @@ func runBaselineDiff() {
 
 	// Format output
 	var output string
-	if formatType == "json" {
+	switch formatType {
+	case "json":
 		data, _ := json.MarshalIndent(alerts, "", "  ")
 		output = string(data)
-	} else if formatType == "yaml" {
+	case "yaml":
 		data, _ := yaml.Marshal(alerts)
 		output = string(data)
-	} else {
+	default:
 		// Text format
 		output = formatDriftText(diffResult, alerts)
 	}
@@ -982,8 +983,8 @@ func runBaselineDiff() {
 func formatDriftText(diffResult *baseline.DiffResult, alerts []alertcodes.Alert) string {
 	var sb strings.Builder
 
-	sb.WriteString(fmt.Sprintf("\nBaseline Comparison Report\n"))
-	sb.WriteString(fmt.Sprintf("==========================\n\n"))
+	sb.WriteString("\nBaseline Comparison Report\n")
+	sb.WriteString("==========================\n\n")
 	sb.WriteString(fmt.Sprintf("Baseline timestamp: %s\n", diffResult.BaselineTimestamp))
 	sb.WriteString(fmt.Sprintf("Current timestamp:  %s\n", diffResult.CurrentTimestamp))
 	sb.WriteString(fmt.Sprintf("Drifts detected:    %d\n\n", diffResult.DriftCount))

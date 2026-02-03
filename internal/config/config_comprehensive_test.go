@@ -27,8 +27,8 @@ monitoring:
 	}
 	
 	// Set environment variable
-	os.Setenv("MCP_CONFIG_DIR", tempDir)
-	defer os.Unsetenv("MCP_CONFIG_DIR")
+	_ = os.Setenv("MCP_CONFIG_DIR", tempDir)
+	defer func() { _ = os.Unsetenv("MCP_CONFIG_DIR") }()
 	
 	cfg, err := Load()
 	if err != nil {
@@ -62,8 +62,8 @@ notifications:
 		t.Fatalf("Failed to create test config: %v", err)
 	}
 	
-	os.Setenv("MCP_CONFIG_DIR", tempDir)
-	defer os.Unsetenv("MCP_CONFIG_DIR")
+	_ = os.Setenv("MCP_CONFIG_DIR", tempDir)
+	defer func() { _ = os.Unsetenv("MCP_CONFIG_DIR") }()
 	
 	_, err := Load()
 	if err == nil {
@@ -320,8 +320,8 @@ discovery:
 		t.Fatalf("Failed to create test config: %v", err)
 	}
 	
-	os.Setenv("MCP_CONFIG_DIR", tempDir)
-	defer os.Unsetenv("MCP_CONFIG_DIR")
+	_ = os.Setenv("MCP_CONFIG_DIR", tempDir)
+	defer func() { _ = os.Unsetenv("MCP_CONFIG_DIR") }()
 	
 	cfg, err := Load()
 	if err != nil {
@@ -359,8 +359,8 @@ notifications:
 		t.Fatalf("Failed to create test config: %v", err)
 	}
 	
-	os.Setenv("MCP_CONFIG_DIR", tempDir)
-	defer os.Unsetenv("MCP_CONFIG_DIR")
+	_ = os.Setenv("MCP_CONFIG_DIR", tempDir)
+	defer func() { _ = os.Unsetenv("MCP_CONFIG_DIR") }()
 	
 	cfg, err := Load()
 	if err != nil {
