@@ -179,7 +179,7 @@ jobs:
 
     steps:
       - name: Install CoSign
-        uses: sigstore/cosign-installer@3454867414a9ddaef2a3d224f10a19e83abadf78 # v3.8.0
+        uses: sigstore/cosign-installer@430b6a704fe0c92f1b1261d84376a900f38d90ff # v3.8.0
 
       - name: Login to Docker Hub
         uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
