@@ -5,8 +5,9 @@
 <!-- Build & CI -->
 [![CI](https://github.com/girste/CHIHUAUDIT/actions/workflows/ci.yml/badge.svg)](https://github.com/girste/CHIHUAUDIT/actions)
 [![Lint](https://github.com/girste/CHIHUAUDIT/actions/workflows/lint.yml/badge.svg)](https://github.com/girste/CHIHUAUDIT/actions/workflows/lint.yml)
-[![Docker](https://github.com/girste/CHIHUAUDIT/actions/workflows/docker.yml/badge.svg)](https://github.com/girste/CHIHUAUDIT/actions/workflows/docker.yml)
 [![Release](https://github.com/girste/CHIHUAUDIT/actions/workflows/release.yml/badge.svg)](https://github.com/girste/CHIHUAUDIT/releases)
+
+[![Docker](https://github.com/girste/CHIHUAUDIT/actions/workflows/docker.yml/badge.svg)](https://github.com/girste/CHIHUAUDIT/actions/workflows/docker.yml)
 
 <!-- Security -->
 [![CodeQL](https://github.com/girste/CHIHUAUDIT/actions/workflows/codeql.yml/badge.svg)](https://github.com/girste/CHIHUAUDIT/security/code-scanning)
@@ -15,7 +16,6 @@
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/girste/CHIHUAUDIT/badge)](https://securityscorecards.dev/viewer/?uri=github.com/girste/CHIHUAUDIT)
 
 <!-- Code Quality -->
-[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=girste_CHIHUAUDIT&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=girste_CHIHUAUDIT)
 [![Codecov](https://img.shields.io/codecov/c/github/girste/CHIHUAUDIT)](https://codecov.io/gh/girste/CHIHUAUDIT)
 [![Go Report Card](https://goreportcard.com/badge/github.com/girste/chihuaudit)](https://goreportcard.com/report/github.com/girste/chihuaudit)
 
