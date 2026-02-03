@@ -19,10 +19,19 @@ type Config struct {
 	Timeouts           TimeoutConfig        `yaml:"timeouts"`
 	Monitoring         MonitoringConfig     `yaml:"monitoring"`
 	Notifications      NotifyConfig         `yaml:"notifications"`
+	Scoring            ScoringConfig        `yaml:"scoring"`
 	Discovery          DiscoveryConfig      `yaml:"discovery"`      // Service auto-discovery patterns
 	Whitelist          *Whitelist           `yaml:"-"`              // Loaded separately
 	Ports              *PortPatterns        `yaml:"-"`              // Pattern definitions
 	Processes          *ProcessPatterns     `yaml:"-"`              // Process patterns
+}
+
+// ScoringConfig defines scoring thresholds
+type ScoringConfig struct {
+	BaseScore     int            `yaml:"baseScore"`
+	Deductions    map[string]int `yaml:"deductions"`    // severity → points
+	MinInterval   int            `yaml:"minInterval"`   // monitoring min interval (seconds)
+	MaxInterval   int            `yaml:"maxInterval"`   // monitoring max interval (seconds)
 }
 
 // DiscoveryConfig allows users to customize service auto-discovery patterns
@@ -87,12 +96,9 @@ func Default() *Config {
 		Checks: map[string]bool{
 			"firewall": true, "ssh": true, "threats": true, "fail2ban": true,
 			"services": true, "docker": true, "updates": true, "mac": true,
-			"kernel": true, "ssl": true, "disk": true, "cve": true,
-			"cis": true, "containers": true, "nist": true, "pci": true,
-			"filesystem": true, "network": true, "users": true, "rootkit": true,
-			"sudoers": true, "system": true, "webheaders": true,
-			"app_security": true, "net_security": true, "db_security": true,
-			"backup": true, "vuln_intel": true,
+			"kernel": true, "ssl": true, "disk": true, "users": true,
+			"sudo": true, "cron": true, "permissions": true, "processes": true,
+			"performance": true,
 		},
 		ThreatAnalysisDays: 7,
 		AnalyzerTimeout:    10,
@@ -103,6 +109,17 @@ func Default() *Config {
 			Medium:   10,
 			Long:     30,
 			VeryLong: 120,
+		},
+		Scoring: ScoringConfig{
+			BaseScore: 100,
+			Deductions: map[string]int{
+				"critical": 25,
+				"high":     15,
+				"medium":   10,
+				"low":      5,
+			},
+			MinInterval: 10,
+			MaxInterval: 86400,
 		},
 		Monitoring: MonitoringConfig{
 			Enabled: false, IntervalSeconds: 3600,
@@ -249,14 +266,14 @@ func (c *Config) Validate() error {
 	}
 
 	// Validate severity
-	validSeverities := map[string]bool{"critical": true, "high": true, "medium": true, "low": true, "info": true}
+	validSeverities := map[string]bool{"critical": true, "high": true, "medium": true, "low": true}
 	if !validSeverities[c.Notifications.MinSeverity] {
-		return fmt.Errorf("invalid min_severity: %s (must be: critical, high, medium, low, info)", c.Notifications.MinSeverity)
+		return fmt.Errorf("invalid min_severity: %s (must be: critical, high, medium, low)", c.Notifications.MinSeverity)
 	}
 
 	// Validate monitoring interval
-	if c.Monitoring.Enabled && (c.Monitoring.IntervalSeconds < 10 || c.Monitoring.IntervalSeconds > 86400) {
-		return fmt.Errorf("monitoring interval must be between 10 and 86400 seconds, got: %d", c.Monitoring.IntervalSeconds)
+	if c.Monitoring.Enabled && (c.Monitoring.IntervalSeconds < c.Scoring.MinInterval || c.Monitoring.IntervalSeconds > c.Scoring.MaxInterval) {
+		return fmt.Errorf("monitoring interval must be between %d and %d seconds, got: %d", c.Scoring.MinInterval, c.Scoring.MaxInterval, c.Monitoring.IntervalSeconds)
 	}
 
 	return nil

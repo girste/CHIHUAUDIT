@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,11 +11,9 @@ import (
 
 	"github.com/girste/chihuaudit/internal/audit"
 	"github.com/girste/chihuaudit/internal/config"
-	"github.com/girste/chihuaudit/internal/metrics"
 	"github.com/girste/chihuaudit/internal/monitoring"
 	"github.com/girste/chihuaudit/internal/notify"
 	"github.com/girste/chihuaudit/internal/output"
-	"github.com/girste/chihuaudit/internal/scanners"
 	"github.com/girste/chihuaudit/internal/util"
 	"github.com/google/uuid"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -29,7 +28,6 @@ type Server struct {
 	config        *config.Config
 	preloadedData map[string]interface{} // For serve mode (no sudo)
 	logger        *zap.Logger
-	metricsReg    *metrics.Registry
 }
 
 // NewServer creates a new MCP server
@@ -40,14 +38,6 @@ func NewServer() (*Server, error) {
 	}
 
 	logger := util.GetLogger()
-	metricsReg := metrics.GetRegistry()
-
-	// Start metrics HTTP server on localhost only (non-blocking)
-	if err := metrics.StartServer("127.0.0.1:9090", metricsReg); err != nil {
-		logger.Warn("Failed to start metrics server", zap.Error(err))
-	} else {
-		logger.Info("Metrics server started", zap.String("addr", "http://127.0.0.1:9090"))
-	}
 
 	mcpServer := server.NewMCPServer(
 		"chihuaudit",
@@ -60,7 +50,6 @@ func NewServer() (*Server, error) {
 		orchestrator: audit.NewOrchestrator(),
 		config:       cfg,
 		logger:       logger,
-		metricsReg:   metricsReg,
 	}
 
 	s.registerTools()
@@ -153,7 +142,7 @@ func (s *Server) registerTools() {
 			Properties: map[string]interface{}{
 				"interval_seconds": map[string]interface{}{
 					"type":        "number",
-					"description": "Check interval in seconds (default: 3600 = 1 hour, min: 10, max: 86400 = 24 hours)",
+					"description": "Check interval in seconds (default: 3600 = 1 hour, configurable via scoring.minInterval/maxInterval)",
 					"default":     3600,
 				},
 			},
@@ -179,16 +168,6 @@ func (s *Server) registerTools() {
 			Properties: map[string]interface{}{},
 		},
 	}, s.handleCleanupOldLogs)
-
-	// Verify backup config
-	s.mcp.AddTool(mcp.Tool{
-		Name:        "verify_backup_config",
-		Description: "Audit backup and disaster recovery configuration. Checks: installed backup tools (restic/borg/duplicity), scheduled backups (cron/systemd), backup destinations (local/remote), encryption status, last backup run. DOES NOT perform backups, only verifies configuration for disaster recovery readiness.",
-		InputSchema: mcp.ToolInputSchema{
-			Type:       "object",
-			Properties: map[string]interface{}{},
-		},
-	}, s.handleVerifyBackupConfig)
 
 	// Configure webhook notifications
 	s.mcp.AddTool(mcp.Tool{
@@ -307,7 +286,7 @@ func (s *Server) getLogDir() string {
 	if os.Geteuid() == 0 {
 		return "/var/log/chihuaudit"
 	}
-	return "/tmp/chihuaudit-" + string(rune(os.Getuid()))
+	return fmt.Sprintf("/tmp/chihuaudit-%d", os.Getuid())
 }
 
 func (s *Server) handleSecurityAudit(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -425,10 +404,11 @@ func (s *Server) handleAnalyzeAnomaly(ctx context.Context, request mcp.CallToolR
 	}
 
 	// Return for AI analysis
+	anomalies, _ := anomalyData["anomalies"].([]interface{})
 	result := map[string]interface{}{
 		"message":       "Security anomaly detected - AI analysis recommended",
-		"anomaly_count": len(anomalyData["anomalies"].([]interface{})),
-		"anomalies":     anomalyData["anomalies"],
+		"anomaly_count": len(anomalies),
+		"anomalies":     anomalies,
 		"timestamp":     anomalyData["timestamp"],
 		"full_report":   anomalyData["full_report"],
 	}
@@ -457,11 +437,16 @@ func (s *Server) handleStartMonitoring(ctx context.Context, request mcp.CallTool
 	}
 
 	// Validate interval
-	if interval < 10 {
-		return mcp.NewToolResultError("Minimum interval is 10 seconds"), nil
+	cfg, _ := config.Load()
+	if cfg == nil {
+		cfg = config.Default()
 	}
-	if interval > 86400 {
-		return mcp.NewToolResultError("Maximum interval is 86400 seconds (24 hours)"), nil
+	
+	if interval < cfg.Scoring.MinInterval {
+		return mcp.NewToolResultError(fmt.Sprintf("Minimum interval is %d seconds", cfg.Scoring.MinInterval)), nil
+	}
+	if interval > cfg.Scoring.MaxInterval {
+		return mcp.NewToolResultError(fmt.Sprintf("Maximum interval is %d seconds", cfg.Scoring.MaxInterval)), nil
 	}
 
 	manager := monitoring.NewMonitoringManager(s.getLogDir())
@@ -482,13 +467,6 @@ func (s *Server) handleStopMonitoring(ctx context.Context, request mcp.CallToolR
 func (s *Server) handleCleanupOldLogs(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	manager := monitoring.NewMonitoringManager(s.getLogDir())
 	result := manager.CleanupOldLogs(50, 20)
-
-	resultJSON, _ := json.MarshalIndent(result, "", "  ")
-	return mcp.NewToolResultText(string(resultJSON)), nil
-}
-
-func (s *Server) handleVerifyBackupConfig(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	result := scanners.VerifyBackupConfig(ctx)
 
 	resultJSON, _ := json.MarshalIndent(result, "", "  ")
 	return mcp.NewToolResultText(string(resultJSON)), nil
@@ -735,16 +713,19 @@ notifications:
     method: "` + s.config.Notifications.GenericWebhook.Method + `"
 `
 
-	// If file exists and has notifications section, we need to be smarter
-	// For now, simple append if not exists or write new
 	content := string(existingData)
 	if strings.Contains(content, "notifications:") {
-		// Replace existing notifications section (simple approach)
-		// In production, use proper YAML merge
-		return os.WriteFile(configPath, []byte(notifyConfig), 0600)
+		// Preserve everything before the notifications: section
+		if strings.HasPrefix(content, "notifications:") {
+			// notifications is at the very start — replace entirely
+			return os.WriteFile(configPath, []byte(notifyConfig), 0600)
+		}
+		if idx := strings.Index(content, "\nnotifications:"); idx >= 0 {
+			// Keep everything up to (not including) the notifications line
+			content = content[:idx]
+		}
 	}
 
-	// Append to existing
 	newContent := content + notifyConfig
 	return os.WriteFile(configPath, []byte(newContent), 0600)
 }

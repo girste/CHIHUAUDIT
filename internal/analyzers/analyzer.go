@@ -15,7 +15,6 @@ const (
 	SeverityHigh     Severity = "high"
 	SeverityMedium   Severity = "medium"
 	SeverityLow      Severity = "low"
-	SeverityInfo     Severity = "info"
 )
 
 // Issue represents a security issue found by an analyzer

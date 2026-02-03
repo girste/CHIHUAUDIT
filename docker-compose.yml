@@ -152,11 +152,10 @@ services:
       retries: 3
       start_period: 10s
 
-    # Monitoring command with webhook support
-    command: 
+    # Monitoring command (webhook configured via .chihuaudit.yaml notifications section)
+    command:
       - "monitor"
       - "--interval"
       - "${MONITOR_INTERVAL:-300}"
       - "--log-dir"
       - "/logs"
-      - "--webhook"

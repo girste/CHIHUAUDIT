@@ -13,7 +13,6 @@ func TestSeverityConstants(t *testing.T) {
 		{SeverityHigh, "high"},
 		{SeverityMedium, "medium"},
 		{SeverityLow, "low"},
-		{SeverityInfo, "info"},
 	}
 
 	for _, tt := range tests {
@@ -96,9 +95,6 @@ func TestSeverityComparison(t *testing.T) {
 	}
 	if SeverityHigh == SeverityMedium {
 		t.Error("High and Medium should be different")
-	}
-	if SeverityInfo == SeverityCritical {
-		t.Error("Info and Critical should be different")
 	}
 }
 

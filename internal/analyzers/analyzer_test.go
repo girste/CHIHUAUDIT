@@ -32,7 +32,11 @@ func TestAnalyzerInterface(t *testing.T) {
 		&DiskAnalyzer{},
 		&MACAnalyzer{},
 		&SSLAnalyzer{},
-		&CVEAnalyzer{},
+		&SudoAnalyzer{},
+		&CronAnalyzer{},
+		&PermissionsAnalyzer{},
+		&ProcessAnalyzer{},
+		&PerformanceAnalyzer{},
 	}
 
 	for _, analyzer := range analyzers {
@@ -52,7 +56,7 @@ func TestAnalyzerInterface(t *testing.T) {
 }
 
 func TestAllAnalyzersExist(t *testing.T) {
-	// Verify all 13 analyzer types can be instantiated
+	// Verify all 17 analyzer types can be instantiated
 	count := 0
 	analyzers := []interface{}{
 		&FirewallAnalyzer{},
@@ -67,13 +71,17 @@ func TestAllAnalyzersExist(t *testing.T) {
 		&DiskAnalyzer{},
 		&MACAnalyzer{},
 		&SSLAnalyzer{},
-		&CVEAnalyzer{},
+		&SudoAnalyzer{},
+		&CronAnalyzer{},
+		&PermissionsAnalyzer{},
+		&ProcessAnalyzer{},
+		&PerformanceAnalyzer{},
 	}
 
 	count = len(analyzers)
 
-	if count != 13 {
-		t.Errorf("Expected 13 analyzers, got %d", count)
+	if count != 17 {
+		t.Errorf("Expected 17 analyzers, got %d", count)
 	}
 }
 

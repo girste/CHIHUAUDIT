@@ -35,7 +35,11 @@ func NewOrchestrator() *Orchestrator {
 	registry.Register(&analyzers.DiskAnalyzer{})
 	registry.Register(&analyzers.MACAnalyzer{})
 	registry.Register(&analyzers.SSLAnalyzer{})
-	registry.Register(&analyzers.CVEAnalyzer{})
+	registry.Register(&analyzers.SudoAnalyzer{})
+	registry.Register(&analyzers.CronAnalyzer{})
+	registry.Register(&analyzers.PermissionsAnalyzer{})
+	registry.Register(&analyzers.ProcessAnalyzer{})
+	registry.Register(&analyzers.PerformanceAnalyzer{})
 
 	return &Orchestrator{
 		registry: registry,
@@ -148,7 +152,7 @@ func (o *Orchestrator) executeAnalyzers(ctx context.Context, cfg *config.Config)
 					Checked: false,
 					Issues: []analyzers.Issue{
 						{
-							Severity: analyzers.SeverityInfo,
+							Severity: analyzers.SeverityLow,
 							Message:  "Analyzer failed to run",
 						},
 					},

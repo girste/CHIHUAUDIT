@@ -27,7 +27,6 @@ func (a *SSHAnalyzer) Analyze(ctx context.Context, cfg *config.Config) (*Result,
 		cmdResult, _ := system.RunCommandSudo(ctx, system.TimeoutShort, "cat", configPath)
 		if cmdResult == nil || !cmdResult.Success {
 			result.Checked = false
-			result.AddIssue(NewIssue(SeverityInfo, "Cannot read SSH config", ""))
 			return result, nil
 		}
 		data = []byte(cmdResult.Stdout)
