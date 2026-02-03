@@ -5,9 +5,8 @@
 <!-- Build & CI -->
 [![CI](https://github.com/girste/CHIHUAUDIT/actions/workflows/ci.yml/badge.svg)](https://github.com/girste/CHIHUAUDIT/actions)
 [![Lint](https://github.com/girste/CHIHUAUDIT/actions/workflows/lint.yml/badge.svg)](https://github.com/girste/CHIHUAUDIT/actions/workflows/lint.yml)
-[![Release](https://github.com/girste/CHIHUAUDIT/actions/workflows/release.yml/badge.svg)](https://github.com/girste/CHIHUAUDIT/releases)
-
 [![Docker](https://github.com/girste/CHIHUAUDIT/actions/workflows/docker.yml/badge.svg)](https://github.com/girste/CHIHUAUDIT/actions/workflows/docker.yml)
+[![Release](https://github.com/girste/CHIHUAUDIT/actions/workflows/release.yml/badge.svg)](https://github.com/girste/CHIHUAUDIT/releases)
 
 <!-- Security -->
 [![CodeQL](https://github.com/girste/CHIHUAUDIT/actions/workflows/codeql.yml/badge.svg)](https://github.com/girste/CHIHUAUDIT/security/code-scanning)
