@@ -8,14 +8,14 @@ on:
   schedule:
     - cron: '0 2 * * 0'  # Weekly on Sunday at 2 AM UTC
 
-permissions:
-  contents: read
-  security-events: write
-  actions: read
+permissions: read-all
 
 jobs:
   snyk:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v6.0.2
