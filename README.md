@@ -60,7 +60,6 @@ Chihuaudit continuously monitors your Linux server's system configuration and al
 **`cleanup_old_logs`** — Log rotation  
 **`configure_webhook`** / **`test_webhook`** / **`get_notification_config`** — Discord/Slack/custom webhooks  
 **`manage_whitelist`** — AI-driven whitelist for false positives  
-**`verify_backup_config`** — Backup integrity verification  
 
 ## Alert System
 

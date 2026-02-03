@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/girste/chihuaudit/internal/recommendations"
 )
 
 // Format types
@@ -137,9 +139,9 @@ func (f *Formatter) analyzeReport(report map[string]interface{}) ([]string, []Ne
 
 	// Analyze SSH
 	if ssh, ok := report["ssh"].(map[string]interface{}); ok {
-		if rootLogin, ok := ssh["permit_root_login"].(string); ok && rootLogin == "no" {
+		if rootLogin, ok := ssh["permitRootLogin"].(string); ok && rootLogin == "no" {
 			positives = append(positives, "Root SSH login is disabled")
-		} else if rootLogin == "yes" {
+		} else if rootLogin, ok := ssh["permitRootLogin"].(string); ok && rootLogin == "yes" {
 			negatives = append(negatives, NegativeItem{
 				Severity: "high",
 				Category: "ssh",
@@ -148,8 +150,15 @@ func (f *Formatter) analyzeReport(report map[string]interface{}) ([]string, []Ne
 			baseScore -= 10
 		}
 
-		if passAuth, ok := ssh["password_authentication"].(string); ok && passAuth == "no" {
+		if passAuth, ok := ssh["passwordAuth"].(string); ok && passAuth == "no" {
 			positives = append(positives, "SSH password authentication disabled (key-only)")
+		} else if passAuth, ok := ssh["passwordAuth"].(string); ok && passAuth == "yes" {
+			negatives = append(negatives, NegativeItem{
+				Severity: "medium",
+				Category: "ssh",
+				Message:  "SSH password authentication enabled (key-only recommended)",
+			})
+			baseScore -= 5
 		}
 	}
 
@@ -169,8 +178,17 @@ func (f *Formatter) analyzeReport(report map[string]interface{}) ([]string, []Ne
 
 	// Analyze MAC (AppArmor/SELinux)
 	if mac, ok := report["mac"].(map[string]interface{}); ok {
-		if active, ok := mac["active"].(bool); ok && active {
-			positives = append(positives, "Mandatory Access Control (AppArmor/SELinux) is active")
+		if enabled, ok := mac["enabled"].(bool); ok {
+			if enabled {
+				positives = append(positives, "Mandatory Access Control (AppArmor/SELinux) is active")
+			} else {
+				negatives = append(negatives, NegativeItem{
+					Severity: "medium",
+					Category: "mac",
+					Message:  "No MAC system (AppArmor/SELinux) active",
+				})
+				baseScore -= 5
+			}
 		}
 	}
 
@@ -193,30 +211,120 @@ func (f *Formatter) analyzeReport(report map[string]interface{}) ([]string, []Ne
 
 	// Analyze updates
 	if updates, ok := report["updates"].(map[string]interface{}); ok {
-		if security, ok := updates["security_updates"].(int); ok {
-			if security == 0 {
-				positives = append(positives, "System is up to date with security patches")
+		security := -1
+		if s, ok := updates["securityUpdates"].(int); ok {
+			security = s
+		} else if s, ok := updates["securityUpdates"].(float64); ok {
+			security = int(s)
+		}
+		if security == 0 {
+			positives = append(positives, "System is up to date with security patches")
+		} else if security > 0 {
+			severity := "medium"
+			if security > 10 {
+				severity = "high"
+				baseScore -= 15
 			} else {
-				severity := "medium"
-				if security > 10 {
-					severity = "high"
-					baseScore -= 15
-				} else {
-					baseScore -= 5
-				}
-				negatives = append(negatives, NegativeItem{
-					Severity: severity,
-					Category: "updates",
-					Message:  fmt.Sprintf("%d security update(s) pending", security),
-				})
+				baseScore -= 5
 			}
+			negatives = append(negatives, NegativeItem{
+				Severity: severity,
+				Category: "updates",
+				Message:  fmt.Sprintf("%d security update(s) pending", security),
+			})
 		}
 	}
 
 	// Analyze kernel hardening
 	if kernel, ok := report["kernel"].(map[string]interface{}); ok {
-		if aslr, ok := kernel["aslr_enabled"].(bool); ok && aslr {
-			positives = append(positives, "ASLR (Address Space Layout Randomization) enabled")
+		var pct float64
+		hasPct := false
+		if p, ok := kernel["hardeningPercentage"].(float64); ok {
+			pct, hasPct = p, true
+		} else if p, ok := kernel["hardeningPercentage"].(int); ok {
+			pct, hasPct = float64(p), true
+		}
+		if hasPct {
+			if pct >= 75 {
+				positives = append(positives, fmt.Sprintf("Kernel hardening at %.0f%%", pct))
+			} else if pct < 50 {
+				negatives = append(negatives, NegativeItem{
+					Severity: "high",
+					Category: "kernel",
+					Message:  fmt.Sprintf("Kernel hardening low: %.0f%% of parameters secure", pct),
+				})
+				baseScore -= 10
+			} else {
+				negatives = append(negatives, NegativeItem{
+					Severity: "medium",
+					Category: "kernel",
+					Message:  fmt.Sprintf("Kernel hardening moderate: %.0f%% of parameters secure", pct),
+				})
+				baseScore -= 5
+			}
+		}
+	}
+
+	// Analyze users
+	if users, ok := report["users"].(map[string]interface{}); ok {
+		hasIssues := false
+		if uidZero, ok := users["uidZeroUsers"].([]interface{}); ok && len(uidZero) > 0 {
+			hasIssues = true
+			names := make([]string, len(uidZero))
+			for i, u := range uidZero {
+				names[i] = fmt.Sprintf("%v", u)
+			}
+			negatives = append(negatives, NegativeItem{
+				Severity: "critical",
+				Category: "users",
+				Message:  fmt.Sprintf("Non-root users with UID 0: %s", strings.Join(names, ", ")),
+			})
+			baseScore -= 25
+		}
+		if weakHash, ok := users["usersWithWeakHash"].([]interface{}); ok && len(weakHash) > 0 {
+			hasIssues = true
+			names := make([]string, len(weakHash))
+			for i, u := range weakHash {
+				names[i] = fmt.Sprintf("%v", u)
+			}
+			negatives = append(negatives, NegativeItem{
+				Severity: "high",
+				Category: "users",
+				Message:  fmt.Sprintf("Users with weak password hashes: %s", strings.Join(names, ", ")),
+			})
+			baseScore -= 10
+		}
+		if noPwd, ok := users["usersWithoutPassword"].([]interface{}); ok && len(noPwd) > 0 {
+			hasIssues = true
+			names := make([]string, len(noPwd))
+			for i, u := range noPwd {
+				names[i] = fmt.Sprintf("%v", u)
+			}
+			negatives = append(negatives, NegativeItem{
+				Severity: "high",
+				Category: "users",
+				Message:  fmt.Sprintf("Interactive users without password: %s", strings.Join(names, ", ")),
+			})
+			baseScore -= 10
+		}
+		if !hasIssues {
+			positives = append(positives, "User accounts look healthy")
+		}
+	}
+
+	// Analyze sudo
+	if sudo, ok := report["sudo"].(map[string]interface{}); ok {
+		if nopasswd, ok := sudo["passwordlessSudo"].([]interface{}); ok && len(nopasswd) == 0 {
+			positives = append(positives, "Sudo configured without NOPASSWD privileges")
+		}
+	}
+
+	// Analyze permissions
+	if perms, ok := report["permissions"].(map[string]interface{}); ok {
+		if count, ok := perms["fileCount"].(int); ok && count > 0 {
+			// Issues are caught by the analysis section below;
+			// if we got here with no issues added yet for this category, permissions are clean
+			positives = append(positives, "Critical file permissions checked")
 		}
 	}
 
@@ -329,22 +437,7 @@ func (f *Formatter) generateAdvice(negatives []NegativeItem) []string {
 	seen := make(map[string]bool)
 
 	for _, neg := range negatives {
-		var tip string
-		switch neg.Category {
-		case "firewall":
-			tip = "Enable UFW firewall: sudo ufw enable && sudo ufw default deny incoming"
-		case "ssh":
-			if strings.Contains(neg.Message, "Root") {
-				tip = "Disable root SSH: edit /etc/ssh/sshd_config and set PermitRootLogin no"
-			}
-		case "intrusion_prevention":
-			tip = "Install and enable fail2ban: sudo apt install fail2ban && sudo systemctl enable fail2ban"
-		case "updates":
-			tip = "Apply security updates: sudo apt update && sudo apt upgrade"
-		case "containers":
-			tip = "Avoid privileged containers. Use --cap-drop=ALL and add only needed capabilities"
-		}
-
+		tip := recommendations.ForIssue(neg.Category, neg.Message)
 		if tip != "" && !seen[tip] {
 			advice = append(advice, tip)
 			seen[tip] = true

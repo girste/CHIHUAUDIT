@@ -6,6 +6,7 @@ import (
 
 	"github.com/girste/chihuaudit/internal/analyzers"
 	"github.com/girste/chihuaudit/internal/baseline"
+	"github.com/girste/chihuaudit/internal/recommendations"
 )
 
 // Alert represents an alert with a unique code
@@ -58,78 +59,31 @@ func (cg *CodeGenerator) ResetAll() {
 	cg.counters = make(map[string]int)
 }
 
-// GenerateAlerts converts drifts to alerts with codes
-func GenerateAlerts(drifts []baseline.Drift) []Alert {
+// GenerateAlerts converts drifts to alerts with codes.
+// riskMap maps analyzer name → risk level ("high", "medium", "low");
+// see config.DefaultAnalyzerRiskMap() for defaults.
+func GenerateAlerts(drifts []baseline.Drift, riskMap map[string]string) []Alert {
 	cg := NewCodeGenerator()
 	alerts := make([]Alert, 0, len(drifts))
 
 	for _, drift := range drifts {
 		code := cg.Generate(drift.Analyzer)
-		severity := SeverityFromChange(drift.Analyzer, drift.Field, string(drift.ChangeType))
+		severity := SeverityFromChange(drift.Analyzer, drift.Field, string(drift.ChangeType), riskMap)
 
 		alert := Alert{
-			Code:       code,
-			Severity:   severity,
-			Analyzer:   drift.Analyzer,
-			Message:    drift.Message,
-			Field:      drift.Field,
-			ChangeType: string(drift.ChangeType),
-			Before:     drift.Before,
-			After:      drift.After,
+			Code:           code,
+			Severity:       severity,
+			Analyzer:       drift.Analyzer,
+			Message:        drift.Message,
+			Field:          drift.Field,
+			ChangeType:     string(drift.ChangeType),
+			Before:         drift.Before,
+			After:          drift.After,
+			Recommendation: recommendations.ForDrift(drift.Analyzer, drift.Field, string(drift.ChangeType)),
 		}
-
-		// Add recommendations based on analyzer and change
-		alert.Recommendation = generateRecommendation(drift.Analyzer, drift.Field, string(drift.ChangeType))
 
 		alerts = append(alerts, alert)
 	}
 
 	return alerts
-}
-
-// generateRecommendation creates context-aware recommendations
-func generateRecommendation(analyzerName, field, changeType string) string {
-	switch analyzerName {
-	case "firewall":
-		if changeType == "added" {
-			return "Review new firewall rule. Ensure it follows principle of least privilege."
-		}
-		if changeType == "removed" {
-			return "Verify firewall rule removal was intentional and doesn't expose services."
-		}
-		return "Audit firewall configuration changes for security impact."
-
-	case "ssh":
-		return "Review SSH configuration change. Ensure it doesn't weaken authentication."
-
-	case "services":
-		if changeType == "added" {
-			return "Verify new service is authorized and properly configured."
-		}
-		if changeType == "removed" {
-			return "Confirm service removal was intentional."
-		}
-		return "Check service configuration for security implications."
-
-	case "users":
-		if changeType == "added" {
-			return "Verify new user account is authorized. Check sudo/admin privileges."
-		}
-		if changeType == "removed" {
-			return "Confirm user removal was intentional."
-		}
-		return "Audit user account changes."
-
-	case "docker":
-		return "Review Docker configuration changes for security impact."
-
-	case "fail2ban":
-		return "Check fail2ban configuration to ensure protection is active."
-
-	case "mac":
-		return "Verify MAC (AppArmor/SELinux) policy changes are intentional."
-
-	default:
-		return "Review system change and verify it was authorized."
-	}
 }

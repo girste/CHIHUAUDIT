@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/girste/chihuaudit/internal/alertcodes"
 )
 
 // NotificationRecord tracks when an anomaly was last notified
@@ -89,27 +91,27 @@ func (nt *NotificationTracker) Save() error {
 	return nil
 }
 
-// ShouldNotify checks if an anomaly should trigger a notification
+// ShouldNotify checks if an alert should trigger a notification
 // Returns true if:
-// - First time seeing this anomaly
+// - First time seeing this alert
 // - Last notification was >= reminderInterval ago (24h)
-func (nt *NotificationTracker) ShouldNotify(anomaly Anomaly) bool {
+func (nt *NotificationTracker) ShouldNotify(alert alertcodes.Alert) bool {
 	nt.mu.Lock()
 	defer nt.mu.Unlock()
 
-	hash := nt.hashAnomaly(anomaly)
+	hash := nt.hashAlert(alert)
 	now := time.Now()
 
 	record, exists := nt.records[hash]
 	if !exists {
-		// First time seeing this anomaly - notify!
+		// First time seeing this alert - notify!
 		nt.records[hash] = &NotificationRecord{
 			AnomalyHash:  hash,
 			FirstSeen:    now,
 			LastNotified: now,
 			NotifyCount:  1,
-			Severity:     anomaly.Severity,
-			Message:      anomaly.Message,
+			Severity:     string(alert.Severity),
+			Message:      alert.Message,
 		}
 		return true
 	}
@@ -127,16 +129,16 @@ func (nt *NotificationTracker) ShouldNotify(anomaly Anomaly) bool {
 	return false
 }
 
-// MarkResolved removes an anomaly from tracking (it's been fixed)
-func (nt *NotificationTracker) MarkResolved(anomaly Anomaly) {
+// MarkResolved removes an alert from tracking (it's been fixed)
+func (nt *NotificationTracker) MarkResolved(alert alertcodes.Alert) {
 	nt.mu.Lock()
 	defer nt.mu.Unlock()
 
-	hash := nt.hashAnomaly(anomaly)
+	hash := nt.hashAlert(alert)
 	delete(nt.records, hash)
 }
 
-// CleanupOldRecords removes records for anomalies not seen in the last N days
+// CleanupOldRecords removes records for alerts not seen in the last N days
 func (nt *NotificationTracker) CleanupOldRecords(maxAge time.Duration) {
 	nt.mu.Lock()
 	defer nt.mu.Unlock()
@@ -149,12 +151,12 @@ func (nt *NotificationTracker) CleanupOldRecords(maxAge time.Duration) {
 	}
 }
 
-// hashAnomaly creates a unique hash for an anomaly
-// Hash is based on severity + category + core message (without timestamps/PIDs)
-func (nt *NotificationTracker) hashAnomaly(anomaly Anomaly) string {
-	// Use severity + category + message as hash input
-	// This ensures same type of anomaly gets same hash
-	hashInput := fmt.Sprintf("%s:%s:%s", anomaly.Severity, anomaly.Category, anomaly.Message)
+// hashAlert creates a unique hash for an alert
+// Hash is based on severity + analyzer + core message (without timestamps/PIDs)
+func (nt *NotificationTracker) hashAlert(alert alertcodes.Alert) string {
+	// Use severity + analyzer + message as hash input
+	// This ensures same type of alert gets same hash
+	hashInput := fmt.Sprintf("%s:%s:%s", alert.Severity, alert.Analyzer, alert.Message)
 	hash := sha256.Sum256([]byte(hashInput))
 	return fmt.Sprintf("%x", hash[:16]) // Use first 16 bytes for shorter hash
 }

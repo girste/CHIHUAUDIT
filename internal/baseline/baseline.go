@@ -135,13 +135,21 @@ func Verify(baseline *Baseline) error {
 }
 
 // generateSignature creates a SHA256 signature for the baseline
-// Signs only the baseline metadata to prevent tampering of baseline timestamp/version
-// Data is intentionally NOT signed so we can detect changes in system state
+// Signs both metadata AND data to ensure baseline integrity
 func generateSignature(baseline *Baseline) (string, error) {
-	// Sign only the baseline metadata (timestamp, hostname, version, os, kernel)
-	// This prevents tampering with when the baseline was created
-	// Data changes are expected and will be detected by diff engine
-	data, err := json.Marshal(baseline.Metadata)
+	// Sign complete baseline (metadata + data)
+	// This prevents any tampering with the baseline file
+	type signatureInput struct {
+		Metadata Metadata               `json:"metadata"`
+		Data     map[string]interface{} `json:"data"`
+	}
+	
+	input := signatureInput{
+		Metadata: baseline.Metadata,
+		Data:     baseline.Data,
+	}
+	
+	data, err := json.Marshal(input)
 	if err != nil {
 		return "", err
 	}

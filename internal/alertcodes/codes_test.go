@@ -19,7 +19,11 @@ func TestGetPrefix(t *testing.T) {
 		{"mac", "MAC"},
 		{"ssl", "SSL"},
 		{"threats", "THR"},
-		{"cve", "CVE"},
+		{"sudo", "SDO"},
+		{"cron", "CRN"},
+		{"permissions", "PRM"},
+		{"processes", "PRC"},
+		{"performance", "PER"},
 		{"unknown", "UNK"},
 	}
 

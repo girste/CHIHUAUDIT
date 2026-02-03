@@ -257,7 +257,7 @@ func (a *ServicesAnalyzer) Analyze(ctx context.Context, cfg *config.Config) (*Re
 			// Skip if it's a known safe process (web server, proxy)
 			if !cfg.Processes.IsWebServerProcess(detail.Process) && !cfg.Processes.IsDatabaseProcess(detail.Process) {
 				// Report custom service exposed on wildcard
-				result.AddIssue(NewIssue(SeverityInfo, "Service "+detail.Process+" listening on "+detail.Bind+":"+strconv.Itoa(detail.Port), "Verify if this service needs network exposure"))
+				result.AddIssue(NewIssue(SeverityLow, "Service "+detail.Process+" listening on "+detail.Bind+":"+strconv.Itoa(detail.Port), "Verify if this service needs network exposure"))
 			}
 		}
 	}

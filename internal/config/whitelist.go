@@ -61,9 +61,10 @@ type CISException struct {
 
 // ThresholdsConfig contains customizable alert thresholds
 type ThresholdsConfig struct {
-	Memory MemoryThresholds `yaml:"memory,omitempty"`
-	Disk   DiskThresholds   `yaml:"disk,omitempty"`
-	CPU    CPUThresholds    `yaml:"cpu,omitempty"`
+	Memory       MemoryThresholds  `yaml:"memory,omitempty"`
+	Disk         DiskThresholds    `yaml:"disk,omitempty"`
+	CPU          CPUThresholds     `yaml:"cpu,omitempty"`
+	AnalyzerRisk map[string]string `yaml:"analyzerRisk,omitempty"` // Risk per analyzer: "high", "medium", "low"
 }
 
 // MemoryThresholds for RAM and swap alerts
@@ -233,6 +234,43 @@ func (wl *Whitelist) GetDiskThreshold() float64 {
 		return wl.Thresholds.Disk.UsagePercent
 	}
 	return 90.0 // Default: 90%
+}
+
+// GetCPUThreshold returns the 1-min load average threshold (0 = use default: cores×1.5).
+func (wl *Whitelist) GetCPUThreshold() float64 {
+	if wl.Thresholds.CPU.LoadAvg1Min > 0 {
+		return wl.Thresholds.CPU.LoadAvg1Min
+	}
+	return 0
+}
+
+// GetAnalyzerRiskMap returns the configured analyzer→risk mapping.
+// Falls back to DefaultAnalyzerRiskMap when no explicit config exists.
+func (wl *Whitelist) GetAnalyzerRiskMap() map[string]string {
+	if wl != nil && len(wl.Thresholds.AnalyzerRisk) > 0 {
+		return wl.Thresholds.AnalyzerRisk
+	}
+	return DefaultAnalyzerRiskMap()
+}
+
+// DefaultAnalyzerRiskMap returns the default risk levels used when the whitelist
+// does not specify thresholds.analyzerRisk.  Override in .chihuaudit-whitelist.yaml:
+//
+//	thresholds:
+//	  analyzerRisk:
+//	    firewall: high
+//	    ssh:      high
+//	    ...
+func DefaultAnalyzerRiskMap() map[string]string {
+	return map[string]string{
+		"firewall": "high",
+		"ssh":      "high",
+		"users":    "high",
+		"services": "medium",
+		"docker":   "medium",
+		"fail2ban": "medium",
+		"mac":      "medium",
+	}
 }
 
 // IsAlertWhitelisted checks if an alert code is whitelisted

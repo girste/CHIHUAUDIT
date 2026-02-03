@@ -82,8 +82,12 @@ func (m *DriftMonitor) CheckDrift(ctx context.Context, cfg *config.Config) (*Dri
 		return nil, fmt.Errorf("failed to compare baseline: %w", err)
 	}
 
-	// Generate alerts with codes
-	alerts := alertcodes.GenerateAlerts(diffResult.Drifts)
+	// Generate alerts with codes — severity rules come from whitelist config
+	riskMap := config.DefaultAnalyzerRiskMap()
+	if cfg.Whitelist != nil {
+		riskMap = cfg.Whitelist.GetAnalyzerRiskMap()
+	}
+	alerts := alertcodes.GenerateAlerts(diffResult.Drifts, riskMap)
 
 	// Filter whitelisted alerts
 	alerts = m.filterWhitelistedAlerts(cfg, alerts)

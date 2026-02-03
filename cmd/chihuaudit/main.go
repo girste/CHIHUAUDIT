@@ -25,7 +25,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-var version = "1.0.0"
+var version = "0.0.6-teacup"
 
 func main() {
 	if len(os.Args) > 1 {
@@ -50,6 +50,10 @@ func main() {
 
 		case "verify":
 			runVerify()
+			os.Exit(0)
+
+		case "monitor":
+			runMonitor()
 			os.Exit(0)
 
 		case "monitor-once":
@@ -554,8 +558,7 @@ func runMonitorOnce() {
 		}
 	}
 
-	baselinePath := logDir + "/baseline.json"
-	monitor := monitoring.NewSecurityMonitor(3600, logDir, baselinePath, true)
+	monitor := monitoring.NewSecurityMonitor(3600, logDir, true)
 
 	result, err := monitor.RunOnce()
 	if err != nil {
@@ -567,6 +570,39 @@ func runMonitorOnce() {
 	if result.AnomalyFile != "" {
 		fmt.Printf("Anomaly file: %s\n", result.AnomalyFile)
 	}
+}
+
+func runMonitor() {
+	interval := 3600
+	logDir := getLogDir()
+	verbose := true
+
+	for i := 2; i < len(os.Args); i++ {
+		arg := os.Args[i]
+		if (arg == "--interval" || arg == "-i") && i+1 < len(os.Args) {
+			if v, err := strconv.Atoi(os.Args[i+1]); err == nil {
+				interval = v
+			}
+			i++
+		} else if (arg == "--log-dir" || arg == "-d") && i+1 < len(os.Args) {
+			logDir = os.Args[i+1]
+			i++
+		} else if arg == "--quiet" || arg == "-q" {
+			verbose = false
+		}
+	}
+
+	if interval < 10 {
+		fmt.Fprintf(os.Stderr, "Error: Minimum interval is 10 seconds\n")
+		os.Exit(1)
+	}
+	if interval > 86400 {
+		fmt.Fprintf(os.Stderr, "Error: Maximum interval is 86400 seconds (24 hours)\n")
+		os.Exit(1)
+	}
+
+	monitor := monitoring.NewSecurityMonitor(interval, logDir, verbose)
+	monitor.Run()
 }
 
 func runMonitorStatus() {
@@ -620,12 +656,19 @@ func runDaemonStart() {
 	}
 
 	// Validate interval
-	if interval < 10 {
-		fmt.Fprintf(os.Stderr, "Error: Minimum interval is 10 seconds\n")
+	cfg, _ := config.Load()
+	if cfg == nil {
+		cfg = config.Default()
+	}
+	minInterval := cfg.Scoring.MinInterval
+	maxInterval := cfg.Scoring.MaxInterval
+	
+	if interval < minInterval {
+		fmt.Fprintf(os.Stderr, "Error: Minimum interval is %d seconds\n", minInterval)
 		os.Exit(1)
 	}
-	if interval > 86400 {
-		fmt.Fprintf(os.Stderr, "Error: Maximum interval is 86400 seconds (24 hours)\n")
+	if interval > maxInterval {
+		fmt.Fprintf(os.Stderr, "Error: Maximum interval is %d seconds (24 hours)\n", maxInterval)
 		os.Exit(1)
 	}
 
@@ -690,7 +733,7 @@ SUBCOMMANDS:
     status      Show daemon status and statistics
 
 START OPTIONS:
-    --interval, -i SECONDS   Check interval (default: 3600, min: 10, max: 86400)
+    --interval, -i SECONDS   Check interval (default: 3600, configurable via scoring section)
     --log-dir, -d PATH       Log directory
 
 EXAMPLES:
@@ -754,7 +797,7 @@ AUDIT OPTIONS (chihuaudit audit):
     Exit codes: 0=OK (green), 1=WARNING (yellow), 2=CRITICAL (red)
 
 DAEMON OPTIONS (chihuaudit daemon start):
-    --interval, -i SECONDS   Check interval (default: 3600, min: 10, max: 86400)
+    --interval, -i SECONDS   Check interval (default: 3600, configurable via scoring section)
     --log-dir, -d PATH       Log directory
 
 MONITOR OPTIONS (foreground mode):
@@ -947,7 +990,8 @@ func runBaselineDiff() {
 	}
 
 	// Generate alerts
-	alerts := alertcodes.GenerateAlerts(diffResult.Drifts)
+	riskMap := config.DefaultAnalyzerRiskMap()
+	alerts := alertcodes.GenerateAlerts(diffResult.Drifts, riskMap)
 
 	// Format output
 	var output string
@@ -1071,7 +1115,7 @@ func runBaselineUpdate() {
 	// Create backup of old baseline
 	timestamp := time.Now().Unix()
 	backupPath := fmt.Sprintf("%s.backup-%d", baselinePath, timestamp)
-	
+
 	fmt.Printf("Updating baseline: %s\n", baselinePath)
 	fmt.Printf("Creating backup: %s\n", backupPath)
 
@@ -1186,152 +1230,152 @@ ALERT CODES:
 }
 
 func runWhitelist() {
-if len(os.Args) < 3 {
-printWhitelistHelp()
-os.Exit(1)
-}
+	if len(os.Args) < 3 {
+		printWhitelistHelp()
+		os.Exit(1)
+	}
 
-subcommand := os.Args[2]
-switch subcommand {
-case "add":
-runWhitelistAdd()
-case "remove":
-runWhitelistRemove()
-case "list":
-runWhitelistList()
-case "help", "--help", "-h":
-printWhitelistHelp()
-default:
-fmt.Printf("Unknown whitelist subcommand: %s\n", subcommand)
-printWhitelistHelp()
-os.Exit(1)
-}
+	subcommand := os.Args[2]
+	switch subcommand {
+	case "add":
+		runWhitelistAdd()
+	case "remove":
+		runWhitelistRemove()
+	case "list":
+		runWhitelistList()
+	case "help", "--help", "-h":
+		printWhitelistHelp()
+	default:
+		fmt.Printf("Unknown whitelist subcommand: %s\n", subcommand)
+		printWhitelistHelp()
+		os.Exit(1)
+	}
 }
 
 func runWhitelistAdd() {
-if len(os.Args) < 4 {
-fmt.Println("Error: Alert code required")
-fmt.Println("Usage: chihuaudit whitelist add <ALERT_CODE>")
-os.Exit(1)
-}
+	if len(os.Args) < 4 {
+		fmt.Println("Error: Alert code required")
+		fmt.Println("Usage: chihuaudit whitelist add <ALERT_CODE>")
+		os.Exit(1)
+	}
 
-alertCode := os.Args[3]
+	alertCode := os.Args[3]
 
-// Load or create whitelist
-whitelistPath := getWhitelistPath()
-wl := loadOrCreateWhitelist(whitelistPath)
+	// Load or create whitelist
+	whitelistPath := getWhitelistPath()
+	wl := loadOrCreateWhitelist(whitelistPath)
 
-// Add alert code
-if wl.IsAlertWhitelisted(alertCode) {
-fmt.Printf("Alert code %s is already whitelisted\n", alertCode)
-return
-}
+	// Add alert code
+	if wl.IsAlertWhitelisted(alertCode) {
+		fmt.Printf("Alert code %s is already whitelisted\n", alertCode)
+		return
+	}
 
-wl.AddAlertCode(alertCode)
+	wl.AddAlertCode(alertCode)
 
-// Save whitelist
-if err := saveWhitelist(wl, whitelistPath); err != nil {
-fmt.Fprintf(os.Stderr, "Failed to save whitelist: %v\n", err)
-os.Exit(1)
-}
+	// Save whitelist
+	if err := saveWhitelist(wl, whitelistPath); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to save whitelist: %v\n", err)
+		os.Exit(1)
+	}
 
-fmt.Printf("✓ Alert code %s added to whitelist\n", alertCode)
-fmt.Printf("  File: %s\n", whitelistPath)
+	fmt.Printf("✓ Alert code %s added to whitelist\n", alertCode)
+	fmt.Printf("  File: %s\n", whitelistPath)
 }
 
 func runWhitelistRemove() {
-if len(os.Args) < 4 {
-fmt.Println("Error: Alert code required")
-fmt.Println("Usage: chihuaudit whitelist remove <ALERT_CODE>")
-os.Exit(1)
-}
+	if len(os.Args) < 4 {
+		fmt.Println("Error: Alert code required")
+		fmt.Println("Usage: chihuaudit whitelist remove <ALERT_CODE>")
+		os.Exit(1)
+	}
 
-alertCode := os.Args[3]
+	alertCode := os.Args[3]
 
-whitelistPath := getWhitelistPath()
-wl := loadOrCreateWhitelist(whitelistPath)
+	whitelistPath := getWhitelistPath()
+	wl := loadOrCreateWhitelist(whitelistPath)
 
-if wl.RemoveAlertCode(alertCode) {
-if err := saveWhitelist(wl, whitelistPath); err != nil {
-fmt.Fprintf(os.Stderr, "Failed to save whitelist: %v\n", err)
-os.Exit(1)
-}
-fmt.Printf("✓ Alert code %s removed from whitelist\n", alertCode)
-} else {
-fmt.Printf("Alert code %s not found in whitelist\n", alertCode)
-os.Exit(1)
-}
+	if wl.RemoveAlertCode(alertCode) {
+		if err := saveWhitelist(wl, whitelistPath); err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to save whitelist: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("✓ Alert code %s removed from whitelist\n", alertCode)
+	} else {
+		fmt.Printf("Alert code %s not found in whitelist\n", alertCode)
+		os.Exit(1)
+	}
 }
 
 func runWhitelistList() {
-whitelistPath := getWhitelistPath()
-wl := loadOrCreateWhitelist(whitelistPath)
+	whitelistPath := getWhitelistPath()
+	wl := loadOrCreateWhitelist(whitelistPath)
 
-codes := wl.GetWhitelistedAlertCodes()
+	codes := wl.GetWhitelistedAlertCodes()
 
-if len(codes) == 0 {
-fmt.Println("No alert codes whitelisted")
-fmt.Printf("  File: %s\n", whitelistPath)
-return
-}
+	if len(codes) == 0 {
+		fmt.Println("No alert codes whitelisted")
+		fmt.Printf("  File: %s\n", whitelistPath)
+		return
+	}
 
-fmt.Printf("Whitelisted Alert Codes (%d):\n", len(codes))
-fmt.Println("──────────────────────────────")
-for _, code := range codes {
-fmt.Printf("  %s\n", code)
-}
-fmt.Printf("\nWhitelist file: %s\n", whitelistPath)
+	fmt.Printf("Whitelisted Alert Codes (%d):\n", len(codes))
+	fmt.Println("──────────────────────────────")
+	for _, code := range codes {
+		fmt.Printf("  %s\n", code)
+	}
+	fmt.Printf("\nWhitelist file: %s\n", whitelistPath)
 }
 
 func getWhitelistPath() string {
-// Check current directory first
-if _, err := os.Stat(".chihuaudit-whitelist.yaml"); err == nil {
-return ".chihuaudit-whitelist.yaml"
-}
+	// Check current directory first
+	if _, err := os.Stat(".chihuaudit-whitelist.yaml"); err == nil {
+		return ".chihuaudit-whitelist.yaml"
+	}
 
-// Check home directory
-homeDir, err := os.UserHomeDir()
-if err == nil {
-homePath := filepath.Join(homeDir, ".chihuaudit-whitelist.yaml")
-if _, err := os.Stat(homePath); err == nil {
-return homePath
-}
-}
+	// Check home directory
+	homeDir, err := os.UserHomeDir()
+	if err == nil {
+		homePath := filepath.Join(homeDir, ".chihuaudit-whitelist.yaml")
+		if _, err := os.Stat(homePath); err == nil {
+			return homePath
+		}
+	}
 
-// Default to current directory
-return ".chihuaudit-whitelist.yaml"
+	// Default to current directory
+	return ".chihuaudit-whitelist.yaml"
 }
 
 func loadOrCreateWhitelist(path string) *config.Whitelist {
-data, err := os.ReadFile(path)
-if err != nil {
-// Create new whitelist
-return &config.Whitelist{
-Version:    "1.0",
-AlertCodes: []string{},
-}
-}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		// Create new whitelist
+		return &config.Whitelist{
+			Version:    "1.0",
+			AlertCodes: []string{},
+		}
+	}
 
-var wl config.Whitelist
-if err := yaml.Unmarshal(data, &wl); err != nil {
-fmt.Fprintf(os.Stderr, "Failed to parse whitelist: %v\n", err)
-os.Exit(1)
-}
+	var wl config.Whitelist
+	if err := yaml.Unmarshal(data, &wl); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to parse whitelist: %v\n", err)
+		os.Exit(1)
+	}
 
-return &wl
+	return &wl
 }
 
 func saveWhitelist(wl *config.Whitelist, path string) error {
-data, err := yaml.Marshal(wl)
-if err != nil {
-return err
-}
+	data, err := yaml.Marshal(wl)
+	if err != nil {
+		return err
+	}
 
-return os.WriteFile(path, data, 0600)
+	return os.WriteFile(path, data, 0600)
 }
 
 func printWhitelistHelp() {
-help := `chihuaudit whitelist - Manage alert code whitelist
+	help := `chihuaudit whitelist - Manage alert code whitelist
 
 USAGE:
     chihuaudit whitelist <SUBCOMMAND>
@@ -1382,5 +1426,5 @@ WORKFLOW:
     3. Future occurrences of whitelisted codes will be suppressed
     4. Update baseline when configuration intentionally changes
 `
-fmt.Print(help)
+	fmt.Print(help)
 }
