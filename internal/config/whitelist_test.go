@@ -291,8 +291,8 @@ network:
 		t.Fatalf("Failed to create test whitelist: %v", err)
 	}
 
-	os.Setenv("MCP_CONFIG_DIR", tempDir)
-	defer os.Unsetenv("MCP_CONFIG_DIR")
+	_ = os.Setenv("MCP_CONFIG_DIR", tempDir)
+	defer func() { _ = os.Unsetenv("MCP_CONFIG_DIR") }()
 
 	wl, err := LoadWhitelist()
 	if err != nil {
