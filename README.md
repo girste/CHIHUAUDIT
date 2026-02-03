@@ -13,7 +13,6 @@
 [![Trivy](https://github.com/girste/CHIHUAUDIT/actions/workflows/trivy.yml/badge.svg)](https://github.com/girste/CHIHUAUDIT/security)
 [![Snyk](https://github.com/girste/CHIHUAUDIT/actions/workflows/snyk.yml/badge.svg)](https://github.com/girste/CHIHUAUDIT/security)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/girste/CHIHUAUDIT/badge)](https://securityscorecards.dev/viewer/?uri=github.com/girste/CHIHUAUDIT)
-[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fgirste%2FCHIHUAUDIT.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fgirste%2FCHIHUAUDIT?ref=badge_shield)
 
 <!-- Code Quality -->
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=girste_CHIHUAUDIT&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=girste_CHIHUAUDIT)

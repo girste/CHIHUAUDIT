@@ -3,8 +3,16 @@ name: SonarCloud
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
   pull_request:
     types: [opened, synchronize, reopened]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
 
 permissions:
   contents: read
