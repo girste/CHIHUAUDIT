@@ -413,37 +413,21 @@ func (h *HostCommandExecutor) logExecution(
 	cmdStr := strings.Join(cmdParts, " ")
 
 	if err != nil {
-		log.WithFields(map[string]interface{}{
-			"command":  cmdStr,
-			"strategy": strategy.String(),
-			"error":    err.Error(),
-			"duration": duration.String(),
-		}).Msg("Host command failed")
+		log.Errorf("Host command failed: command=%s strategy=%s error=%v duration=%s",
+			cmdStr, strategy.String(), err, duration.String())
 		return
 	}
 
 	if result != nil {
 		if result.TimedOut {
-			log.WithFields(map[string]interface{}{
-				"command":  cmdStr,
-				"strategy": strategy.String(),
-				"timeout":  true,
-				"duration": duration.String(),
-			}).Msg("Host command timed out")
+			log.Warnf("Host command timed out: command=%s strategy=%s duration=%s",
+				cmdStr, strategy.String(), duration.String())
 		} else if !result.Success {
-			log.WithFields(map[string]interface{}{
-				"command":  cmdStr,
-				"strategy": strategy.String(),
-				"exitCode": result.ExitCode,
-				"stderr":   truncateString(result.Stderr, 200),
-				"duration": duration.String(),
-			}).Msg("Host command returned non-zero exit code")
+			log.Warnf("Host command returned non-zero exit code: command=%s strategy=%s exitCode=%d stderr=%s duration=%s",
+				cmdStr, strategy.String(), result.ExitCode, truncateString(result.Stderr, 200), duration.String())
 		} else {
-			log.WithFields(map[string]interface{}{
-				"command":  cmdStr,
-				"strategy": strategy.String(),
-				"duration": duration.String(),
-			}).Msg("Host command executed successfully")
+			log.Debugf("Host command executed successfully: command=%s strategy=%s duration=%s",
+				cmdStr, strategy.String(), duration.String())
 		}
 	}
 }

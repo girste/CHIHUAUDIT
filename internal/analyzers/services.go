@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -173,7 +174,22 @@ func (a *ServicesAnalyzer) Analyze(ctx context.Context, cfg *config.Config) (*Re
 	result := NewResult()
 
 	// Read listening ports from host /proc/net/tcp and /proc/net/tcp6
-	exposedServices, listeningPorts := readListeningPorts(ctx)
+	_, listeningPorts := readListeningPorts(ctx)
+
+	// Auto-discovery: Enrich ports with process information via ss/netstat
+	enrichedDetails := enrichPortsWithProcessInfo(ctx, listeningPorts)
+	
+	// Update exposedServices with enriched data
+	enrichedServices := make([]map[string]interface{}, 0, len(enrichedDetails))
+	for _, detail := range enrichedDetails {
+		enrichedServices = append(enrichedServices, map[string]interface{}{
+			"port":    detail.Port,
+			"bind":    detail.Bind,
+			"process": detail.Process,
+			"pid":     detail.PID,
+			"risk":    detail.Risk,
+		})
+	}
 
 	// Failed services check via HostExecutor
 	failedCount := 0
@@ -188,8 +204,8 @@ func (a *ServicesAnalyzer) Analyze(ctx context.Context, cfg *config.Config) (*Re
 	}
 
 	result.Data = map[string]interface{}{
-		"exposedServices": exposedServices,
-		"exposedCount":    len(exposedServices),
+		"exposedServices": enrichedServices,
+		"exposedCount":    len(enrichedServices),
 		"listeningPorts":  listeningPorts,
 		"failedUnits":     failedCount,
 	}
@@ -200,45 +216,246 @@ func (a *ServicesAnalyzer) Analyze(ctx context.Context, cfg *config.Config) (*Re
 	}
 
 	// Check for risky services on exposed ports (using centralized patterns)
-	for _, svc := range exposedServices {
-		svcPort, ok := svc["port"].(int)
-		if !ok {
-			continue
-		}
-
-		bindAddr, _ := svc["bind"].(string)
-		processName, _ := svc["process"].(string)
-
+	for _, detail := range enrichedDetails {
 		// Skip localhost bindings (127.0.0.1, ::1)
-		if bindAddr == "127.0.0.1" || bindAddr == "::1" {
+		if detail.Bind == "127.0.0.1" || detail.Bind == "::1" {
 			continue
 		}
 
 		// Check if it's a risky database port
-		if service, isRisky := cfg.Ports.GetRiskyService(svcPort); isRisky {
-			// Check whitelist before reporting
-			if cfg.Whitelist != nil {
-				if cfg.Whitelist.IsServiceWhitelisted(svcPort, bindAddr) {
-					continue // Whitelisted, skip
+		if service, isRisky := cfg.Ports.GetRiskyService(detail.Port); isRisky {
+			// Auto-discovery: Check if process matches database pattern
+			if cfg.Processes.IsDatabaseProcess(detail.Process) {
+				// Check whitelist before reporting
+				if cfg.Whitelist != nil {
+					if cfg.Whitelist.IsServiceWhitelisted(detail.Port, detail.Bind) {
+						continue // Whitelisted, skip
+					}
+					if (detail.Bind == "0.0.0.0" || detail.Bind == "::") && cfg.Whitelist.IsWildcardPortAllowed(detail.Port) {
+						continue // Whitelisted wildcard port, skip
+					}
 				}
-				if (bindAddr == "0.0.0.0" || bindAddr == "::") && cfg.Whitelist.IsWildcardPortAllowed(svcPort) {
-					continue // Whitelisted wildcard port, skip
-				}
+				result.AddIssue(NewIssue(SeverityMedium, service+" ("+detail.Process+") is exposed on "+detail.Bind+":"+strconv.Itoa(detail.Port), "Ensure database is not accessible from internet"))
 			}
-			result.AddIssue(NewIssue(SeverityMedium, service+" is exposed on "+bindAddr+":"+strconv.Itoa(svcPort), "Ensure database is not accessible from internet (currently bound to "+bindAddr+")"))
 			continue
 		}
 
 		// Context-aware: Web server ports on wildcard binding
-		if cfg.Ports.IsWebPort(svcPort) {
+		if cfg.Ports.IsWebPort(detail.Port) {
 			// Auto-discovery: Check if process matches web server patterns
-			if cfg.Processes.IsWebServerProcess(processName) {
+			if cfg.Processes.IsWebServerProcess(detail.Process) {
 				continue // Known web server on web port - expected, skip
 			}
-			// Unknown process on web port - report as low severity
-			result.AddIssue(NewIssue(SeverityLow, "Port "+strconv.Itoa(svcPort)+" exposed on "+bindAddr+" by unknown process: "+processName, "Verify this is an intentional web server. Known patterns are auto-detected."))
+			// Unknown process on web port - report as info only if we identified the process
+			if detail.Process != "unknown" {
+				result.AddIssue(NewIssue(SeverityLow, "Port "+strconv.Itoa(detail.Port)+" exposed on "+detail.Bind+" by process: "+detail.Process, "Verify this is an intentional web server"))
+			}
+		}
+
+		// Wildcard bindings with high risk (not web, not database patterns)
+		if detail.Risk == "high" && detail.Process != "unknown" {
+			// Skip if it's a known safe process (web server, proxy)
+			if !cfg.Processes.IsWebServerProcess(detail.Process) && !cfg.Processes.IsDatabaseProcess(detail.Process) {
+				// Report custom service exposed on wildcard
+				result.AddIssue(NewIssue(SeverityInfo, "Service "+detail.Process+" listening on "+detail.Bind+":"+strconv.Itoa(detail.Port), "Verify if this service needs network exposure"))
+			}
 		}
 	}
 
 	return result, nil
+}
+
+// enrichPortsWithProcessInfo uses ss/netstat to correlate ports with processes
+func enrichPortsWithProcessInfo(ctx context.Context, ports []int) []portDetail {
+	if len(ports) == 0 {
+		return []portDetail{}
+	}
+
+	// Use ss command (modern, faster)
+	if system.CommandExists("ss") {
+		return enrichWithSS(ctx, ports)
+	}
+
+	// Fallback to netstat (older systems)
+	if system.CommandExists("netstat") {
+		return enrichWithNetstat(ctx, ports)
+	}
+
+	// No tools available - return basic info
+	return createBasicPortDetails(ports)
+}
+
+// portDetail contains enriched port information
+type portDetail struct {
+	Port    int
+	Process string
+	PID     int
+	Bind    string
+	Risk    string
+}
+
+// enrichWithSS uses ss command
+func enrichWithSS(ctx context.Context, ports []int) []portDetail {
+	result, err := system.RunCommandSudo(ctx, system.TimeoutShort, "ss", "-tlnp")
+	if err != nil || result == nil || !result.Success {
+		return createBasicPortDetails(ports)
+	}
+
+	portMap := make(map[int]portDetail)
+	ssAddrRegex := regexp.MustCompile(`([\d\.]+|\[\:[\:a-f0-9]*\]|\*):(\d+)`)
+	ssProcRegex := regexp.MustCompile(`users:\(\("([^"]+)",pid=(\d+)`)
+
+	for _, line := range strings.Split(result.Stdout, "\n") {
+		if strings.HasPrefix(line, "State") || strings.TrimSpace(line) == "" {
+			continue
+		}
+
+		matches := ssAddrRegex.FindStringSubmatch(line)
+		if len(matches) < 3 {
+			continue
+		}
+
+		portNum, err := strconv.Atoi(matches[2])
+		if err != nil {
+			continue
+		}
+
+		// Check if this is one of our target ports
+		found := false
+		for _, p := range ports {
+			if p == portNum {
+				found = true
+				break
+			}
+		}
+		if !found {
+			continue
+		}
+
+		bindAddr := normalizeBindAddr(matches[1])
+		detail := portDetail{
+			Port:    portNum,
+			Bind:    bindAddr,
+			Process: "unknown",
+			PID:     0,
+			Risk:    determinePortRisk(bindAddr),
+		}
+
+		// Extract process info
+		procMatches := ssProcRegex.FindStringSubmatch(line)
+		if len(procMatches) >= 3 {
+			detail.Process = procMatches[1]
+			if pid, err := strconv.Atoi(procMatches[2]); err == nil {
+				detail.PID = pid
+			}
+		}
+
+		portMap[portNum] = detail
+	}
+
+	return buildOrderedPortResults(ports, portMap)
+}
+
+// enrichWithNetstat uses netstat command
+func enrichWithNetstat(ctx context.Context, ports []int) []portDetail {
+	result, err := system.RunCommandSudo(ctx, system.TimeoutShort, "netstat", "-tlnp")
+	if err != nil || result == nil || !result.Success {
+		return createBasicPortDetails(ports)
+	}
+
+	portMap := make(map[int]portDetail)
+	netstatRegex := regexp.MustCompile(`^(tcp|tcp6)\s+\d+\s+\d+\s+([\d\.:]+|\*):(\d+)\s+.*?(\d+)/(\S+)`)
+
+	for _, line := range strings.Split(result.Stdout, "\n") {
+		matches := netstatRegex.FindStringSubmatch(line)
+		if len(matches) < 6 {
+			continue
+		}
+
+		portNum, err := strconv.Atoi(matches[3])
+		if err != nil {
+			continue
+		}
+
+		found := false
+		for _, p := range ports {
+			if p == portNum {
+				found = true
+				break
+			}
+		}
+		if !found {
+			continue
+		}
+
+		pid, _ := strconv.Atoi(matches[4])
+		bindAddr := normalizeBindAddr(matches[2])
+		detail := portDetail{
+			Port:    portNum,
+			Bind:    bindAddr,
+			Process: matches[5],
+			PID:     pid,
+			Risk:    determinePortRisk(bindAddr),
+		}
+
+		portMap[portNum] = detail
+	}
+
+	return buildOrderedPortResults(ports, portMap)
+}
+
+func normalizeBindAddr(addr string) string {
+	addr = strings.TrimSpace(addr)
+	if addr == "*" {
+		return "0.0.0.0"
+	}
+	if strings.HasPrefix(addr, "[") && strings.HasSuffix(addr, "]") {
+		addr = strings.Trim(addr, "[]")
+	}
+	if addr == "::1" {
+		return "127.0.0.1"
+	}
+	return addr
+}
+
+func determinePortRisk(bindAddr string) string {
+	if bindAddr == "0.0.0.0" || bindAddr == "::" {
+		return "high"
+	}
+	if bindAddr == "127.0.0.1" || bindAddr == "::1" || strings.HasPrefix(bindAddr, "127.") {
+		return "low"
+	}
+	return "medium"
+}
+
+func createBasicPortDetails(ports []int) []portDetail {
+	details := make([]portDetail, len(ports))
+	for i, port := range ports {
+		details[i] = portDetail{
+			Port:    port,
+			Process: "unknown",
+			PID:     0,
+			Bind:    "unknown",
+			Risk:    "medium",
+		}
+	}
+	return details
+}
+
+func buildOrderedPortResults(ports []int, portMap map[int]portDetail) []portDetail {
+	results := make([]portDetail, len(ports))
+	for i, port := range ports {
+		if detail, found := portMap[port]; found {
+			results[i] = detail
+		} else {
+			results[i] = portDetail{
+				Port:    port,
+				Process: "unknown",
+				PID:     0,
+				Bind:    "unknown",
+				Risk:    "medium",
+			}
+		}
+	}
+	return results
 }

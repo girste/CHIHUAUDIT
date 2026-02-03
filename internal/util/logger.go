@@ -36,7 +36,15 @@ func NewLogger(name string) *zap.Logger {
 		ErrorOutputPaths: []string{"stderr"},
 	}
 
-	logger, _ := config.Build()
+	logger, err := config.Build()
+	if err != nil {
+		// Fallback to production logger if config build fails
+		fallback, fallbackErr := zap.NewProduction()
+		if fallbackErr != nil {
+			panic("failed to initialize logger: " + err.Error() + " (fallback also failed: " + fallbackErr.Error() + ")")
+		}
+		return fallback.Named(name)
+	}
 	return logger.Named(name)
 }
 

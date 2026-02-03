@@ -25,11 +25,13 @@ type SecurityMonitor struct {
 	verbose         bool
 	running         bool
 	baselineMgr     *BaselineManager
+	driftMonitor    *DriftMonitor    // New baseline-based drift detection
 	anomalyDetector *AnomalyDetector
 	bulletinGen     *BulletinGenerator
 	notifTracker    *NotificationTracker
 	logger          *zap.Logger
 	stopChan        chan struct{}
+	useDriftMode    bool // Toggle between old anomaly detection and new drift detection
 }
 
 // NewSecurityMonitor creates a new monitor
@@ -56,11 +58,13 @@ func NewSecurityMonitor(intervalSeconds int, logDir, baselinePath string, verbos
 		logDir:          logDir,
 		verbose:         verbose,
 		baselineMgr:     NewBaselineManager(baselinePath),
+		driftMonitor:    NewDriftMonitor(logDir, verbose),
 		anomalyDetector: NewAnomalyDetector(),
 		bulletinGen:     NewBulletinGenerator(),
 		notifTracker:    tracker,
 		logger:          util.GetLogger(),
 		stopChan:        make(chan struct{}),
+		useDriftMode:    true, // Use new drift detection by default
 	}
 }
 
@@ -93,6 +97,53 @@ func (m *SecurityMonitor) RunOnce() (*CheckResult, error) {
 		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
 
+	// Use new drift-based monitoring if enabled
+	if m.useDriftMode {
+		return m.runDriftCheck(cfg)
+	}
+
+	// Otherwise use legacy anomaly detection
+	return m.runLegacyCheck(cfg)
+}
+
+// runDriftCheck performs baseline drift detection
+func (m *SecurityMonitor) runDriftCheck(cfg *config.Config) (*CheckResult, error) {
+	ctx := context.Background()
+	
+	driftResult, err := m.driftMonitor.CheckDrift(ctx, cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert DriftResult to CheckResult for compatibility
+	result := &CheckResult{
+		Status:       driftResult.Status,
+		BulletinFile: driftResult.BulletinFile,
+		AnomalyFile:  driftResult.AnomalyFile,
+	}
+
+	// Convert alerts to anomalies for notification compatibility
+	anomalies := make([]Anomaly, len(driftResult.Alerts))
+	for i, alert := range driftResult.Alerts {
+		anomalies[i] = Anomaly{
+			Code:     alert.Code,
+			Severity: string(alert.Severity),
+			Category: alert.Analyzer,
+			Message:  alert.Message,
+		}
+	}
+	result.Anomalies = anomalies
+
+	// Send notification if drifts detected
+	if len(driftResult.Alerts) > 0 {
+		m.sendDriftNotification(ctx, cfg, driftResult, result.AnomalyFile)
+	}
+
+	return result, nil
+}
+
+// runLegacyCheck performs legacy anomaly detection
+func (m *SecurityMonitor) runLegacyCheck(cfg *config.Config) (*CheckResult, error) {
 	orchestrator := audit.NewOrchestrator()
 	ctx := context.Background()
 
@@ -350,6 +401,7 @@ func (m *SecurityMonitor) sendNotification(ctx context.Context, cfg *config.Conf
 	issues := make([]notify.AlertIssue, 0, len(filteredAnomalies))
 	for _, a := range filteredAnomalies {
 		issues = append(issues, notify.AlertIssue{
+			Code:     a.Code,
 			Severity: a.Severity,
 			Message:  a.Message,
 			Category: a.Category,
@@ -463,4 +515,60 @@ func (m *SecurityMonitor) filterWhitelistedAnomalies(cfg *config.Config, anomali
 	}
 
 	return filtered
+}
+
+// sendDriftNotification sends webhook notification for detected drifts
+func (m *SecurityMonitor) sendDriftNotification(ctx context.Context, cfg *config.Config, driftResult *DriftResult, driftFile string) {
+if !cfg.Notifications.Enabled {
+return
+}
+
+// Check notification cooldown for first drift
+if len(driftResult.Alerts) > 0 {
+firstAnomaly := Anomaly{
+Code:     driftResult.Alerts[0].Code,
+Severity: string(driftResult.Alerts[0].Severity),
+Category: driftResult.Alerts[0].Analyzer,
+Message:  driftResult.Alerts[0].Message,
+}
+
+if !m.notifTracker.ShouldNotify(firstAnomaly) {
+m.log("Skipping notification (cooldown active)")
+return
+}
+}
+
+// Create notification payload
+issues := make([]notify.AlertIssue, 0, len(driftResult.Alerts))
+for _, alert := range driftResult.Alerts {
+issues = append(issues, notify.AlertIssue{
+Code:     alert.Code,
+Severity: string(alert.Severity),
+Message:  alert.Message,
+Category: alert.Analyzer,
+})
+}
+
+hostname := "unknown"
+
+payload := &notify.AlertPayload{
+Timestamp: time.Now().UTC().Format(time.RFC3339),
+Hostname:  hostname,
+Status:    driftResult.Status,
+Title:     fmt.Sprintf("Configuration Drift Detected (%d changes)", driftResult.DriftCount),
+Summary:   fmt.Sprintf("%d configuration drifts detected", driftResult.DriftCount),
+Issues:    issues,
+}
+
+notifier := notify.NewNotifier(&cfg.Notifications)
+result := notifier.Send(ctx, payload)
+
+if len(result.Sent) > 0 {
+m.log(fmt.Sprintf("Drift notification sent to: %v", result.Sent))
+_ = m.notifTracker.Save()
+}
+
+if len(result.Failed) > 0 {
+m.log(fmt.Sprintf("Failed to send notifications to: %v", result.Failed))
+}
 }

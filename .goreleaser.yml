@@ -70,7 +70,7 @@ changelog:
 
 release:
   github:
-    owner: girste
+    owner: "{{ .Env.GITHUB_REPOSITORY_OWNER }}"
     name: chihuaudit
   name_template: "V {{.Version}} Teacup"
   prerelease: auto
@@ -91,7 +91,7 @@ release:
 
     ```bash
     # Download (replace with your architecture)
-    wget https://github.com/girste/chihuaudit/releases/download/{{.Tag}}/chihuaudit_{{.Tag}}_linux_amd64.tar.gz
+    wget https://github.com/{{ .Env.GITHUB_REPOSITORY_OWNER }}/chihuaudit/releases/download/{{.Tag}}/chihuaudit_{{.Tag}}_linux_amd64.tar.gz
 
     # Extract
     tar xzf chihuaudit_{{.Tag}}_linux_amd64.tar.gz
@@ -107,7 +107,7 @@ release:
 
     ```bash
     # Download checksums
-    wget https://github.com/girste/chihuaudit/releases/download/{{.Tag}}/checksums.txt
+    wget https://github.com/{{ .Env.GITHUB_REPOSITORY_OWNER }}/chihuaudit/releases/download/{{.Tag}}/checksums.txt
 
     # Verify
     sha256sum -c checksums.txt --ignore-missing

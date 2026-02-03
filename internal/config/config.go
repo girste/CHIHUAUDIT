@@ -11,17 +11,28 @@ import (
 )
 
 type Config struct {
-	Checks             map[string]bool  `yaml:"checks"`
-	ThreatAnalysisDays int              `yaml:"threatAnalysisDays"`
-	AnalyzerTimeout    int              `yaml:"analyzerTimeoutSeconds"`
-	MaxConcurrency     int              `yaml:"maxConcurrency"`
-	MaskData           bool             `yaml:"maskData"`
-	Timeouts           TimeoutConfig    `yaml:"timeouts"`
-	Monitoring         MonitoringConfig `yaml:"monitoring"`
-	Notifications      NotifyConfig     `yaml:"notifications"`
-	Whitelist          *Whitelist       `yaml:"-"` // Loaded separately, not from YAML
-	Ports              *PortPatterns    `yaml:"-"` // Pattern definitions
-	Processes          *ProcessPatterns `yaml:"-"` // Process patterns
+	Checks             map[string]bool      `yaml:"checks"`
+	ThreatAnalysisDays int                  `yaml:"threatAnalysisDays"`
+	AnalyzerTimeout    int                  `yaml:"analyzerTimeoutSeconds"`
+	MaxConcurrency     int                  `yaml:"maxConcurrency"`
+	MaskData           bool                 `yaml:"maskData"`
+	Timeouts           TimeoutConfig        `yaml:"timeouts"`
+	Monitoring         MonitoringConfig     `yaml:"monitoring"`
+	Notifications      NotifyConfig         `yaml:"notifications"`
+	Discovery          DiscoveryConfig      `yaml:"discovery"`      // Service auto-discovery patterns
+	Whitelist          *Whitelist           `yaml:"-"`              // Loaded separately
+	Ports              *PortPatterns        `yaml:"-"`              // Pattern definitions
+	Processes          *ProcessPatterns     `yaml:"-"`              // Process patterns
+}
+
+// DiscoveryConfig allows users to customize service auto-discovery patterns
+type DiscoveryConfig struct {
+	WebServerProcesses   []string       `yaml:"webServerProcesses"`   // Additional web server process names
+	DatabaseProcesses    []string       `yaml:"databaseProcesses"`    // Additional database process names
+	ContainerProcesses   []string       `yaml:"containerProcesses"`   // Additional container runtime names
+	RiskyPorts           map[int]string `yaml:"riskyPorts"`           // Custom risky ports (port: service name)
+	WebPorts             []int          `yaml:"webPorts"`             // Additional web ports
+	SafeWildcardPorts    []int          `yaml:"safeWildcardPorts"`    // Ports allowed on 0.0.0.0 (bypass warnings)
 }
 
 // TimeoutConfig defines configurable timeout durations
@@ -173,9 +184,28 @@ func Load() (*Config, error) {
 	}
 	cfg.Whitelist = wl
 
-	// Load default patterns (can be overridden by user config later)
+	// Load default patterns
 	cfg.Ports = DefaultPortPatterns()
 	cfg.Processes = DefaultProcessPatterns()
+	
+	// Merge user-defined discovery patterns with defaults
+	if cfg.Discovery.WebServerProcesses != nil {
+		cfg.Processes.WebServers = append(cfg.Processes.WebServers, cfg.Discovery.WebServerProcesses...)
+	}
+	if cfg.Discovery.DatabaseProcesses != nil {
+		cfg.Processes.Databases = append(cfg.Processes.Databases, cfg.Discovery.DatabaseProcesses...)
+	}
+	if cfg.Discovery.ContainerProcesses != nil {
+		cfg.Processes.ContainerRuntime = append(cfg.Processes.ContainerRuntime, cfg.Discovery.ContainerProcesses...)
+	}
+	if cfg.Discovery.RiskyPorts != nil {
+		for port, service := range cfg.Discovery.RiskyPorts {
+			cfg.Ports.RiskyDatabase[port] = service
+		}
+	}
+	if cfg.Discovery.WebPorts != nil {
+		cfg.Ports.WebPorts = append(cfg.Ports.WebPorts, cfg.Discovery.WebPorts...)
+	}
 
 	return cfg, nil
 }

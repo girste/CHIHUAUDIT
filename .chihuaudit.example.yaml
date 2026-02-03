@@ -1,6 +1,51 @@
 # Chihuaudit Configuration Example
 # Copy this file to .chihuaudit.yaml and customize
 
+# Service Auto-Discovery Configuration
+# Customize patterns for detecting web servers, databases, and other services
+discovery:
+  # Additional web server process names (case-insensitive substring match)
+  webServerProcesses:
+    - "gunicorn"      # Python WSGI server
+    - "uvicorn"       # Python ASGI server
+    - "puma"          # Ruby web server
+    - "tomcat"        # Java application server
+    - "jetty"         # Java servlet engine
+    # Add your custom web servers here
+  
+  # Additional database process names
+  databaseProcesses:
+    - "cassandra"     # NoSQL database
+    - "couchbase"     # Document database
+    - "neo4j"         # Graph database
+    # Add your custom databases here
+  
+  # Additional container runtime names
+  containerProcesses:
+    - "k3s"           # Lightweight Kubernetes
+    - "microk8s"      # Canonical Kubernetes
+    # Add your custom container runtimes here
+  
+  # Custom risky ports (ports that should not be exposed on 0.0.0.0)
+  riskyPorts:
+    8086: "InfluxDB"
+    9200: "Elasticsearch"
+    # Add your custom risky services: port_number: "Service Name"
+  
+  # Additional web ports (ports commonly used for HTTP/HTTPS services)
+  webPorts:
+    - 8000
+    - 8888
+    - 3000
+    # Add your custom web ports here
+  
+  # Safe wildcard ports (ports allowed on 0.0.0.0 without warnings)
+  # Use this for intentional public services that should not trigger alerts
+  safeWildcardPorts:
+    - 80    # HTTP (if you run a public web server)
+    - 443   # HTTPS (if you run a public web server)
+    # Add ports that you intentionally expose publicly
+
 notifications:
   enabled: true
   onlyOnIssues: false  # If true, only send notifications when issues are found

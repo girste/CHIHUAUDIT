@@ -19,6 +19,7 @@ const (
 
 // Anomaly represents a detected security change
 type Anomaly struct {
+	Code     string                 `json:"code"`     // Unique alert code (e.g., "FW-001", "SSH-003")
 	Severity string                 `json:"severity"`
 	Category string                 `json:"category"`
 	Message  string                 `json:"message"`
@@ -77,12 +78,35 @@ func (d *AnomalyDetector) HasHigh() bool {
 }
 
 func (d *AnomalyDetector) addAnomaly(severity, category, message string, details map[string]interface{}) {
+	code := generateAlertCode(category, len(d.anomalies))
 	d.anomalies = append(d.anomalies, Anomaly{
+		Code:     code,
 		Severity: severity,
 		Category: category,
 		Message:  message,
 		Details:  details,
 	})
+}
+
+// generateAlertCode creates a unique alert code based on category
+func generateAlertCode(category string, index int) string {
+	prefix := map[string]string{
+		"firewall":      "FW",
+		"ssh":           "SSH",
+		"services":      "SVC",
+		"fail2ban":      "F2B",
+		"threats":       "THR",
+		"docker":        "DCK",
+		"updates":       "UPD",
+		"system":        "SYS",
+		"network":       "NET",
+		"configuration": "CFG",
+	}
+	
+	if p, ok := prefix[category]; ok {
+		return fmt.Sprintf("%s-%03d", p, index+1)
+	}
+	return fmt.Sprintf("GEN-%03d", index+1)
 }
 
 func (d *AnomalyDetector) checkFirewall(baseline, current map[string]interface{}) {

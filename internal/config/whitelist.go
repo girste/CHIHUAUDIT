@@ -14,6 +14,7 @@ type Whitelist struct {
 	Server     ServerInfo         `yaml:"server"`
 	Services   []ServiceWhitelist `yaml:"services"`
 	Network    NetworkWhitelist   `yaml:"network"`
+	AlertCodes []string           `yaml:"alertCodes,omitempty"` // Whitelisted alert codes (FW-001, SSH-003, etc.)
 	CIS        CISWhitelist       `yaml:"cis"`
 	Thresholds ThresholdsConfig   `yaml:"thresholds,omitempty"`
 }
@@ -232,4 +233,64 @@ func (wl *Whitelist) GetDiskThreshold() float64 {
 		return wl.Thresholds.Disk.UsagePercent
 	}
 	return 90.0 // Default: 90%
+}
+
+// IsAlertWhitelisted checks if an alert code is whitelisted
+func (wl *Whitelist) IsAlertWhitelisted(code string) bool {
+if wl == nil {
+return false
+}
+
+code = strings.TrimSpace(strings.ToUpper(code))
+
+for _, whitelisted := range wl.AlertCodes {
+if strings.ToUpper(strings.TrimSpace(whitelisted)) == code {
+return true
+}
+}
+
+return false
+}
+
+// AddAlertCode adds an alert code to the whitelist
+func (wl *Whitelist) AddAlertCode(code string) {
+if wl == nil {
+return
+}
+
+code = strings.TrimSpace(strings.ToUpper(code))
+
+// Check if already exists
+if wl.IsAlertWhitelisted(code) {
+return
+}
+
+wl.AlertCodes = append(wl.AlertCodes, code)
+}
+
+// RemoveAlertCode removes an alert code from the whitelist
+func (wl *Whitelist) RemoveAlertCode(code string) bool {
+if wl == nil {
+return false
+}
+
+code = strings.TrimSpace(strings.ToUpper(code))
+
+for i, whitelisted := range wl.AlertCodes {
+if strings.ToUpper(strings.TrimSpace(whitelisted)) == code {
+// Remove by creating new slice without this element
+wl.AlertCodes = append(wl.AlertCodes[:i], wl.AlertCodes[i+1:]...)
+return true
+}
+}
+
+return false
+}
+
+// GetWhitelistedAlertCodes returns all whitelisted alert codes
+func (wl *Whitelist) GetWhitelistedAlertCodes() []string {
+if wl == nil {
+return []string{}
+}
+return wl.AlertCodes
 }

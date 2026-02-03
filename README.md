@@ -2,43 +2,75 @@
 
 ![Chihuaudit Logo](docs/images/chihuaudit_cover.png)
 
+<!-- Build & CI -->
 [![CI](https://github.com/girste/CHIHUAUDIT/actions/workflows/ci.yml/badge.svg)](https://github.com/girste/CHIHUAUDIT/actions)
 [![Lint](https://github.com/girste/CHIHUAUDIT/actions/workflows/lint.yml/badge.svg)](https://github.com/girste/CHIHUAUDIT/actions/workflows/lint.yml)
-[![CodeQL](https://github.com/girste/CHIHUAUDIT/actions/workflows/codeql.yml/badge.svg)](https://github.com/girste/CHIHUAUDIT/security/code-scanning)
-[![Trivy](https://github.com/girste/CHIHUAUDIT/actions/workflows/trivy.yml/badge.svg)](https://github.com/girste/CHIHUAUDIT/actions/workflows/trivy.yml)
-[![Snyk Security](https://github.com/girste/CHIHUAUDIT/actions/workflows/snyk.yml/badge.svg)](https://github.com/girste/CHIHUAUDIT/security/code-scanning)
-[![Codecov](https://img.shields.io/codecov/c/github/girste/CHIHUAUDIT)](https://codecov.io/gh/girste/CHIHUAUDIT)
+[![Docker](https://github.com/girste/CHIHUAUDIT/actions/workflows/docker.yml/badge.svg)](https://github.com/girste/CHIHUAUDIT/actions/workflows/docker.yml)
+[![Release](https://github.com/girste/CHIHUAUDIT/actions/workflows/release.yml/badge.svg)](https://github.com/girste/CHIHUAUDIT/releases)
 
-[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=girste_CHIHUAUDIT&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=girste_CHIHUAUDIT)
+<!-- Security -->
+[![CodeQL](https://github.com/girste/CHIHUAUDIT/actions/workflows/codeql.yml/badge.svg)](https://github.com/girste/CHIHUAUDIT/security/code-scanning)
+[![Trivy](https://github.com/girste/CHIHUAUDIT/actions/workflows/trivy.yml/badge.svg)](https://github.com/girste/CHIHUAUDIT/security)
+[![Snyk](https://github.com/girste/CHIHUAUDIT/actions/workflows/snyk.yml/badge.svg)](https://github.com/girste/CHIHUAUDIT/security)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/girste/CHIHUAUDIT/badge)](https://securityscorecards.dev/viewer/?uri=github.com/girste/CHIHUAUDIT)
-[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/11858/badge)](https://www.bestpractices.dev/projects/11858)
-[![SLSA 3](https://slsa.dev/images/gh-badge-level3.svg)](https://slsa.dev)
+[![OpenSSF Best Practices](https://www.bestpractices.coreinfrastructure.org/projects/9999/badge)](https://www.bestpractices.coreinfrastructure.org/projects/9999)
+
+<!-- Code Quality -->
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=girste_CHIHUAUDIT&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=girste_CHIHUAUDIT)
+[![Codecov](https://img.shields.io/codecov/c/github/girste/CHIHUAUDIT)](https://codecov.io/gh/girste/CHIHUAUDIT)
 [![Go Report Card](https://goreportcard.com/badge/github.com/girste/chihuaudit)](https://goreportcard.com/report/github.com/girste/chihuaudit)
 
-[![Mentioned in Awesome](https://awesome.re/mentioned-badge.svg)](https://github.com/punkpeye/awesome-mcp-servers)
-[![Docker Pulls](https://img.shields.io/docker/pulls/steuuu/chihuaudit)](https://hub.docker.com/r/steuuu/chihuaudit)
+<!-- Version & License -->
+[![Go Version](https://img.shields.io/github/go-mod/go-version/girste/chihuaudit)](https://go.dev/)
+[![Latest Release](https://img.shields.io/github/v/release/girste/chihuaudit)](https://github.com/girste/chihuaudit/releases)
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
 
-Single full system checkup or continuous monitoring with anomaly detection, Discord/Slack webhooks.
+**System Configuration Drift Detection for Linux Servers**
+
+Monitor server configuration changes, detect deviations from baseline, and get AI-powered insights.
+
+## What It Does
+
+Chihuaudit continuously monitors your Linux server's system configuration and alerts you when changes occur:
+
+- **Firewall rules** (ufw/iptables/nftables)
+- **SSH configuration** (sshd_config changes)
+- **Open ports and services** (systemd, network listeners)
+- **System users and groups**
+- **Critical file permissions** (/etc/passwd, /etc/shadow, etc.)
+- **Kernel parameters** (sysctl)
+- **Docker containers and security**
+- **Cron jobs and scheduled tasks**
+- **Security tools** (fail2ban, AppArmor/SELinux)
+
+### Key Features
+
+✅ **Signed Baselines** - Cryptographically signed baseline to prevent tampering  
+✅ **Drift Detection** - Automated comparison against known-good state  
+✅ **Alert Codes** - Each alert has a unique code (e.g., `FW-001`, `SSH-003`) for tracking and whitelisting  
+✅ **AI Insights** - On-demand explanations of what changed and why it matters  
+✅ **Discord/Slack Webhooks** - Real-time notifications  
+✅ **Git-Friendly Output** - YAML/JSON format for version control integration  
+✅ **Whitelist System** - Suppress known-safe changes  
 
 ## Tools
 
 **`security_audit`** — Complete system security analysis  
-**`cis_audit`** — CIS Benchmark compliance check  
-**`scan_app_security`** — Ports, processes, containers  
-**`scan_network_security`** — Network & firewall rules  
-**`scan_database_security`** — Database exposure & hardening  
-**`scan_waf_cdn`** — WAF/CDN detection & SSL/TLS  
-**`verify_backup_config`** — Backup integrity verification  
-**`check_vulnerability_intel`** — CVE database lookup (EU Vulnerability Database)  
 **`start_monitoring`** / **`stop_monitoring`** / **`monitoring_status`** — Continuous monitoring daemon  
 **`analyze_anomaly`** — AI anomaly detection analysis  
 **`cleanup_old_logs`** — Log rotation  
 **`configure_webhook`** / **`test_webhook`** / **`get_notification_config`** — Discord/Slack/custom webhooks  
 **`manage_whitelist`** — AI-driven whitelist for false positives  
+**`verify_backup_config`** — Backup integrity verification  
 
 ## Alert System
 
-Real-time security notifications with severity-based anomaly detection. Detects configuration changes, port exposure, failed services, and security degradation.
+Real-time security notifications with severity-based anomaly detection. Each alert includes:
+
+- **Unique code** (e.g., `FW-001`, `SSH-003`) for tracking
+- **Severity level** (critical, high, medium, low)
+- **Category** (firewall, ssh, services, etc.)
+- **Detailed message** explaining what changed
 
 **Examples:** [Discord Alert](docs/images/screen-discord.png) | [Full Audit Output](docs/outputs/)
 
