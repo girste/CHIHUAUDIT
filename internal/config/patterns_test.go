@@ -27,9 +27,9 @@ func TestGetRiskyService(t *testing.T) {
 
 func TestMatchesPattern(t *testing.T) {
 	tests := []struct {
-		input   string
+		input    string
 		patterns []string
-		expect  bool
+		expect   bool
 	}{
 		{"nginx", []string{"nginx"}, true},
 		{"nginx-worker", []string{"nginx"}, true},

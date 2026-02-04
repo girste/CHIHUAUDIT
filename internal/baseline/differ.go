@@ -50,9 +50,9 @@ func Compare(baseline *Baseline, currentResults map[string]interface{}) (*DiffRe
 	// Compare each analyzer's data
 	for analyzerName, baselineData := range baseline.Data {
 		// Skip metadata and meta-analyzers
-		if analyzerName == "metadata" || analyzerName == "timestamp" || 
-		   analyzerName == "os" || analyzerName == "kernel" || analyzerName == "hostname" ||
-		   analyzerName == "recommendations" {
+		if analyzerName == "metadata" || analyzerName == "timestamp" ||
+			analyzerName == "os" || analyzerName == "kernel" || analyzerName == "hostname" ||
+			analyzerName == "recommendations" {
 			continue
 		}
 
@@ -78,9 +78,9 @@ func Compare(baseline *Baseline, currentResults map[string]interface{}) (*DiffRe
 	// Check for new analyzers
 	for analyzerName, currentData := range currentResults {
 		// Skip metadata and meta-analyzers
-		if analyzerName == "metadata" || analyzerName == "timestamp" || 
-		   analyzerName == "os" || analyzerName == "kernel" || analyzerName == "hostname" ||
-		   analyzerName == "recommendations" {
+		if analyzerName == "metadata" || analyzerName == "timestamp" ||
+			analyzerName == "os" || analyzerName == "kernel" || analyzerName == "hostname" ||
+			analyzerName == "recommendations" {
 			continue
 		}
 

@@ -13,6 +13,7 @@
 [![Trivy](https://github.com/girste/CHIHUAUDIT/actions/workflows/trivy.yml/badge.svg)](https://github.com/girste/CHIHUAUDIT/security)
 [![Snyk](https://github.com/girste/CHIHUAUDIT/actions/workflows/snyk.yml/badge.svg)](https://github.com/girste/CHIHUAUDIT/security)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/girste/CHIHUAUDIT/badge)](https://securityscorecards.dev/viewer/?uri=github.com/girste/CHIHUAUDIT)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/9999/badge)](https://www.bestpractices.dev/projects/9999)
 [![SLSA 3](https://slsa.dev/images/gh-badge-level3.svg)](https://slsa.dev)
 
 <!-- Code Quality -->
@@ -54,12 +55,23 @@ Chihuaudit continuously monitors your Linux server's system configuration and al
 
 ## Tools
 
-**`security_audit`** — Complete system security analysis  
-**`start_monitoring`** / **`stop_monitoring`** / **`monitoring_status`** — Continuous monitoring daemon  
-**`analyze_anomaly`** — AI anomaly detection analysis  
-**`cleanup_old_logs`** — Log rotation  
-**`configure_webhook`** / **`test_webhook`** / **`get_notification_config`** — Discord/Slack/custom webhooks  
-**`manage_whitelist`** — AI-driven whitelist for false positives  
+**`audit`** — Complete system security analysis  
+**`monitor`** — Continuous monitoring with drift detection  
+**`baseline`** — Manage configuration baselines (create/diff/verify)  
+**`whitelist`** — Manage alert code whitelist for false positives  
+**`serve`** — Start MCP server for Claude Desktop integration  
+**`verify`** — Check prerequisites and configuration  
+
+### MCP Tools (Claude Desktop)
+
+When running as MCP server, CHIHUAUDIT provides:
+- `security_audit` — Full security analysis
+- `analyze_anomaly` — AI anomaly detection
+- `monitoring_status` — Check monitoring state
+- `start_monitoring` / `stop_monitoring` — Control monitoring
+- `configure_webhook` / `test_webhook` — Setup notifications
+- `manage_whitelist` — AI-driven whitelist management
+- `cleanup_old_logs` — Log rotation  
 
 ## Alert System
 
@@ -74,30 +86,50 @@ Real-time security notifications with severity-based anomaly detection. Each ale
 
 ## Installation
 
-### Binary (Recommended)
+### Docker (Recommended for Production)
 
+CHIHUAUDIT is designed for Docker-first deployment. Each server runs its own container with webhook-based centralization.
+
+**Quick Start:**
 ```bash
-# Download v0.0.6-teacup (Latest)
-wget https://github.com/girste/CHIHUAUDIT/releases/download/v0.0.6-teacup/chihuaudit_0.0.6-teacup_linux_amd64.tar.gz
-tar -xzf chihuaudit_0.0.6-teacup_linux_amd64.tar.gz
-chmod +x chihuaudit
-sudo mv chihuaudit /usr/local/bin/
+# Pull latest image
+docker pull girste/chihuaudit:0.0.7-teacup
 
-# Verify installation
-chihuaudit --version
-# Output: chihuaudit version 0.0.6-teacup
+# One-time audit
+docker run --rm \
+  --network=host \
+  --pid=host \
+  -v /:/host:ro \
+  -v /var/run/docker.sock:/var/run/docker.sock:ro \
+  girste/chihuaudit:0.0.7-teacup audit
+
+# Continuous monitoring (daemon)
+docker run -d \
+  --name=chihuaudit-monitor \
+  --restart=unless-stopped \
+  --network=host \
+  --pid=host \
+  -v /:/host:ro \
+  -v /var/run/docker.sock:/var/run/docker.sock:ro \
+  -v ./config:/config \
+  girste/chihuaudit:0.0.7-teacup monitor --interval 300
 ```
 
-### Docker
-
-**Docker (recommended):**
+**Docker Compose:**
 ```bash
-docker pull girste/chihuaudit:0.0.6-teacup
-docker run --rm \
-  --cap-add=NET_RAW \
-  --cap-add=DAC_READ_SEARCH \
-  -v /etc:/host/etc:ro \
-  girste/chihuaudit:0.0.6-teacup audit
+# Clone repository
+git clone https://github.com/girste/CHIHUAUDIT.git
+cd CHIHUAUDIT
+
+# Configure webhook (optional)
+cp .chihuaudit.example.yaml .chihuaudit.yaml
+# Edit .chihuaudit.yaml with your Discord/Slack webhook
+
+# Start monitoring
+docker-compose up -d chihuaudit-monitor
+
+# Check status
+docker-compose logs -f chihuaudit-monitor
 ```
 
 **GitHub Container Registry:**
@@ -105,19 +137,31 @@ docker run --rm \
 docker pull ghcr.io/girste/chihuaudit:latest
 ```
 
-**Binary release:**
-```bash
-curl -sSfL https://github.com/girste/CHIHUAUDIT/releases/latest/download/chihuaudit_linux_amd64 -o chihuaudit
-chmod +x chihuaudit
-./chihuaudit audit
-```
+**Latest release:** [v0.0.7-teacup](https://github.com/girste/chihuaudit/releases/latest)
 
-**Latest release:** [v0.0.6-teacup](https://github.com/girste/CHIHUAUDIT/releases/latest)
+### Distributed Architecture
+
+CHIHUAUDIT follows a **standalone distributed model**:
+- Each server runs its own container
+- No central manager needed (avoid single point of failure)
+- Webhook notifications to Discord/Slack for centralization
+- Baseline and whitelist stored locally per server
+- Scale infinitely: just add containers
+
+```
+┌──────────────────────────────────────┐
+│  Server-1: chihuaudit → Discord      │
+│  Server-2: chihuaudit → Discord      │
+│  Server-3: chihuaudit → Discord      │
+│  ...                                 │
+│  Central Dashboard: Discord/Slack    │
+└──────────────────────────────────────┘
+```
 
 ## Security
 
 **Reporting vulnerabilities:** See [SECURITY.md](.github/SECURITY.md)  
-**Supported versions:** v0.0.6+  
+**Supported versions:** v0.0.7+  
 **SLSA Level 3** supply chain security  
 
 ## Contributing

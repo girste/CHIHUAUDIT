@@ -11,37 +11,37 @@ import (
 )
 
 type Config struct {
-	Checks             map[string]bool      `yaml:"checks"`
-	ThreatAnalysisDays int                  `yaml:"threatAnalysisDays"`
-	AnalyzerTimeout    int                  `yaml:"analyzerTimeoutSeconds"`
-	MaxConcurrency     int                  `yaml:"maxConcurrency"`
-	MaskData           bool                 `yaml:"maskData"`
-	Timeouts           TimeoutConfig        `yaml:"timeouts"`
-	Monitoring         MonitoringConfig     `yaml:"monitoring"`
-	Notifications      NotifyConfig         `yaml:"notifications"`
-	Scoring            ScoringConfig        `yaml:"scoring"`
-	Discovery          DiscoveryConfig      `yaml:"discovery"`      // Service auto-discovery patterns
-	Whitelist          *Whitelist           `yaml:"-"`              // Loaded separately
-	Ports              *PortPatterns        `yaml:"-"`              // Pattern definitions
-	Processes          *ProcessPatterns     `yaml:"-"`              // Process patterns
+	Checks             map[string]bool  `yaml:"checks"`
+	ThreatAnalysisDays int              `yaml:"threatAnalysisDays"`
+	AnalyzerTimeout    int              `yaml:"analyzerTimeoutSeconds"`
+	MaxConcurrency     int              `yaml:"maxConcurrency"`
+	MaskData           bool             `yaml:"maskData"`
+	Timeouts           TimeoutConfig    `yaml:"timeouts"`
+	Monitoring         MonitoringConfig `yaml:"monitoring"`
+	Notifications      NotifyConfig     `yaml:"notifications"`
+	Scoring            ScoringConfig    `yaml:"scoring"`
+	Discovery          DiscoveryConfig  `yaml:"discovery"` // Service auto-discovery patterns
+	Whitelist          *Whitelist       `yaml:"-"`         // Loaded separately
+	Ports              *PortPatterns    `yaml:"-"`         // Pattern definitions
+	Processes          *ProcessPatterns `yaml:"-"`         // Process patterns
 }
 
 // ScoringConfig defines scoring thresholds
 type ScoringConfig struct {
-	BaseScore     int            `yaml:"baseScore"`
-	Deductions    map[string]int `yaml:"deductions"`    // severity → points
-	MinInterval   int            `yaml:"minInterval"`   // monitoring min interval (seconds)
-	MaxInterval   int            `yaml:"maxInterval"`   // monitoring max interval (seconds)
+	BaseScore   int            `yaml:"baseScore"`
+	Deductions  map[string]int `yaml:"deductions"`  // severity → points
+	MinInterval int            `yaml:"minInterval"` // monitoring min interval (seconds)
+	MaxInterval int            `yaml:"maxInterval"` // monitoring max interval (seconds)
 }
 
 // DiscoveryConfig allows users to customize service auto-discovery patterns
 type DiscoveryConfig struct {
-	WebServerProcesses   []string       `yaml:"webServerProcesses"`   // Additional web server process names
-	DatabaseProcesses    []string       `yaml:"databaseProcesses"`    // Additional database process names
-	ContainerProcesses   []string       `yaml:"containerProcesses"`   // Additional container runtime names
-	RiskyPorts           map[int]string `yaml:"riskyPorts"`           // Custom risky ports (port: service name)
-	WebPorts             []int          `yaml:"webPorts"`             // Additional web ports
-	SafeWildcardPorts    []int          `yaml:"safeWildcardPorts"`    // Ports allowed on 0.0.0.0 (bypass warnings)
+	WebServerProcesses []string       `yaml:"webServerProcesses"` // Additional web server process names
+	DatabaseProcesses  []string       `yaml:"databaseProcesses"`  // Additional database process names
+	ContainerProcesses []string       `yaml:"containerProcesses"` // Additional container runtime names
+	RiskyPorts         map[int]string `yaml:"riskyPorts"`         // Custom risky ports (port: service name)
+	WebPorts           []int          `yaml:"webPorts"`           // Additional web ports
+	SafeWildcardPorts  []int          `yaml:"safeWildcardPorts"`  // Ports allowed on 0.0.0.0 (bypass warnings)
 }
 
 // TimeoutConfig defines configurable timeout durations
@@ -204,7 +204,7 @@ func Load() (*Config, error) {
 	// Load default patterns
 	cfg.Ports = DefaultPortPatterns()
 	cfg.Processes = DefaultProcessPatterns()
-	
+
 	// Merge user-defined discovery patterns with defaults
 	if cfg.Discovery.WebServerProcesses != nil {
 		cfg.Processes.WebServers = append(cfg.Processes.WebServers, cfg.Discovery.WebServerProcesses...)

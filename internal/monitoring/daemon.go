@@ -47,10 +47,10 @@ func NewSecurityMonitor(intervalSeconds int, logDir string, verbose bool) *Secur
 
 // CheckResult represents the result of a single monitoring check.
 type CheckResult struct {
-	Status       string               `json:"status"`
-	Anomalies    []alertcodes.Alert   `json:"anomalies"`
-	BulletinFile string               `json:"bulletin_file,omitempty"`
-	AnomalyFile  string               `json:"anomaly_file,omitempty"`
+	Status       string             `json:"status"`
+	Anomalies    []alertcodes.Alert `json:"anomalies"`
+	BulletinFile string             `json:"bulletin_file,omitempty"`
+	AnomalyFile  string             `json:"anomaly_file,omitempty"`
 }
 
 func (m *SecurityMonitor) log(msg string) {

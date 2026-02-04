@@ -45,7 +45,7 @@ func TestIssueStruct(t *testing.T) {
 func TestResultStruct(t *testing.T) {
 	installed := true
 	active := true
-	
+
 	result := Result{
 		Installed: &installed,
 		Active:    &active,
@@ -139,4 +139,3 @@ func TestNewRegistry(t *testing.T) {
 		t.Error("Analyzers map not initialized")
 	}
 }
-

@@ -39,11 +39,11 @@ func NewDriftMonitor(logDir string, verbose bool) *DriftMonitor {
 
 // DriftResult represents the result of drift detection
 type DriftResult struct {
-	Status       string                `json:"status"`
-	DriftCount   int                   `json:"drift_count"`
-	Alerts       []alertcodes.Alert    `json:"alerts"`
-	BulletinFile string                `json:"bulletin_file,omitempty"`
-	AnomalyFile  string                `json:"anomaly_file,omitempty"`
+	Status       string             `json:"status"`
+	DriftCount   int                `json:"drift_count"`
+	Alerts       []alertcodes.Alert `json:"alerts"`
+	BulletinFile string             `json:"bulletin_file,omitempty"`
+	AnomalyFile  string             `json:"anomaly_file,omitempty"`
 }
 
 // CheckDrift performs baseline comparison and detects drifts
@@ -130,7 +130,7 @@ func (m *DriftMonitor) CheckDrift(ctx context.Context, cfg *config.Config) (*Dri
 	// Generate bulletin if drifts detected
 	if len(alerts) > 0 {
 		m.log(fmt.Sprintf("Detected %d configuration drifts", len(alerts)))
-		
+
 		bulletin := m.generateBulletin(bl, diffResult, alerts, baselineAge)
 		bulletinFile := m.writeBulletin(bulletin)
 		result.BulletinFile = bulletinFile
@@ -141,7 +141,7 @@ func (m *DriftMonitor) CheckDrift(ctx context.Context, cfg *config.Config) (*Dri
 
 		if m.verbose {
 			fmt.Println("\n" + bulletin + "\n")
-			
+
 			switch status {
 			case "critical":
 				fmt.Fprintf(os.Stderr, "\n🔴 CRITICAL DRIFT DETECTED\n")
@@ -311,7 +311,7 @@ func (m *DriftMonitor) writeBulletin(bulletin string) string {
 func (m *DriftMonitor) writeDriftReport(alerts []alertcodes.Alert, diffResult *baseline.DiffResult) string {
 	timestamp := time.Now().UTC().Format("2006-01-02-150405")
 	filename := filepath.Join(m.logDir, fmt.Sprintf("drift-%s.json", timestamp))
-	
+
 	report := map[string]interface{}{
 		"timestamp":          time.Now().UTC().Format(time.RFC3339),
 		"baseline_timestamp": diffResult.BaselineTimestamp,

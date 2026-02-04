@@ -422,8 +422,8 @@ func (h *HostCommandExecutor) logExecution(
 		if result.TimedOut {
 			log.Warnf("Host command timed out: command=%s strategy=%s duration=%s",
 				cmdStr, strategy.String(), duration.String())
-		} else if !result.Success {
-			log.Warnf("Host command returned non-zero exit code: command=%s strategy=%s exitCode=%d stderr=%s duration=%s",
+		} else if result.ExitCode != 0 {
+			log.Warnf("Host command failed: command=%s strategy=%s exitCode=%d stderr=%s duration=%s",
 				cmdStr, strategy.String(), result.ExitCode, truncateString(result.Stderr, 200), duration.String())
 		} else {
 			log.Debugf("Host command executed successfully: command=%s strategy=%s duration=%s",

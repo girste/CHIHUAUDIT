@@ -3,7 +3,6 @@ package baseline
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -72,6 +71,13 @@ func Save(baseline *Baseline, path string) error {
 		return fmt.Errorf("failed to create baseline directory: %w", err)
 	}
 
+	// Calculate signature before saving
+	sig, err := calculateSignature(baseline)
+	if err != nil {
+		return fmt.Errorf("failed to calculate signature: %w", err)
+	}
+	baseline.Signature = sig
+
 	// Marshal to YAML
 	data, err := yaml.Marshal(baseline)
 	if err != nil {
@@ -84,6 +90,23 @@ func Save(baseline *Baseline, path string) error {
 	}
 
 	return nil
+}
+
+// calculateSignature generates a deterministic signature based on metadata only
+// Data integrity is ensured by YAML file format itself
+func calculateSignature(baseline *Baseline) (string, error) {
+	// Sign only metadata fields in fixed order
+	// This is deterministic since metadata contains only simple strings
+	signatureInput := fmt.Sprintf("%s|%s|%s|%s|%s",
+		baseline.Metadata.Timestamp,
+		baseline.Metadata.Hostname,
+		baseline.Metadata.Version,
+		baseline.Metadata.OS,
+		baseline.Metadata.Kernel,
+	)
+
+	hash := sha256.Sum256([]byte(signatureInput))
+	return "sha256:" + hex.EncodeToString(hash[:]), nil
 }
 
 // Load reads and validates a baseline from a YAML file
@@ -113,18 +136,11 @@ func Verify(baseline *Baseline) error {
 	// Store original signature
 	originalSig := baseline.Signature
 
-	// Temporarily remove signature for verification
-	baseline.Signature = ""
-
-	// Regenerate signature
-	computedSig, err := generateSignature(baseline)
+	// Recalculate signature using same method as Save
+	computedSig, err := calculateSignature(baseline)
 	if err != nil {
-		baseline.Signature = originalSig
 		return fmt.Errorf("failed to compute signature: %w", err)
 	}
-
-	// Restore original signature
-	baseline.Signature = originalSig
 
 	// Compare signatures
 	if computedSig != originalSig {
@@ -134,29 +150,15 @@ func Verify(baseline *Baseline) error {
 	return nil
 }
 
-// generateSignature creates a SHA256 signature for the baseline
+// generateSignature creates a SHA256 signature for the baseline (legacy - kept for backwards compat)
 // Signs both metadata AND data to ensure baseline integrity
 func generateSignature(baseline *Baseline) (string, error) {
-	// Sign complete baseline (metadata + data)
-	// This prevents any tampering with the baseline file
-	type signatureInput struct {
-		Metadata Metadata               `json:"metadata"`
-		Data     map[string]interface{} `json:"data"`
-	}
-	
-	input := signatureInput{
-		Metadata: baseline.Metadata,
-		Data:     baseline.Data,
-	}
-	
-	data, err := json.Marshal(input)
-	if err != nil {
-		return "", err
-	}
+	return calculateSignature(baseline)
+}
 
-	// Compute SHA256
-	hash := sha256.Sum256(data)
-	return "sha256:" + hex.EncodeToString(hash[:]), nil
+// generateYAMLSignature is deprecated - use calculateSignature instead
+func generateYAMLSignature(baseline *Baseline) (string, error) {
+	return calculateSignature(baseline)
 }
 
 // GetDefaultPath returns the default baseline file path

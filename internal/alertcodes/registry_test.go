@@ -46,14 +46,14 @@ func TestCodeGenerator_Reset(t *testing.T) {
 	// Generate some codes
 	cg.Generate("firewall")
 	cg.Generate("firewall")
-	
+
 	if cg.counters["firewall"] != 2 {
 		t.Errorf("Expected counter 2, got %d", cg.counters["firewall"])
 	}
 
 	// Reset
 	cg.Reset("firewall")
-	
+
 	if cg.counters["firewall"] != 0 {
 		t.Errorf("Expected counter 0 after reset, got %d", cg.counters["firewall"])
 	}
@@ -113,4 +113,3 @@ func TestAlert_Struct(t *testing.T) {
 		t.Error("Message should not be empty")
 	}
 }
-

@@ -40,7 +40,7 @@ type AlertPayload struct {
 
 // AlertIssue represents a single security issue
 type AlertIssue struct {
-	Code     string `json:"code,omitempty"`     // Alert code (e.g., "FW-001", "SSH-003")
+	Code     string `json:"code,omitempty"` // Alert code (e.g., "FW-001", "SSH-003")
 	Severity string `json:"severity"`
 	Message  string `json:"message"`
 	Category string `json:"category,omitempty"`

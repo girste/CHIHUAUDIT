@@ -66,7 +66,7 @@ func ForIssue(category, message string) string {
 	switch category {
 	case "firewall":
 		return "Enable UFW firewall: sudo ufw enable && sudo ufw default deny incoming"
-	
+
 	case "ssh":
 		if strings.Contains(message, "Root") {
 			return "Disable root SSH: edit /etc/ssh/sshd_config and set PermitRootLogin no"
@@ -75,25 +75,25 @@ func ForIssue(category, message string) string {
 			return "Disable password auth: set PasswordAuthentication no in sshd_config"
 		}
 		return "Harden SSH configuration following CIS benchmarks"
-	
+
 	case "intrusion_prevention", "fail2ban":
 		return "Install and enable fail2ban: sudo apt install fail2ban && sudo systemctl enable fail2ban"
-	
+
 	case "updates":
 		return "Apply security updates: sudo apt update && sudo apt upgrade"
-	
+
 	case "containers", "docker":
 		return "Avoid privileged containers. Use --cap-drop=ALL and add only needed capabilities"
-	
+
 	case "sudo":
 		return "Review and remove NOPASSWD entries from sudoers configuration"
-	
+
 	case "cron":
 		return "Review all cron jobs and remove any unauthorized or suspicious entries"
-	
+
 	case "permissions":
 		return "Fix file permissions — sensitive files must not be readable/writable by unauthorized users"
-	
+
 	case "users":
 		if strings.Contains(message, "UID 0") {
 			return "Remove or reassign UID 0 from non-root users immediately"
@@ -102,13 +102,13 @@ func ForIssue(category, message string) string {
 			return "Upgrade password hashes to SHA-512: use passwd to reset affected accounts"
 		}
 		return "Audit user accounts and remove unauthorized or stale accounts"
-	
+
 	case "kernel":
 		return "Apply kernel hardening: review /proc/sys parameters and set secure defaults in /etc/sysctl.d/"
-	
+
 	case "mac":
 		return "Enable AppArmor or SELinux for mandatory access control"
-	
+
 	case "processes":
 		if strings.Contains(message, "miner") || strings.Contains(message, "mining") {
 			return "Terminate cryptocurrency miner immediately and investigate compromise"
@@ -117,7 +117,7 @@ func ForIssue(category, message string) string {
 			return "Investigate process running from /tmp — likely malicious"
 		}
 		return "Review running processes and terminate any unauthorized services"
-	
+
 	case "performance":
 		if strings.Contains(message, "CPU") {
 			return "Investigate running processes with top/htop and optimize or kill resource hogs"
@@ -129,7 +129,7 @@ func ForIssue(category, message string) string {
 			return "Free disk space or expand storage volume"
 		}
 		return "Monitor system performance and optimize resource usage"
-	
+
 	default:
 		return "Review the issue and take appropriate remediation action"
 	}

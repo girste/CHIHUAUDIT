@@ -275,60 +275,60 @@ func DefaultAnalyzerRiskMap() map[string]string {
 
 // IsAlertWhitelisted checks if an alert code is whitelisted
 func (wl *Whitelist) IsAlertWhitelisted(code string) bool {
-if wl == nil {
-return false
-}
+	if wl == nil {
+		return false
+	}
 
-code = strings.TrimSpace(strings.ToUpper(code))
+	code = strings.TrimSpace(strings.ToUpper(code))
 
-for _, whitelisted := range wl.AlertCodes {
-if strings.ToUpper(strings.TrimSpace(whitelisted)) == code {
-return true
-}
-}
+	for _, whitelisted := range wl.AlertCodes {
+		if strings.ToUpper(strings.TrimSpace(whitelisted)) == code {
+			return true
+		}
+	}
 
-return false
+	return false
 }
 
 // AddAlertCode adds an alert code to the whitelist
 func (wl *Whitelist) AddAlertCode(code string) {
-if wl == nil {
-return
-}
+	if wl == nil {
+		return
+	}
 
-code = strings.TrimSpace(strings.ToUpper(code))
+	code = strings.TrimSpace(strings.ToUpper(code))
 
-// Check if already exists
-if wl.IsAlertWhitelisted(code) {
-return
-}
+	// Check if already exists
+	if wl.IsAlertWhitelisted(code) {
+		return
+	}
 
-wl.AlertCodes = append(wl.AlertCodes, code)
+	wl.AlertCodes = append(wl.AlertCodes, code)
 }
 
 // RemoveAlertCode removes an alert code from the whitelist
 func (wl *Whitelist) RemoveAlertCode(code string) bool {
-if wl == nil {
-return false
-}
+	if wl == nil {
+		return false
+	}
 
-code = strings.TrimSpace(strings.ToUpper(code))
+	code = strings.TrimSpace(strings.ToUpper(code))
 
-for i, whitelisted := range wl.AlertCodes {
-if strings.ToUpper(strings.TrimSpace(whitelisted)) == code {
-// Remove by creating new slice without this element
-wl.AlertCodes = append(wl.AlertCodes[:i], wl.AlertCodes[i+1:]...)
-return true
-}
-}
+	for i, whitelisted := range wl.AlertCodes {
+		if strings.ToUpper(strings.TrimSpace(whitelisted)) == code {
+			// Remove by creating new slice without this element
+			wl.AlertCodes = append(wl.AlertCodes[:i], wl.AlertCodes[i+1:]...)
+			return true
+		}
+	}
 
-return false
+	return false
 }
 
 // GetWhitelistedAlertCodes returns all whitelisted alert codes
 func (wl *Whitelist) GetWhitelistedAlertCodes() []string {
-if wl == nil {
-return []string{}
-}
-return wl.AlertCodes
+	if wl == nil {
+		return []string{}
+	}
+	return wl.AlertCodes
 }

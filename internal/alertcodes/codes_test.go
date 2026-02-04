@@ -36,4 +36,3 @@ func TestGetPrefix(t *testing.T) {
 		})
 	}
 }
-

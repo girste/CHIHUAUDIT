@@ -10,7 +10,7 @@ import (
 func TestLoadWithMCPConfigDir(t *testing.T) {
 	tempDir := t.TempDir()
 	configPath := filepath.Join(tempDir, ".chihuaudit.yaml")
-	
+
 	// Create test config
 	configYAML := `
 notifications:
@@ -25,16 +25,16 @@ monitoring:
 	if err := os.WriteFile(configPath, []byte(configYAML), 0600); err != nil {
 		t.Fatalf("Failed to create test config: %v", err)
 	}
-	
+
 	// Set environment variable
 	_ = os.Setenv("MCP_CONFIG_DIR", tempDir)
 	defer func() { _ = os.Unsetenv("MCP_CONFIG_DIR") }()
-	
+
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("Load() failed: %v", err)
 	}
-	
+
 	if !cfg.Notifications.Enabled {
 		t.Error("Notifications should be enabled")
 	}
@@ -50,7 +50,7 @@ monitoring:
 func TestLoadWithInvalidYAML(t *testing.T) {
 	tempDir := t.TempDir()
 	configPath := filepath.Join(tempDir, ".chihuaudit.yaml")
-	
+
 	// Create invalid YAML
 	invalidYAML := `
 notifications:
@@ -61,10 +61,10 @@ notifications:
 	if err := os.WriteFile(configPath, []byte(invalidYAML), 0600); err != nil {
 		t.Fatalf("Failed to create test config: %v", err)
 	}
-	
+
 	_ = os.Setenv("MCP_CONFIG_DIR", tempDir)
 	defer func() { _ = os.Unsetenv("MCP_CONFIG_DIR") }()
-	
+
 	_, err := Load()
 	if err == nil {
 		t.Error("Load() should fail with invalid YAML")
@@ -76,7 +76,7 @@ func TestValidateInvalidDiscordWebhook(t *testing.T) {
 	cfg := Default()
 	cfg.Notifications.Discord.Enabled = true
 	cfg.Notifications.Discord.WebhookURL = "invalid-url-without-protocol"
-	
+
 	err := cfg.Validate()
 	if err == nil {
 		t.Error("Validate() should fail with invalid Discord webhook URL")
@@ -91,7 +91,7 @@ func TestValidateInvalidSlackWebhook(t *testing.T) {
 	cfg := Default()
 	cfg.Notifications.Slack.Enabled = true
 	cfg.Notifications.Slack.WebhookURL = "ftp://invalid-protocol.com"
-	
+
 	err := cfg.Validate()
 	if err == nil {
 		t.Error("Validate() should fail with invalid Slack webhook URL")
@@ -103,7 +103,7 @@ func TestValidateInvalidGenericWebhook(t *testing.T) {
 	cfg := Default()
 	cfg.Notifications.GenericWebhook.Enabled = true
 	cfg.Notifications.GenericWebhook.URL = "not-a-url"
-	
+
 	err := cfg.Validate()
 	if err == nil {
 		t.Error("Validate() should fail with invalid generic webhook URL")
@@ -119,7 +119,7 @@ func TestValidateValidWebhooks(t *testing.T) {
 	cfg.Notifications.Slack.WebhookURL = "https://hooks.slack.com/services/test"
 	cfg.Notifications.GenericWebhook.Enabled = true
 	cfg.Notifications.GenericWebhook.URL = "http://example.com/webhook"
-	
+
 	err := cfg.Validate()
 	if err != nil {
 		t.Errorf("Validate() should pass with valid webhooks: %v", err)
@@ -130,7 +130,7 @@ func TestValidateValidWebhooks(t *testing.T) {
 func TestValidateInvalidSeverity(t *testing.T) {
 	cfg := Default()
 	cfg.Notifications.MinSeverity = "super-critical"
-	
+
 	err := cfg.Validate()
 	if err == nil {
 		t.Error("Validate() should fail with invalid severity")
@@ -139,12 +139,12 @@ func TestValidateInvalidSeverity(t *testing.T) {
 
 // Test Validate() with valid severities
 func TestValidateValidSeverities(t *testing.T) {
-	severities := []string{"critical", "high", "medium", "low", }
-	
+	severities := []string{"critical", "high", "medium", "low"}
+
 	for _, sev := range severities {
 		cfg := Default()
 		cfg.Notifications.MinSeverity = sev
-		
+
 		err := cfg.Validate()
 		if err != nil {
 			t.Errorf("Validate() should pass with severity %s: %v", sev, err)
@@ -157,7 +157,7 @@ func TestValidateMonitoringIntervalTooLow(t *testing.T) {
 	cfg := Default()
 	cfg.Monitoring.Enabled = true
 	cfg.Monitoring.IntervalSeconds = 5
-	
+
 	err := cfg.Validate()
 	if err == nil {
 		t.Error("Validate() should fail with interval < 10")
@@ -169,7 +169,7 @@ func TestValidateMonitoringIntervalTooHigh(t *testing.T) {
 	cfg := Default()
 	cfg.Monitoring.Enabled = true
 	cfg.Monitoring.IntervalSeconds = 90000
-	
+
 	err := cfg.Validate()
 	if err == nil {
 		t.Error("Validate() should fail with interval > 86400")
@@ -181,7 +181,7 @@ func TestValidateMonitoringIntervalValid(t *testing.T) {
 	cfg := Default()
 	cfg.Monitoring.Enabled = true
 	cfg.Monitoring.IntervalSeconds = 3600
-	
+
 	err := cfg.Validate()
 	if err != nil {
 		t.Errorf("Validate() should pass with valid interval: %v", err)
@@ -192,7 +192,7 @@ func TestValidateMonitoringIntervalValid(t *testing.T) {
 func TestIsAnalyzerEnabledTrue(t *testing.T) {
 	cfg := Default()
 	cfg.Checks["firewall"] = true
-	
+
 	if !cfg.IsAnalyzerEnabled("firewall") {
 		t.Error("IsAnalyzerEnabled should return true for enabled analyzer")
 	}
@@ -202,7 +202,7 @@ func TestIsAnalyzerEnabledTrue(t *testing.T) {
 func TestIsAnalyzerEnabledFalse(t *testing.T) {
 	cfg := Default()
 	cfg.Checks["firewall"] = false
-	
+
 	if cfg.IsAnalyzerEnabled("firewall") {
 		t.Error("IsAnalyzerEnabled should return false for disabled analyzer")
 	}
@@ -211,7 +211,7 @@ func TestIsAnalyzerEnabledFalse(t *testing.T) {
 // Test IsAnalyzerEnabled with non-existent analyzer (should default to true)
 func TestIsAnalyzerEnabledNonExistent(t *testing.T) {
 	cfg := Default()
-	
+
 	if !cfg.IsAnalyzerEnabled("non-existent-analyzer") {
 		t.Error("IsAnalyzerEnabled should return true for non-existent analyzer (default)")
 	}
@@ -221,7 +221,7 @@ func TestIsAnalyzerEnabledNonExistent(t *testing.T) {
 func TestGetMaxConcurrencyDefault(t *testing.T) {
 	cfg := Default()
 	cfg.MaxConcurrency = 0
-	
+
 	max := cfg.GetMaxConcurrency()
 	if max <= 0 {
 		t.Errorf("GetMaxConcurrency() should return positive value, got %d", max)
@@ -232,7 +232,7 @@ func TestGetMaxConcurrencyDefault(t *testing.T) {
 func TestGetMaxConcurrencyCustom(t *testing.T) {
 	cfg := Default()
 	cfg.MaxConcurrency = 8
-	
+
 	max := cfg.GetMaxConcurrency()
 	if max != 8 {
 		t.Errorf("GetMaxConcurrency() = %d, want 8", max)
@@ -255,7 +255,7 @@ func TestLoadWithHomeConfig(t *testing.T) {
 // Test Default config values
 func TestDefaultConfigValues(t *testing.T) {
 	cfg := Default()
-	
+
 	// Check default checks
 	if !cfg.Checks["firewall"] {
 		t.Error("Default firewall check should be enabled")
@@ -263,7 +263,7 @@ func TestDefaultConfigValues(t *testing.T) {
 	if !cfg.Checks["ssh"] {
 		t.Error("Default ssh check should be enabled")
 	}
-	
+
 	// Check default timeouts
 	if cfg.Timeouts.Short != 5 {
 		t.Errorf("Default short timeout = %d, want 5", cfg.Timeouts.Short)
@@ -277,7 +277,7 @@ func TestDefaultConfigValues(t *testing.T) {
 	if cfg.Timeouts.VeryLong != 120 {
 		t.Errorf("Default very_long timeout = %d, want 120", cfg.Timeouts.VeryLong)
 	}
-	
+
 	// Check default monitoring
 	if cfg.Monitoring.Enabled {
 		t.Error("Default monitoring should be disabled")
@@ -285,7 +285,7 @@ func TestDefaultConfigValues(t *testing.T) {
 	if cfg.Monitoring.IntervalSeconds != 3600 {
 		t.Errorf("Default interval = %d, want 3600", cfg.Monitoring.IntervalSeconds)
 	}
-	
+
 	// Check default notifications
 	if cfg.Notifications.Enabled {
 		t.Error("Default notifications should be disabled")
@@ -302,7 +302,7 @@ func TestDefaultConfigValues(t *testing.T) {
 func TestLoadWithDiscoveryPatterns(t *testing.T) {
 	tempDir := t.TempDir()
 	configPath := filepath.Join(tempDir, ".chihuaudit.yaml")
-	
+
 	configYAML := `
 discovery:
   webServerProcesses:
@@ -319,15 +319,15 @@ discovery:
 	if err := os.WriteFile(configPath, []byte(configYAML), 0600); err != nil {
 		t.Fatalf("Failed to create test config: %v", err)
 	}
-	
+
 	_ = os.Setenv("MCP_CONFIG_DIR", tempDir)
 	defer func() { _ = os.Unsetenv("MCP_CONFIG_DIR") }()
-	
+
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("Load() failed: %v", err)
 	}
-	
+
 	// Check that custom patterns are merged
 	found := false
 	for _, proc := range cfg.Processes.WebServers {
@@ -339,7 +339,7 @@ discovery:
 	if !found {
 		t.Error("Custom web server process not found in merged patterns")
 	}
-	
+
 	// Check risky ports
 	if service, ok := cfg.Ports.RiskyDatabase[9999]; !ok || service != "Custom Service" {
 		t.Error("Custom risky port not found in merged patterns")
@@ -350,7 +350,7 @@ discovery:
 func TestLoadWithYmlExtension(t *testing.T) {
 	tempDir := t.TempDir()
 	configPath := filepath.Join(tempDir, ".chihuaudit.yml")
-	
+
 	configYAML := `
 notifications:
   enabled: true
@@ -358,10 +358,10 @@ notifications:
 	if err := os.WriteFile(configPath, []byte(configYAML), 0600); err != nil {
 		t.Fatalf("Failed to create test config: %v", err)
 	}
-	
+
 	_ = os.Setenv("MCP_CONFIG_DIR", tempDir)
 	defer func() { _ = os.Unsetenv("MCP_CONFIG_DIR") }()
-	
+
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("Load() should work with .yml extension: %v", err)

@@ -178,7 +178,7 @@ func (a *ServicesAnalyzer) Analyze(ctx context.Context, cfg *config.Config) (*Re
 
 	// Auto-discovery: Enrich ports with process information via ss/netstat
 	enrichedDetails := enrichPortsWithProcessInfo(ctx, listeningPorts)
-	
+
 	// Update exposedServices with enriched data
 	enrichedServices := make([]map[string]interface{}, 0, len(enrichedDetails))
 	for _, detail := range enrichedDetails {

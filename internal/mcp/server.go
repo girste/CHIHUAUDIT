@@ -441,7 +441,7 @@ func (s *Server) handleStartMonitoring(ctx context.Context, request mcp.CallTool
 	if cfg == nil {
 		cfg = config.Default()
 	}
-	
+
 	if interval < cfg.Scoring.MinInterval {
 		return mcp.NewToolResultError(fmt.Sprintf("Minimum interval is %d seconds", cfg.Scoring.MinInterval)), nil
 	}
