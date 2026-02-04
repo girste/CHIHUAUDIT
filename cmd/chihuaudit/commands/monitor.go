@@ -18,22 +18,22 @@ func RunMonitor() {
 
 	for i := 2; i < len(os.Args); i++ {
 		arg := os.Args[i]
-		switch {
-		case arg == "--interval" || arg == "-i":
+		switch arg {
+		case "--interval", "-i":
 			if i+1 < len(os.Args) {
 				if v, err := strconv.Atoi(os.Args[i+1]); err == nil {
 					interval = v
 				}
 				i++
 			}
-		case arg == "--log-dir" || arg == "-d":
+		case "--log-dir", "-d":
 			if i+1 < len(os.Args) {
 				logDir = os.Args[i+1]
 				i++
 			}
-		case arg == "--quiet" || arg == "-q":
+		case "--quiet", "-q":
 			verbose = false
-		case arg == "--once":
+		case "--once":
 			once = true
 		}
 	}

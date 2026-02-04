@@ -156,11 +156,6 @@ func generateSignature(baseline *Baseline) (string, error) {
 	return calculateSignature(baseline)
 }
 
-// generateYAMLSignature is deprecated - use calculateSignature instead
-func generateYAMLSignature(baseline *Baseline) (string, error) {
-	return calculateSignature(baseline)
-}
-
 // GetDefaultPath returns the default baseline file path
 func GetDefaultPath() (string, error) {
 	homeDir, err := os.UserHomeDir()
