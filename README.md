@@ -42,6 +42,26 @@ sudo ./chihuaudit audit
 - **📝 Logs**: Error analysis, SSH attempts, service restarts
 - **⏰ Monitoring**: Continuous mode with Discord webhook notifications
 
+## 🤖 Claude Skill Alternative
+
+![Chihuaudit Skill](docs/chihu-skill.png)
+
+**Don't want to install anything?** Use the **Claude Skill** version instead!
+
+Execute the same comprehensive system audit directly through Claude (Sonnet, Opus, or Haiku) using native shell commands - no binary installation required.
+
+**Key Benefits**:
+- 🚀 **Zero Installation** - Works immediately with sudo access
+- 🔄 **Consistent Results** - 1+ year of production use with extremely reliable output
+- 📊 **Same Coverage** - All 87 checks, 10 categories, identical methodology
+- ⚡ **Fast** - 30-90 second execution time
+
+**Requirements**: Linux with systemd, sudo NOPASSWD configured, Claude with shell access
+
+**Documentation**: [docs/skill/chihuaudit-skill.md](docs/skill/chihuaudit-skill.md)
+
+---
+
 ## 🚀 Quick Start
 
 ### Build
