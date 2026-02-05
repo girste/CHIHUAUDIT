@@ -10,6 +10,6 @@ jobs:
     - uses: actions/setup-go@v5
       with: { go-version: 'stable' }
     - uses: snyk/actions/setup@master
-    - run: snyk test --severity-threshold=high || true
+    - run: snyk test --severity-threshold=high
       env:
         SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
