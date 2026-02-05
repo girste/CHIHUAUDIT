@@ -2,11 +2,18 @@
 
 ![Chihuaudit](docs/chihuaudit-cover.png)
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/girste/CHIHUAUDIT)](https://goreportcard.com/report/github.com/girste/CHIHUAUDIT)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![CodeQL](https://github.com/girste/CHIHUAUDIT/workflows/CodeQL/badge.svg)](https://github.com/girste/CHIHUAUDIT/actions/workflows/codeql.yml)
-[![Lint](https://github.com/girste/CHIHUAUDIT/workflows/Lint/badge.svg)](https://github.com/girste/CHIHUAUDIT/actions/workflows/lint.yml)
+[![Awesome](https://awesome.re/badge.svg)](https://awesome.re)
+
 [![CI](https://github.com/girste/CHIHUAUDIT/workflows/CI/badge.svg)](https://github.com/girste/CHIHUAUDIT/actions/workflows/ci.yml)
+[![Lint](https://github.com/girste/CHIHUAUDIT/workflows/Lint/badge.svg)](https://github.com/girste/CHIHUAUDIT/actions/workflows/lint.yml)
+[![CodeQL](https://github.com/girste/CHIHUAUDIT/workflows/CodeQL/badge.svg)](https://github.com/girste/CHIHUAUDIT/actions/workflows/codeql.yml)
+[![Trivy](https://github.com/girste/CHIHUAUDIT/workflows/Trivy/badge.svg)](https://github.com/girste/CHIHUAUDIT/actions/workflows/trivy.yml)
+[![Snyk](https://snyk.io/test/github/girste/CHIHUAUDIT/badge.svg)](https://snyk.io/test/github/girste/CHIHUAUDIT)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/girste/CHIHUAUDIT/badge)](https://scorecard.dev/viewer/?uri=github.com/girste/CHIHUAUDIT)
+[![OpenSSF Best Practices](https://www.bestpractices.coreinfrastructure.org/projects/9999/badge)](https://www.bestpractices.coreinfrastructure.org/projects/9999)
+[![SLSA](https://slsa.dev/images/gh-badge-level3.svg)](https://slsa.dev)
+[![Coverage](https://codecov.io/gh/girste/CHIHUAUDIT/branch/main/graph/badge.svg)](https://codecov.io/gh/girste/CHIHUAUDIT)
+[![Go Report Card](https://goreportcard.com/badge/github.com/girste/CHIHUAUDIT)](https://goreportcard.com/report/github.com/girste/CHIHUAUDIT)
 
 </div>
 
@@ -161,5 +168,7 @@ MIT License - see [LICENSE](LICENSE) for details
 <div align="center">
 
 **Made with ❤️ for sysadmins everywhere**
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 </div>
