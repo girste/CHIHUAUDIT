@@ -37,3 +37,4 @@ Thumbs.db
 *.log
 /var/log/chihuaudit.log
 /tmp/chihuaudit.log
+
