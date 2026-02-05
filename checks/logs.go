@@ -19,55 +19,72 @@ func CheckLogs() Logs {
 }
 
 func countSyslogErrors() int {
-	logPath := detect.TryPaths("/var/log/syslog", "/var/log/messages")
-	if logPath == "" {
-		return 0
-	}
-
-	out, err := exec.Command("grep", "-i", "-c", "error", logPath).Output()
+	// Use journalctl for systemd-based systems (more reliable than log files)
+	out, err := exec.Command("journalctl", "--since", "24 hours ago", "-p", "err", "--no-pager").Output()
 	if err != nil {
-		return 0
+		// Fallback to log files if journalctl fails
+		logPath := detect.TryPaths("/var/log/syslog", "/var/log/messages")
+		if logPath == "" {
+			return 0
+		}
+		out, err = exec.Command("grep", "-i", "-c", "error", logPath).Output()
+		if err != nil {
+			return 0
+		}
+		count, _ := strconv.Atoi(strings.TrimSpace(string(out)))
+		return count
 	}
 
-	count, _ := strconv.Atoi(strings.TrimSpace(string(out)))
+	count := 0
+	lines := strings.Split(string(out), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		// Skip empty lines and journalctl headers (starting with --)
+		if line != "" && !strings.HasPrefix(line, "-- ") {
+			count++
+		}
+	}
+
 	return count
 }
 
 func getSSHFailures() (count int, ips []string) {
-	logPath := detect.TryPaths("/var/log/auth.log", "/var/log/secure")
-	if logPath == "" {
-		return
-	}
-
-	// Count failed attempts
-	out, err := exec.Command("grep", "-c", "Failed password", logPath).Output()
-	if err == nil {
-		count, _ = strconv.Atoi(strings.TrimSpace(string(out)))
-	}
-
-	// Get unique IPs
-	out, err = exec.Command("grep", "Failed password", logPath).Output()
+	// Use journalctl for systemd-based systems (more accurate, last 24h only)
+	out, err := exec.Command("journalctl", "-u", "sshd", "--since", "24 hours ago", "--no-pager").Output()
 	if err != nil {
+		// Fallback to log files if journalctl fails
+		logPath := detect.TryPaths("/var/log/auth.log", "/var/log/secure")
+		if logPath == "" {
+			return
+		}
+		out, err = exec.Command("grep", "-c", "Failed password", logPath).Output()
+		if err == nil {
+			count, _ = strconv.Atoi(strings.TrimSpace(string(out)))
+		}
 		return
 	}
 
+	// Count lines containing "Failed" or "failure" (case insensitive)
 	ipMap := make(map[string]bool)
 	for _, line := range strings.Split(string(out), "\n") {
-		fields := strings.Fields(line)
-		for i, field := range fields {
-			if field == "from" && i+1 < len(fields) {
-				ip := fields[i+1]
-				if !ipMap[ip] {
-					ips = append(ips, ip)
-					ipMap[ip] = true
-					if len(ips) >= 5 { // Limit to top 5
-						return
+		lower := strings.ToLower(line)
+		if strings.Contains(lower, "failed") || strings.Contains(lower, "failure") {
+			count++
+			
+			// Extract IPs if possible
+			fields := strings.Fields(line)
+			for i, field := range fields {
+				if field == "from" && i+1 < len(fields) {
+					ip := fields[i+1]
+					if !ipMap[ip] && len(ips) < 5 {
+						ips = append(ips, ip)
+						ipMap[ip] = true
 					}
 				}
 			}
 		}
 	}
-
+	
 	return
 }
 

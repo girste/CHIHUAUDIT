@@ -21,9 +21,46 @@ func CheckBackups() Backups {
 		b.LastBackup, b.BackupSize = getLastBackup(b.BackupDir)
 		b.RecentFiles = getRecentBackupFiles(b.BackupDir, 3)
 	}
+	
+	// Check for backup cron jobs even if no backup directory found
+	b.CronJobs = checkBackupCronJobs()
 
 	return b
 }
+
+func checkBackupCronJobs() int {
+	count := 0
+	
+	// Check system cron directories
+	cronDirs := []string{"/etc/cron.d", "/etc/cron.daily", "/etc/cron.weekly", "/etc/cron.monthly"}
+	for _, dir := range cronDirs {
+		out, err := exec.Command("grep", "-r", "-l", "-E", "backup|dump", dir).Output()
+		if err == nil {
+			lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+			for _, line := range lines {
+				if line != "" {
+					count++
+				}
+			}
+		}
+	}
+	
+	// Check user crontabs
+	out, err := exec.Command("crontab", "-l").Output()
+	if err == nil {
+		for _, line := range strings.Split(string(out), "\n") {
+			line = strings.TrimSpace(line)
+			if line != "" && !strings.HasPrefix(line, "#") {
+				if strings.Contains(line, "backup") || strings.Contains(line, "dump") {
+					count++
+				}
+			}
+		}
+	}
+	
+	return count
+}
+
 
 func getLastBackup(dir string) (lastTime, size string) {
 	// Find most recent backup file - both pattern matching

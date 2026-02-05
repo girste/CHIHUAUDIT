@@ -78,7 +78,7 @@ func getMemory() (total, used uint64, percent float64) {
 	if err != nil {
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	var memFree, buffers, cached uint64
 
@@ -118,7 +118,7 @@ func getSwap() (total, used uint64, percent float64) {
 	if err != nil {
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	var swapFree uint64
 
@@ -156,7 +156,7 @@ func getDiskUsage() []DiskMount {
 	if err != nil {
 		return mounts
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	seen := make(map[string]bool)
 	scanner := bufio.NewScanner(file)

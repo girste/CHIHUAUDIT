@@ -29,11 +29,11 @@ func CheckDatabase() Database {
 func checkPostgreSQL() PostgreSQLInfo {
 	info := PostgreSQLInfo{Available: true}
 
-	// Try to connect and get stats
-	out, err := exec.Command("sudo", "-u", "postgres", "psql", "-t", "-c", "SELECT count(*) FROM pg_database;").Output()
+	// Try to connect and get stats - exclude template databases
+	out, err := exec.Command("sudo", "-u", "postgres", "psql", "-t", "-c", "SELECT count(*) FROM pg_database WHERE datistemplate = false;").Output()
 	if err != nil {
 		// Try without sudo
-		out, err = exec.Command("psql", "-U", "postgres", "-t", "-c", "SELECT count(*) FROM pg_database;").Output()
+		out, err = exec.Command("psql", "-U", "postgres", "-t", "-c", "SELECT count(*) FROM pg_database WHERE datistemplate = false;").Output()
 		if err != nil {
 			return info
 		}
@@ -42,8 +42,8 @@ func checkPostgreSQL() PostgreSQLInfo {
 	count, _ := strconv.Atoi(strings.TrimSpace(string(out)))
 	info.Databases = count
 
-	// Get total size
-	out, err = exec.Command("sudo", "-u", "postgres", "psql", "-t", "-c", "SELECT pg_size_pretty(sum(pg_database_size(datname))) FROM pg_database;").Output()
+	// Get total size - exclude template databases
+	out, err = exec.Command("sudo", "-u", "postgres", "psql", "-t", "-c", "SELECT pg_size_pretty(sum(pg_database_size(datname))) FROM pg_database WHERE datistemplate = false;").Output()
 	if err == nil {
 		info.TotalSize = strings.TrimSpace(string(out))
 	}

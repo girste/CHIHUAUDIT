@@ -87,7 +87,7 @@ func getNetworkInterfaces() []NetInterface {
 	if err != nil {
 		return interfaces
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	scanner := bufio.NewScanner(file)
 	lineNum := 0

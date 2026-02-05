@@ -29,11 +29,14 @@ func SendDiscord(cfg *config.Config, change state.Change) {
 	}
 
 	// Determine color based on severity
-	color := 0xFFA500 // Orange for warnings
-	if change.Key == "disk_health" || change.Key == "failed_services" {
+	var color int
+	switch change.Key {
+	case "disk_health", "failed_services":
 		color = 0xFF0000 // Red for critical
-	} else if change.Key == "cpu_usage" || change.Key == "memory_usage" || change.Key == "disk_usage" {
+	case "cpu_usage", "memory_usage", "disk_usage":
 		color = 0xFFFF00 // Yellow for thresholds
+	default:
+		color = 0xFFA500 // Orange for warnings
 	}
 
 	message := DiscordMessage{
@@ -57,7 +60,7 @@ func SendDiscord(cfg *config.Config, change state.Change) {
 		fmt.Printf("Failed to send Discord notification: %v\n", err)
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
 		fmt.Printf("Discord notification failed with status: %d\n", resp.StatusCode)

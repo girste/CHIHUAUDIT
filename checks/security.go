@@ -141,7 +141,7 @@ func checkSSH() (status string, port int, passwordAuth, rootLogin, protocol, all
 		}
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// We successfully opened the config
 	configReadable = true
@@ -226,19 +226,16 @@ func checkFail2ban() (status string, jails, banned int) {
 }
 
 func checkSSLCerts() (count int, expires string, expiringSoon int) {
-	// Check common cert locations
+	// Check common cert locations - only actual server certs
 	certPaths := []string{
 		"/etc/letsencrypt/live",
-		"/etc/ssl/certs",
-		"/etc/caddy/certificates",
+		"/var/lib/caddy/.local/share/caddy/certificates",
 	}
 
 	for _, path := range certPaths {
 		if detect.FileExists(path) {
-			// Count cert directories or files
-			if entries, err := os.ReadDir(path); err == nil {
-				count += len(entries)
-			}
+			// Count only cert.pem and *.crt files, not all entries
+			countCertsInPath(path, &count)
 		}
 	}
 
@@ -254,6 +251,26 @@ func checkSSLCerts() (count int, expires string, expiringSoon int) {
 	}
 
 	return
+}
+
+func countCertsInPath(basePath string, count *int) {
+	entries, err := os.ReadDir(basePath)
+	if err != nil {
+		return
+	}
+	
+	for _, entry := range entries {
+		if entry.IsDir() {
+			// Recursively check subdirectories
+			countCertsInPath(basePath+"/"+entry.Name(), count)
+		} else {
+			// Count only actual certificate files
+			name := entry.Name()
+			if name == "cert.pem" || strings.HasSuffix(name, ".crt") {
+				*count++
+			}
+		}
+	}
 }
 
 func checkCertExpiry(basePath string) int {
@@ -297,7 +314,7 @@ func countRootUsers() int {
 	if err != nil {
 		return 0
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	count := 0
 	scanner := bufio.NewScanner(file)
@@ -316,7 +333,7 @@ func getShellUsers() []string {
 	if err != nil {
 		return nil
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	var users []string
 	validShells := map[string]bool{
@@ -336,18 +353,33 @@ func getShellUsers() []string {
 }
 
 func countFailedLogins() int {
-	logPaths := []string{"/var/log/auth.log", "/var/log/secure"}
-	logPath := detect.TryPaths(logPaths...)
-	if logPath == "" {
-		return 0
-	}
-
-	out, err := exec.Command("grep", "-c", "Failed password", logPath).Output()
+	// Use journalctl for systemd-based systems (more accurate than log files)
+	out, err := exec.Command("journalctl", "-u", "sshd", "--since", "24 hours ago", "--no-pager").Output()
 	if err != nil {
-		return 0
+		// Fallback to log files if journalctl fails
+		logPaths := []string{"/var/log/auth.log", "/var/log/secure"}
+		logPath := detect.TryPaths(logPaths...)
+		if logPath == "" {
+			return 0
+		}
+		out, err = exec.Command("grep", "-c", "Failed password", logPath).Output()
+		if err != nil {
+			return 0
+		}
+		count, _ := strconv.Atoi(strings.TrimSpace(string(out)))
+		return count
 	}
 
-	count, _ := strconv.Atoi(strings.TrimSpace(string(out)))
+	// Count lines containing "Failed" or "failure" (case insensitive)
+	count := 0
+	lines := strings.Split(string(out), "\n")
+	for _, line := range lines {
+		lower := strings.ToLower(line)
+		if strings.Contains(lower, "failed") || strings.Contains(lower, "failure") {
+			count++
+		}
+	}
+	
 	return count
 }
 
@@ -401,12 +433,24 @@ func getOpenPorts() (allPorts, external, localOnly []int) {
 }
 
 func countSUIDBinaries() int {
-	out, err := exec.Command("find", "/usr/bin", "/usr/sbin", "-type", "f", "-perm", "-4000", "-o", "-perm", "-2000").Output()
-	if err != nil {
-		return 0
+	// Search only in standard binary locations, count only SUID (not SGID)
+	paths := []string{"/usr/bin", "/usr/sbin", "/bin", "/sbin"}
+	count := 0
+	
+	for _, basePath := range paths {
+		out, err := exec.Command("find", basePath, "-perm", "-4000", "-type", "f").Output()
+		if err != nil {
+			continue
+		}
+		lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+		for _, line := range lines {
+			if line != "" {
+				count++
+			}
+		}
 	}
-
-	return len(strings.Split(strings.TrimSpace(string(out)), "\n"))
+	
+	return count
 }
 
 func countWorldWritable() int {

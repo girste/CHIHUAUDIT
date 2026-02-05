@@ -23,6 +23,7 @@ type AuditResults struct {
 	Logs      Logs
 	Network   Network
 	Backups   Backups
+	Tuning    SystemTuning
 
 	TotalChecks int
 	Skipped     []string
@@ -41,7 +42,7 @@ func RunAll() *AuditResults {
 	results.Hostname, results.OS, results.Kernel, results.Uptime = GetSystemInfo()
 
 	// Run all checks in parallel
-	wg.Add(10)
+	wg.Add(11)
 
 	go func() {
 		defer wg.Done()
@@ -91,6 +92,11 @@ func RunAll() *AuditResults {
 	go func() {
 		defer wg.Done()
 		results.Backups = CheckBackups()
+	}()
+	
+	go func() {
+		defer wg.Done()
+		results.Tuning = CheckSystemTuning()
 	}()
 
 	wg.Wait()

@@ -204,7 +204,7 @@ func Log(change Change) {
 			return
 		}
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	timestamp := time.Now().Format("2006-01-02 15:04:05")
 	logLine := fmt.Sprintf("[%s] %s: %s\n", timestamp, change.Key, change.Description)

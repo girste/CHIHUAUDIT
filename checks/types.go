@@ -197,4 +197,31 @@ type Backups struct {
 	LastBackup  string
 	BackupSize  string
 	RecentFiles []string
+	CronJobs    int
 }
+
+type SystemTuning struct {
+	NTPStatus              string
+	NTPService             string
+	FileDescriptorsCurrent int
+	FileDescriptorsMax     int
+	SysctlParams           map[string]string
+}
+
+type CronJob struct {
+	User    string
+	Command string
+	Schedule string
+}
+
+type SystemdTimer struct {
+	Name     string
+	NextRun  string
+	LastRun  string
+}
+
+type ConnectionState struct {
+	State string
+	Count int
+}
+

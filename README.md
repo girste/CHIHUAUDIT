@@ -21,7 +21,7 @@
 
 ## 🎯 What is Chihuaudit?
 
-A portable, single-binary system auditing tool for Linux. Inspired by [Lynis](https://cisofy.com/lynis/) but simplified and focused on automation.
+A portable, single-binary system auditing tool for Linux. Like [Lynis](https://cisofy.com/lynis/) but faster and smarter.
 
 **No configuration needed. No dependencies. Just run.**
 

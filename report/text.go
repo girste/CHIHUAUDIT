@@ -26,6 +26,7 @@ func PrintText(results *checks.AuditResults) {
 	printLogs(results.Logs)
 	printNetwork(results.Network)
 	printBackups(results.Backups)
+	printSystemTuning(results.Tuning)
 
 	printSummary(results)
 }
@@ -105,6 +106,37 @@ func printSecurity(s checks.Security) {
 	}
 	if s.WorldWritable > 0 {
 		fmt.Printf("World-Writable Files: %d (⚠️)\n", s.WorldWritable)
+	}
+	
+	// Fail2ban
+	if s.Fail2banStatus == "active" {
+		fmt.Printf("Fail2ban: active")
+		if s.Fail2banJails > 0 {
+			fmt.Printf(" (%d jails)", s.Fail2banJails)
+		}
+		if s.Fail2banBanned > 0 {
+			fmt.Printf(", %d IPs banned", s.Fail2banBanned)
+		}
+		fmt.Println()
+	}
+	
+	// Shell users
+	if len(s.ShellUsers) > 0 {
+		fmt.Printf("Shell Users: %d", len(s.ShellUsers))
+		if len(s.ShellUsers) <= 5 {
+			fmt.Printf(" (%s)", strings.Join(s.ShellUsers, ", "))
+		}
+		fmt.Println()
+	}
+	
+	// Root UID users
+	if s.RootUsers > 1 {
+		fmt.Printf("⚠️  Root UID Users: %d (multiple root accounts!)\n", s.RootUsers)
+	}
+	
+	// Recent /etc modifications
+	if s.RecentEtcMods > 0 {
+		fmt.Printf("Recent /etc Mods: %d (last 7 days)\n", s.RecentEtcMods)
 	}
 	
 	fmt.Println()
@@ -232,8 +264,15 @@ func printBackups(b checks.Backups) {
 		fmt.Printf("Last Backup: %s\n", b.LastBackup)
 		fmt.Printf("Size: %s\n", b.BackupSize)
 	} else {
-		fmt.Println("No backup directory found")
+		fmt.Println("Backup Dir: none found")
+		fmt.Println("Last Backup: none found")
+		fmt.Println("Size: 0")
 	}
+	
+	if b.CronJobs > 0 {
+		fmt.Printf("Cron Backup Jobs: %d active\n", b.CronJobs)
+	}
+	
 	fmt.Println()
 }
 
@@ -256,4 +295,45 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func printSystemTuning(t checks.SystemTuning) {
+fmt.Println("--- 11. SYSTEM TUNING ---")
+
+// NTP/Time Sync
+if t.NTPStatus != "" {
+fmt.Printf("Time Sync: %s", t.NTPStatus)
+if t.NTPService != "" && t.NTPService != "unknown" {
+fmt.Printf(" (NTP: %s)", t.NTPService)
+}
+fmt.Println()
+}
+
+// File Descriptors
+if t.FileDescriptorsMax > 0 {
+fmt.Printf("File Descriptors: %d / %d", t.FileDescriptorsCurrent, t.FileDescriptorsMax)
+if t.FileDescriptorsMax > 0 {
+percent := float64(t.FileDescriptorsCurrent) / float64(t.FileDescriptorsMax) * 100
+fmt.Printf(" (%.1f%%)", percent)
+}
+fmt.Println()
+}
+
+// Sysctl Parameters
+if len(t.SysctlParams) > 0 {
+fmt.Println("Kernel Parameters:")
+keys := []string{
+"net.core.somaxconn",
+"net.ipv4.tcp_max_syn_backlog",
+"net.ipv4.ip_local_port_range",
+"vm.swappiness",
+}
+for _, key := range keys {
+if val, ok := t.SysctlParams[key]; ok {
+fmt.Printf("  %s = %s\n", key, val)
+}
+}
+}
+
+fmt.Println()
 }
