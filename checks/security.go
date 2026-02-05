@@ -15,7 +15,7 @@ func CheckSecurity() Security {
 
 	s.Firewall = checkFirewall()
 	s.FirewallRules = countFirewallRules(s.Firewall)
-	s.SSHStatus, s.SSHPort, s.SSHPasswordAuth, s.SSHRootLogin, s.SSHProtocol, s.SSHAllowUsers = checkSSH()
+	s.SSHStatus, s.SSHPort, s.SSHPasswordAuth, s.SSHRootLogin, s.SSHProtocol, s.SSHAllowUsers, s.SSHConfigReadable = checkSSH()
 	s.Fail2banStatus, s.Fail2banJails, s.Fail2banBanned = checkFail2ban()
 	s.SSLCerts, s.SSLExpires, s.SSLExpiringSoon = checkSSLCerts()
 	s.RootUsers = countRootUsers()
@@ -41,11 +41,23 @@ func checkFirewall() string {
 	// Check if actually running
 	switch fw {
 	case "ufw":
-		if out, err := exec.Command("ufw", "status").Output(); err == nil {
-			if strings.Contains(string(out), "Status: active") {
-				return "active (ufw)"
-			}
+		cmd := exec.Command("ufw", "status")
+		output, err := cmd.CombinedOutput() // Capture both stdout and stderr
+		outputStr := string(output)
+		
+		// Check for permission errors
+		if strings.Contains(outputStr, "need to be root") || strings.Contains(outputStr, "permission denied") {
+			return "skipped (run with sudo)"
 		}
+		
+		if err == nil && strings.Contains(outputStr, "Status: active") {
+			return "active (ufw)"
+		}
+		
+		if err != nil {
+			return "inactive (ufw)"
+		}
+		
 		return "inactive (ufw)"
 	case "firewalld":
 		if err := exec.Command("systemctl", "is-active", "firewalld").Run(); err == nil {
@@ -95,13 +107,14 @@ func countFirewallRules(firewall string) int {
 	return 0
 }
 
-func checkSSH() (status string, port int, passwordAuth bool, rootLogin, protocol, allowUsers string) {
+func checkSSH() (status string, port int, passwordAuth, rootLogin, protocol, allowUsers string, configReadable bool) {
 	status = "not found"
-	port = 22 // default
-	passwordAuth = true
-	rootLogin = "yes" // default if not specified
-	protocol = "2"    // default
+	port = 22
+	passwordAuth = "skipped"
+	rootLogin = "skipped"
+	protocol = "2"
 	allowUsers = "any"
+	configReadable = false
 
 	// Check if SSH is running
 	if detect.CommandExists("systemctl") {
@@ -122,9 +135,20 @@ func checkSSH() (status string, port int, passwordAuth bool, rootLogin, protocol
 
 	file, err := os.Open(configPath)
 	if err != nil {
+		// Permission denied - mark as skipped
+		if os.IsPermission(err) {
+			return
+		}
 		return
 	}
 	defer file.Close()
+
+	// We successfully opened the config
+	configReadable = true
+
+	// Set defaults for when directives are not specified
+	passwordAuth = "not specified"
+	rootLogin = "not specified"
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
@@ -147,7 +171,7 @@ func checkSSH() (status string, port int, passwordAuth bool, rootLogin, protocol
 				port = p
 			}
 		case "passwordauthentication":
-			passwordAuth = value == "yes"
+			passwordAuth = value
 		case "permitrootlogin":
 			rootLogin = value
 		case "protocol":

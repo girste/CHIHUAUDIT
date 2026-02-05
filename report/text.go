@@ -42,19 +42,33 @@ func printSecurity(s checks.Security) {
 	if s.SSHPort > 0 {
 		fmt.Printf("SSH Port: %d\n", s.SSHPort)
 	}
-	if s.SSHPasswordAuth {
+	
+	// SSH Password Auth
+	switch s.SSHPasswordAuth {
+	case "yes":
 		fmt.Printf("SSH Password Auth: enabled (⚠️ consider key-only)\n")
-	} else {
+	case "no":
 		fmt.Printf("SSH Password Auth: disabled ✓\n")
+	case "skipped":
+		fmt.Printf("SSH Password Auth: skipped (run with sudo)\n")
+	case "not specified":
+		fmt.Printf("SSH Password Auth: not specified (⚠️ defaults to enabled)\n")
 	}
-	if s.SSHRootLogin != "" && s.SSHRootLogin != "yes" {
-		if s.SSHRootLogin == "no" || s.SSHRootLogin == "prohibit-password" {
-			fmt.Printf("SSH Root Login: %s ✓\n", s.SSHRootLogin)
-		} else {
+	
+	// SSH Root Login
+	switch s.SSHRootLogin {
+	case "no", "prohibit-password":
+		fmt.Printf("SSH Root Login: %s ✓\n", s.SSHRootLogin)
+	case "yes", "without-password":
+		fmt.Printf("SSH Root Login: %s (⚠️ not recommended)\n", s.SSHRootLogin)
+	case "skipped":
+		fmt.Printf("SSH Root Login: skipped (run with sudo)\n")
+	case "not specified":
+		fmt.Printf("SSH Root Login: not specified (⚠️ defaults to enabled)\n")
+	default:
+		if s.SSHRootLogin != "" {
 			fmt.Printf("SSH Root Login: %s\n", s.SSHRootLogin)
 		}
-	} else if s.SSHRootLogin == "yes" {
-		fmt.Printf("SSH Root Login: yes (⚠️ not recommended)\n")
 	}
 	
 	// Ports

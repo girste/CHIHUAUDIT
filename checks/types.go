@@ -2,32 +2,33 @@ package checks
 
 // Security check results
 type Security struct {
-	Firewall         string
-	FirewallRules    int
-	SSHStatus        string
-	SSHPort          int
-	SSHPasswordAuth  bool
-	SSHRootLogin     string
-	SSHProtocol      string
-	SSHAllowUsers    string
-	Fail2banStatus   string
-	Fail2banJails    int
-	Fail2banBanned   int
-	SSLCerts         int
-	SSLExpires       string
-	SSLExpiringSoon  int
-	RootUsers        int
-	ShellUsers       []string
-	FailedLogins     int
-	OpenPorts        []int
-	ExternalPorts    []int
-	LocalOnlyPorts   []int
-	UnusualPorts     []int
-	SUIDCount        int
-	WorldWritable    int
-	RecentEtcMods    int
-	ExternalConns    int
-	TopIPs           []IPConnection
+	Firewall            string
+	FirewallRules       int
+	SSHStatus           string
+	SSHPort             int
+	SSHPasswordAuth     string // Changed to string: "yes", "no", "skipped"
+	SSHRootLogin        string
+	SSHProtocol         string
+	SSHAllowUsers       string
+	SSHConfigReadable   bool // Track if we could read the config
+	Fail2banStatus      string
+	Fail2banJails       int
+	Fail2banBanned      int
+	SSLCerts            int
+	SSLExpires          string
+	SSLExpiringSoon     int
+	RootUsers           int
+	ShellUsers          []string
+	FailedLogins        int
+	OpenPorts           []int
+	ExternalPorts       []int
+	LocalOnlyPorts      []int
+	UnusualPorts        []int
+	SUIDCount           int
+	WorldWritable       int
+	RecentEtcMods       int
+	ExternalConns       int
+	TopIPs              []IPConnection
 }
 
 // Services check results

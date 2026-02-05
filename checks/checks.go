@@ -103,6 +103,16 @@ func RunAll() *AuditResults {
 
 func (r *AuditResults) calculateTotals() {
 	r.TotalChecks = 87 // Total possible checks
-	// Count skipped items from each category
-	// This will be populated by individual check functions
+	
+	// Track skipped checks based on permission issues
+	if r.Security.SSHPasswordAuth == "skipped" || r.Security.SSHRootLogin == "skipped" {
+		if !r.Security.SSHConfigReadable {
+			r.Skipped = append(r.Skipped, "SSH config (requires sudo)")
+		}
+	}
+	
+	// Add recommendation note if running without sudo
+	if len(r.Skipped) > 0 {
+		r.Notes = append(r.Notes, "⚠️  Run with sudo for complete security audit")
+	}
 }
