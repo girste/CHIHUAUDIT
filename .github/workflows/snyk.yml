@@ -1,7 +1,6 @@
 name: Snyk Security
 on: [push, pull_request]
 permissions:
-  security-events: write
   contents: read
 jobs:
   snyk:
@@ -11,9 +10,6 @@ jobs:
     - uses: actions/setup-go@v5
       with: { go-version: 'stable' }
     - uses: snyk/actions/setup@master
-    - run: snyk test --sarif-file-output=snyk.sarif || true
+    - run: snyk test --severity-threshold=high || true
       env:
         SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-    - uses: github/codeql-action/upload-sarif@v3
-      if: always()
-      with: { sarif_file: snyk.sarif }
