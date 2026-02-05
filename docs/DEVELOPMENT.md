@@ -172,7 +172,7 @@ Common detection patterns:
 ### Docker Build (Recommended)
 ```bash
 ./build.sh
-# Uses golang:1.21-alpine
+# Uses golang:alpine (latest)
 # Outputs to bin/chihuaudit
 ```
 
