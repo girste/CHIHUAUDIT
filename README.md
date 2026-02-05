@@ -2,7 +2,7 @@
 
 ![Chihuaudit](docs/chihuaudit-cover.png)
 
-[![Awesome](https://awesome.re/badge.svg)](https://awesome.re)
+[![Mentioned in Awesome](https://awesome.re/mentioned-badge.svg)](https://github.com/punkpeye/awesome-mcp-servers)
 
 [![CI](https://github.com/girste/CHIHUAUDIT/workflows/CI/badge.svg)](https://github.com/girste/CHIHUAUDIT/actions/workflows/ci.yml)
 [![Lint](https://github.com/girste/CHIHUAUDIT/workflows/Lint/badge.svg)](https://github.com/girste/CHIHUAUDIT/actions/workflows/lint.yml)
