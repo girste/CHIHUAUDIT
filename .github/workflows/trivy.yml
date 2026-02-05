@@ -1,5 +1,8 @@
 name: Trivy
 on: [push, pull_request]
+permissions:
+  security-events: write
+  contents: read
 jobs:
   scan:
     runs-on: ubuntu-latest

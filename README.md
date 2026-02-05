@@ -9,7 +9,6 @@
 [![Snyk](https://snyk.io/test/github/girste/CHIHUAUDIT/badge.svg)](https://snyk.io/test/github/girste/CHIHUAUDIT)
 
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/girste/CHIHUAUDIT/badge)](https://scorecard.dev/viewer/?uri=github.com/girste/CHIHUAUDIT)
-[![OpenSSF Best Practices](https://www.bestpractices.coreinfrastructure.org/projects/9999/badge)](https://www.bestpractices.coreinfrastructure.org/projects/9999)
 [![SLSA](https://slsa.dev/images/gh-badge-level3.svg)](https://slsa.dev)
 [![Go Report Card](https://goreportcard.com/badge/github.com/girste/CHIHUAUDIT)](https://goreportcard.com/report/github.com/girste/CHIHUAUDIT)
 
