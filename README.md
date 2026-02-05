@@ -6,7 +6,7 @@
 [![Lint](https://github.com/girste/CHIHUAUDIT/workflows/Lint/badge.svg)](https://github.com/girste/CHIHUAUDIT/actions/workflows/lint.yml)
 [![CodeQL](https://github.com/girste/CHIHUAUDIT/workflows/CodeQL/badge.svg)](https://github.com/girste/CHIHUAUDIT/actions/workflows/codeql.yml)
 [![Trivy](https://github.com/girste/CHIHUAUDIT/workflows/Trivy/badge.svg)](https://github.com/girste/CHIHUAUDIT/actions/workflows/trivy.yml)
-[![Snyk](https://snyk.io/test/github/girste/CHIHUAUDIT/badge.svg)](https://snyk.io/test/github/girste/CHIHUAUDIT)
+[![Snyk](https://github.com/girste/CHIHUAUDIT/workflows/Snyk%20Security/badge.svg)](https://github.com/girste/CHIHUAUDIT/actions/workflows/snyk.yml)
 
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/girste/CHIHUAUDIT/badge)](https://scorecard.dev/viewer/?uri=github.com/girste/CHIHUAUDIT)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/11858/badge)](https://www.bestpractices.dev/projects/11858)
