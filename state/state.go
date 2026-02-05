@@ -3,7 +3,6 @@ package state
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"time"
 
@@ -209,7 +208,7 @@ func Log(change Change) {
 
 	timestamp := time.Now().Format("2006-01-02 15:04:05")
 	logLine := fmt.Sprintf("[%s] %s: %s\n", timestamp, change.Key, change.Description)
-	f.WriteString(logLine)
+	_, _ = f.WriteString(logLine)
 }
 
 // Save persists the current audit results to disk
@@ -221,13 +220,13 @@ func Save(results *checks.AuditResults) error {
 
 	// Try primary location first
 	if err := os.MkdirAll("/var/lib/chihuaudit", 0755); err == nil {
-		if err := ioutil.WriteFile(stateFile, data, 0644); err == nil {
+		if err := os.WriteFile(stateFile, data, 0644); err == nil {
 			return nil
 		}
 	}
 
 	// Fallback to tmp
-	return ioutil.WriteFile(stateFallback, data, 0644)
+	return os.WriteFile(stateFallback, data, 0644)
 }
 
 // Load retrieves the last audit results from disk
@@ -235,10 +234,10 @@ func Load() *checks.AuditResults {
 	var results checks.AuditResults
 
 	// Try primary location
-	data, err := ioutil.ReadFile(stateFile)
+	data, err := os.ReadFile(stateFile)
 	if err != nil {
 		// Try fallback
-		data, err = ioutil.ReadFile(stateFallback)
+		data, err = os.ReadFile(stateFallback)
 		if err != nil {
 			return nil
 		}

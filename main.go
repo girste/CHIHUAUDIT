@@ -28,11 +28,11 @@ func main() {
 
 	switch os.Args[1] {
 	case "audit":
-		auditCmd.Parse(os.Args[2:])
+		_ = auditCmd.Parse(os.Args[2:])
 		runAudit(*auditJSON)
 
 	case "monitor":
-		monitorCmd.Parse(os.Args[2:])
+		_ = monitorCmd.Parse(os.Args[2:])
 		interval, err := time.ParseDuration(*monitorInterval)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Invalid interval: %v\n", err)
@@ -146,7 +146,7 @@ func runMonitor(interval time.Duration) {
 		fmt.Printf("[%s] Running initial audit...\n", time.Now().Format("15:04:05"))
 		previous = checks.RunAll()
 		report.PrintText(previous)
-		state.Save(previous)
+		_ = state.Save(previous)
 	} else {
 		fmt.Printf("[%s] Loaded previous state from %s\n", time.Now().Format("15:04:05"), previous.Timestamp.Format("2006-01-02 15:04:05"))
 	}
@@ -175,7 +175,7 @@ func runMonitor(interval time.Duration) {
 			}
 		}
 
-		state.Save(current)
+		_ = state.Save(current)
 		previous = current
 		fmt.Println()
 	}

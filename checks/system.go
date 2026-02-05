@@ -141,7 +141,7 @@ func getPendingUpdates() (total, security int) {
 	switch pm {
 	case "apt":
 		// Update package list
-		exec.Command("apt-get", "update", "-qq").Run()
+		_ = exec.Command("apt-get", "update", "-qq").Run()
 
 		out, err := exec.Command("apt", "list", "--upgradable").Output()
 		if err != nil {
