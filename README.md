@@ -123,21 +123,16 @@ Database: postgresql (active)
 Total Checks: 87
 ```
 
-### Webhook Notifications
-
-![Discord Webhook Examples](docs/test-screen.png)
-
-Chihuaudit can send real-time alerts to Discord, Slack, or any webhook-compatible service with color-coded severity levels:
-- 🟢 **Green**: All systems healthy
-- 🟡 **Yellow**: Warnings (high resource usage, pending updates)
-- 🔴 **Red**: Critical issues (failed services, security problems)
-
 </details>
 
 <details>
 <summary><h2>🔧 Webhook Notifications</h2></summary>
 
 Chihuaudit supports **webhook notifications** for real-time monitoring alerts. While optimized for Discord, it works with **any webhook-compatible service** (Slack, Microsoft Teams, Mattermost, custom endpoints, etc.).
+
+<img src="docs/test-screen.png" width="500" alt="Discord Webhook Examples">
+
+*Color-coded alerts: 🟢 Green (healthy), 🟡 Yellow (warnings), 🔴 Red (critical)*
 
 ### Setup
 
