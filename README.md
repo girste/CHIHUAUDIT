@@ -62,7 +62,8 @@ Execute the same comprehensive system audit directly through Claude (Sonnet, Opu
 
 ---
 
-## 🚀 Quick Start
+<details>
+<summary><h2>🚀 Quick Start</h2></summary>
 
 ### Build
 
@@ -88,7 +89,12 @@ sudo ./bin/chihuaudit monitor --interval=5m
 ./bin/chihuaudit init-config
 ```
 
-## 📊 Example Output
+</details>
+
+<details>
+<summary><h2>📊 Example Output</h2></summary>
+
+### Terminal Output
 
 ```
 === CHIHUAUDIT REPORT ===
@@ -117,18 +123,37 @@ Database: postgresql (active)
 Total Checks: 87
 ```
 
-## 🔧 Configuration
+### Webhook Notifications
 
-Optional Discord webhook notifications:
+![Discord Webhook Examples](docs/test-screen.png)
+
+Chihuaudit can send real-time alerts to Discord, Slack, or any webhook-compatible service with color-coded severity levels:
+- 🟢 **Green**: All systems healthy
+- 🟡 **Yellow**: Warnings (high resource usage, pending updates)
+- 🔴 **Red**: Critical issues (failed services, security problems)
+
+</details>
+
+<details>
+<summary><h2>🔧 Webhook Notifications</h2></summary>
+
+Chihuaudit supports **webhook notifications** for real-time monitoring alerts. While optimized for Discord, it works with **any webhook-compatible service** (Slack, Microsoft Teams, Mattermost, custom endpoints, etc.).
+
+### Setup
 
 ```bash
+# Generate default config
 ./bin/chihuaudit init-config
-# Edit ~/.chihuaudit/config.json
+
+# Edit configuration
+nano ~/.chihuaudit/config.json
 ```
+
+### Configuration
 
 ```json
 {
-  "discord_webhook": "https://discord.com/api/webhooks/...",
+  "discord_webhook": "https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_WEBHOOK_TOKEN",
   "notification_whitelist": {
     "cpu_threshold": 70,
     "memory_threshold": 70,
@@ -138,7 +163,44 @@ Optional Discord webhook notifications:
 }
 ```
 
-## 🎯 Design Philosophy
+### Webhook Compatibility
+
+**Discord** (native support):
+- Rich embeds with color-coded alerts
+- Custom avatar and username
+- Timestamp and structured fields
+
+**Slack** (works with minor format differences):
+- Use `discord_webhook` field with your Slack webhook URL
+- Embeds translate to Slack attachments
+- Colors and formatting preserved
+
+**Other services**:
+- Any service accepting JSON POST with `embeds` field
+- Microsoft Teams incoming webhooks
+- Mattermost webhooks
+- Custom webhook handlers
+
+### Alert Thresholds
+
+**CPU Load**: Trigger when load average exceeds threshold  
+**Memory Usage**: Alert on RAM usage percentage  
+**Disk Space**: Warning when disk usage crosses limit  
+**Ignore List**: Skip notifications for frequently changing metrics
+
+### Monitoring Mode
+
+```bash
+# Monitor every 5 minutes with webhook alerts
+sudo ./bin/chihuaudit monitor --interval=5m
+```
+
+Changes are detected and only significant events trigger notifications, reducing alert fatigue.
+
+</details>
+
+<details>
+<summary><h2>🎯 Design Philosophy</h2></summary>
 
 - **Universal**: Works on any Linux distro without configuration
 - **Portable**: Single static binary, zero dependencies
@@ -147,13 +209,16 @@ Optional Discord webhook notifications:
 - **Simple**: Minimal code, maximum clarity
 - **Automated**: Perfect for CI/CD and monitoring
 
+</details>
+
 ## 📖 Documentation
 
 - [Installation Guide](docs/INSTALLATION.md)
 - [Development Log](docs/DEVELOPMENT.md)
 - [Contributing Guidelines](CONTRIBUTING.md)
 
-## 🏗️ Architecture
+<details>
+<summary><h2>🏗️ Architecture</h2></summary>
 
 ```
 chihuaudit/
@@ -168,6 +233,8 @@ chihuaudit/
 ├── report/           # Text/JSON formatters
 └── state/            # Change tracking
 ```
+
+</details>
 
 ## 🤝 Contributing
 
