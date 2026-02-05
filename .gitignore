@@ -1,0 +1,39 @@
+# Binaries
+bin/chihuaudit
+chihuaudit
+
+# State files
+*.state.json
+/var/lib/chihuaudit/
+/tmp/chihuaudit.log
+
+# User configs (keep examples/ for git)
+/etc/chihuaudit/config.json
+~/.chihuaudit/config.json
+.chihuaudit/config.json
+config.json
+
+# Build artifacts
+*.o
+*.a
+*.so
+
+# Go
+vendor/
+go.sum
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+/var/log/chihuaudit.log
+/tmp/chihuaudit.log
