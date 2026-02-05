@@ -2,22 +2,11 @@
 
 ![Chihuaudit](docs/chihuaudit-cover.png)
 
-# Chihuaudit
-
-**Universal Linux System Auditing Tool**
-
-[![Awesome](https://awesome.re/badge.svg)](https://awesome.re)
-[![Go Report Card](https://goreportcard.com/badge/github.com/girfest/chihuaudit)](https://goreportcard.com/report/github.com/girfest/chihuaudit)
-[![OpenSSF Best Practices](https://www.bestpractices.coreinfrastructure.org/projects/0000/badge)](https://www.bestpractices.coreinfrastructure.org/projects/0000)
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/girfest/chihuaudit/badge)](https://scorecard.dev/viewer/?uri=github.com/girfest/chihuaudit)
-[![SLSA](https://slsa.dev/images/gh-badge-level3.svg)](https://slsa.dev)
-
-[![CodeQL](https://github.com/girfest/chihuaudit/workflows/CodeQL/badge.svg)](https://github.com/girfest/chihuaudit/actions/workflows/codeql.yml)
-[![Snyk](https://snyk.io/test/github/girfest/chihuaudit/badge.svg)](https://snyk.io/test/github/girfest/chihuaudit)
-[![Trivy](https://github.com/girfest/chihuaudit/workflows/Trivy/badge.svg)](https://github.com/girfest/chihuaudit/actions/workflows/trivy.yml)
-[![Lint](https://github.com/girfest/chihuaudit/workflows/Lint/badge.svg)](https://github.com/girfest/chihuaudit/actions/workflows/lint.yml)
-[![CI](https://github.com/girfest/chihuaudit/workflows/CI/badge.svg)](https://github.com/girfest/chihuaudit/actions/workflows/ci.yml)
-[![Coverage](https://codecov.io/gh/girfest/chihuaudit/branch/main/graph/badge.svg)](https://codecov.io/gh/girfest/chihuaudit)
+[![Go Report Card](https://goreportcard.com/badge/github.com/girste/CHIHUAUDIT)](https://goreportcard.com/report/github.com/girste/CHIHUAUDIT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![CodeQL](https://github.com/girste/CHIHUAUDIT/workflows/CodeQL/badge.svg)](https://github.com/girste/CHIHUAUDIT/actions/workflows/codeql.yml)
+[![Lint](https://github.com/girste/CHIHUAUDIT/workflows/Lint/badge.svg)](https://github.com/girste/CHIHUAUDIT/actions/workflows/lint.yml)
+[![CI](https://github.com/girste/CHIHUAUDIT/workflows/CI/badge.svg)](https://github.com/girste/CHIHUAUDIT/actions/workflows/ci.yml)
 
 </div>
 
@@ -172,7 +161,5 @@ MIT License - see [LICENSE](LICENSE) for details
 <div align="center">
 
 **Made with ❤️ for sysadmins everywhere**
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 </div>
