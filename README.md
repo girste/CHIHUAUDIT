@@ -13,8 +13,6 @@
 [![SLSA](https://slsa.dev/images/gh-badge-level3.svg)](https://slsa.dev)
 [![Go Report Card](https://goreportcard.com/badge/github.com/girste/CHIHUAUDIT)](https://goreportcard.com/report/github.com/girste/CHIHUAUDIT)
 
-[![Mentioned in Awesome](https://awesome.re/mentioned-badge.svg)](https://github.com/punkpeye/awesome-mcp-servers)
-
 </div>
 
 ---
@@ -59,6 +57,120 @@ Execute the same comprehensive system audit directly through Claude (Sonnet, Opu
 **Requirements**: Linux with systemd, sudo NOPASSWD configured, Claude with shell access
 
 **Documentation**: [docs/skill/chihuaudit-skill.md](docs/skill/chihuaudit-skill.md)
+
+---
+
+## Webhook Alerts
+
+![Webhook Alerts](docs/chihualerts.png)
+
+Chihuaudit supports **webhook notifications** for real-time monitoring alerts. While optimized for Discord, it works with **any webhook-compatible service** (Slack, Microsoft Teams, Mattermost, custom endpoints, etc.).
+
+<img src="docs/test-screen.png" width="500" alt="Discord Webhook Examples">
+
+*Color-coded alerts: 🟢 Green (healthy), 🟡 Yellow (warnings), 🔴 Red (critical)*
+
+### Setup
+
+```bash
+# Generate default config
+./bin/chihuaudit init-config
+
+# Edit configuration
+nano ~/.chihuaudit/config.json
+```
+
+### Configuration
+
+```json
+{
+  "discord_webhook": "https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_WEBHOOK_TOKEN",
+  "notification_whitelist": {
+    "cpu_threshold": 70,
+    "memory_threshold": 70,
+    "disk_threshold": 85,
+    "ignore_changes": ["uptime", "active_connections"]
+  }
+}
+```
+
+### Webhook Compatibility
+
+| Platform | Support |
+|----------|---------|
+| **Discord** | Native — rich embeds, color-coded alerts, timestamps |
+| **Slack** | Works — embeds translate to attachments |
+| **Teams** | Works — incoming webhook format |
+| **Mattermost** | Works — Slack-compatible webhooks |
+| **Custom** | Any service accepting JSON POST |
+
+### Alert Thresholds
+
+**CPU Load**: Trigger when load average exceeds threshold
+**Memory Usage**: Alert on RAM usage percentage
+**Disk Space**: Warning when disk usage crosses limit
+**Ignore List**: Skip notifications for frequently changing metrics
+
+### Monitoring Mode
+
+```bash
+# Monitor every 5 minutes with webhook alerts
+sudo ./bin/chihuaudit monitor --interval=5m
+```
+
+Changes are detected and only significant events trigger notifications, reducing alert fatigue.
+
+---
+
+## Self Hosted Dashboard
+
+![Self Hosted Dashboard](docs/chihucloud.png)
+
+**Chihuaudit Cloud** is a self-hosted web dashboard for collecting and visualizing audits from multiple hosts. Single binary, SQLite database, zero external dependencies.
+
+<!-- TODO: add dashboard screenshot -->
+
+### How It Works
+
+1. **Deploy the dashboard** — single binary, runs anywhere
+2. **Register hosts** — each host gets a unique API key
+3. **Agents push audits** — configure `cloud_url` + `api_key` in the agent config
+4. **Monitor everything** — real-time dashboard with history, alerting, and webhooks
+
+### Features
+
+- **Multi-host overview** — all your servers in one place
+- **Audit history** — browse and compare past audits per host
+- **Change detection** — automatic diff between consecutive audits
+- **Threshold alerts** — CPU, memory, disk with per-host configuration
+- **Persistent breach alerts** — webhook notification when thresholds stay exceeded for 48h+
+- **Webhook integration** — Discord, Slack, and generic JSON webhooks
+- **API key auth** — SHA-256 hashed, shown only once at creation
+- **Retention policies** — per-host configurable audit retention
+- **Rate limiting** — 60 req/min per API key
+
+### Quick Start
+
+```bash
+# Build
+go build ./cmd/chihuaudit-cloud
+# or
+./build.sh cloud
+
+# Run
+export JWT_SECRET="your-secret-here"
+./chihuaudit-cloud
+```
+
+The dashboard listens on `:8091` by default. SQLite database is created automatically.
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `JWT_SECRET` | *(required)* | Secret for JWT token signing |
+| `DATABASE_PATH` | `./chihuaudit-cloud.db` | SQLite database file path |
+| `LISTEN_ADDR` | `:8091` | HTTP listen address |
 
 ---
 
@@ -126,75 +238,6 @@ Total Checks: 87
 </details>
 
 <details>
-<summary><h2>🔧 Webhook Notifications</h2></summary>
-
-Chihuaudit supports **webhook notifications** for real-time monitoring alerts. While optimized for Discord, it works with **any webhook-compatible service** (Slack, Microsoft Teams, Mattermost, custom endpoints, etc.).
-
-<img src="docs/test-screen.png" width="500" alt="Discord Webhook Examples">
-
-*Color-coded alerts: 🟢 Green (healthy), 🟡 Yellow (warnings), 🔴 Red (critical)*
-
-### Setup
-
-```bash
-# Generate default config
-./bin/chihuaudit init-config
-
-# Edit configuration
-nano ~/.chihuaudit/config.json
-```
-
-### Configuration
-
-```json
-{
-  "discord_webhook": "https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_WEBHOOK_TOKEN",
-  "notification_whitelist": {
-    "cpu_threshold": 70,
-    "memory_threshold": 70,
-    "disk_threshold": 85,
-    "ignore_changes": ["uptime", "active_connections"]
-  }
-}
-```
-
-### Webhook Compatibility
-
-**Discord** (native support):
-- Rich embeds with color-coded alerts
-- Custom avatar and username
-- Timestamp and structured fields
-
-**Slack** (works with minor format differences):
-- Use `discord_webhook` field with your Slack webhook URL
-- Embeds translate to Slack attachments
-- Colors and formatting preserved
-
-**Other services**:
-- Any service accepting JSON POST with `embeds` field
-- Microsoft Teams incoming webhooks
-- Mattermost webhooks
-- Custom webhook handlers
-
-### Alert Thresholds
-
-**CPU Load**: Trigger when load average exceeds threshold  
-**Memory Usage**: Alert on RAM usage percentage  
-**Disk Space**: Warning when disk usage crosses limit  
-**Ignore List**: Skip notifications for frequently changing metrics
-
-### Monitoring Mode
-
-```bash
-# Monitor every 5 minutes with webhook alerts
-sudo ./bin/chihuaudit monitor --interval=5m
-```
-
-Changes are detected and only significant events trigger notifications, reducing alert fatigue.
-
-</details>
-
-<details>
 <summary><h2>🎯 Design Philosophy</h2></summary>
 
 - **Universal**: Works on any Linux distro without configuration
@@ -217,16 +260,24 @@ Changes are detected and only significant events trigger notifications, reducing
 
 ```
 chihuaudit/
-├── main.go           # CLI entry point
-├── checks/           # 10 audit categories
-│   ├── security.go   # Firewall, SSH, SSL, ports
-│   ├── services.go   # Systemd, web, DB servers
-│   ├── resources.go  # CPU, RAM, disk
+├── main.go                # CLI entry point (agent)
+├── checks/                # 10 audit categories
+│   ├── security.go        # Firewall, SSH, SSL, ports
+│   ├── services.go        # Systemd, web, DB servers
+│   ├── resources.go       # CPU, RAM, disk
 │   └── ...
-├── detect/           # OS/tool detection
-├── notify/           # Discord webhooks
-├── report/           # Text/JSON formatters
-└── state/            # Change tracking
+├── detect/                # OS/tool detection
+├── notify/                # Discord webhooks
+├── report/                # Text/JSON formatters
+├── state/                 # Change tracking
+├── cloud/                 # Cloud dashboard packages
+│   ├── models/            # SQLite database layer
+│   ├── handlers/          # HTTP API handlers
+│   ├── alerting/          # Change detection & webhooks
+│   └── middleware/        # JWT authentication
+└── cmd/chihuaudit-cloud/  # Cloud dashboard entry point
+    ├── migrations/        # SQLite schema
+    └── static/            # Web frontend
 ```
 
 </details>
