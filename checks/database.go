@@ -42,6 +42,20 @@ func checkPostgreSQL() PostgreSQLInfo {
 	count, _ := strconv.Atoi(strings.TrimSpace(string(out)))
 	info.Databases = count
 
+	// Get database names
+	out, err = exec.Command("sudo", "-u", "postgres", "psql", "-t", "-A", "-c", "SELECT datname FROM pg_database WHERE datistemplate = false ORDER BY datname;").Output()
+	if err != nil {
+		out, _ = exec.Command("psql", "-U", "postgres", "-t", "-A", "-c", "SELECT datname FROM pg_database WHERE datistemplate = false ORDER BY datname;").Output()
+	}
+	if len(out) > 0 {
+		for _, name := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+			name = strings.TrimSpace(name)
+			if name != "" {
+				info.DatabaseNames = append(info.DatabaseNames, name)
+			}
+		}
+	}
+
 	// Get total size - exclude template databases
 	out, err = exec.Command("sudo", "-u", "postgres", "psql", "-t", "-c", "SELECT pg_size_pretty(sum(pg_database_size(datname))) FROM pg_database WHERE datistemplate = false;").Output()
 	if err == nil {
@@ -78,6 +92,17 @@ func checkMySQL() MySQLInfo {
 	if len(lines) > 1 {
 		count, _ := strconv.Atoi(strings.TrimSpace(lines[1]))
 		info.Databases = count
+	}
+
+	// Get database names
+	out, err = exec.Command("mysql", "-N", "-e", "SELECT schema_name FROM information_schema.schemata WHERE schema_name NOT IN ('information_schema','mysql','performance_schema','sys') ORDER BY schema_name;").Output()
+	if err == nil {
+		for _, name := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+			name = strings.TrimSpace(name)
+			if name != "" {
+				info.DatabaseNames = append(info.DatabaseNames, name)
+			}
+		}
 	}
 
 	// Get connections

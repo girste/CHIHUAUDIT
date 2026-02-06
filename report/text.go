@@ -73,10 +73,30 @@ func printSecurity(s checks.Security) {
 	}
 	
 	// Ports
-	if len(s.ExternalPorts) > 0 {
+	if len(s.ExternalPortDetails) > 0 {
+		parts := make([]string, len(s.ExternalPortDetails))
+		for i, pd := range s.ExternalPortDetails {
+			if pd.Process != "" {
+				parts[i] = fmt.Sprintf("%d (%s)", pd.Port, pd.Process)
+			} else {
+				parts[i] = fmt.Sprintf("%d", pd.Port)
+			}
+		}
+		fmt.Printf("External Ports: %s\n", strings.Join(parts, ", "))
+	} else if len(s.ExternalPorts) > 0 {
 		fmt.Printf("External Ports: %v\n", s.ExternalPorts)
 	}
-	if len(s.LocalOnlyPorts) > 0 {
+	if len(s.LocalPortDetails) > 0 {
+		parts := make([]string, len(s.LocalPortDetails))
+		for i, pd := range s.LocalPortDetails {
+			if pd.Process != "" {
+				parts[i] = fmt.Sprintf("%d (%s)", pd.Port, pd.Process)
+			} else {
+				parts[i] = fmt.Sprintf("%d", pd.Port)
+			}
+		}
+		fmt.Printf("Localhost-Only Ports: %s\n", strings.Join(parts, ", "))
+	} else if len(s.LocalOnlyPorts) > 0 {
 		fmt.Printf("Localhost-Only Ports: %v\n", s.LocalOnlyPorts)
 	}
 	if len(s.UnusualPorts) > 0 {
@@ -85,7 +105,11 @@ func printSecurity(s checks.Security) {
 	
 	// SSL
 	if s.SSLCerts > 0 {
-		fmt.Printf("SSL Certificates: %d (%s)\n", s.SSLCerts, s.SSLExpires)
+		fmt.Printf("SSL Certificates: %d (%s)", s.SSLCerts, s.SSLExpires)
+		if len(s.SSLDomains) > 0 {
+			fmt.Printf(" — %s", strings.Join(s.SSLDomains, ", "))
+		}
+		fmt.Println()
 	}
 	
 	// Connections
@@ -103,6 +127,9 @@ func printSecurity(s checks.Security) {
 	// Other security metrics
 	if s.SUIDCount > 0 {
 		fmt.Printf("SUID Binaries: %d\n", s.SUIDCount)
+		for _, path := range s.SUIDPaths {
+			fmt.Printf("  %s\n", path)
+		}
 	}
 	if s.WorldWritable > 0 {
 		fmt.Printf("World-Writable Files: %d (⚠️)\n", s.WorldWritable)
@@ -112,7 +139,11 @@ func printSecurity(s checks.Security) {
 	if s.Fail2banStatus == "active" {
 		fmt.Printf("Fail2ban: active")
 		if s.Fail2banJails > 0 {
-			fmt.Printf(" (%d jails)", s.Fail2banJails)
+			if len(s.Fail2banJailNames) > 0 {
+				fmt.Printf(" (%d jails: %s)", s.Fail2banJails, strings.Join(s.Fail2banJailNames, ", "))
+			} else {
+				fmt.Printf(" (%d jails)", s.Fail2banJails)
+			}
 		}
 		if s.Fail2banBanned > 0 {
 			fmt.Printf(", %d IPs banned", s.Fail2banBanned)
@@ -145,7 +176,11 @@ func printSecurity(s checks.Security) {
 func printServices(s checks.Services) {
 	fmt.Println("--- 2. SERVICES ---")
 	fmt.Printf("Total Running: %d\n", s.TotalRunning)
-	fmt.Printf("Failed: %d\n", s.Failed)
+	if s.Failed > 0 && len(s.FailedNames) > 0 {
+		fmt.Printf("Failed: %d (%s)\n", s.Failed, strings.Join(s.FailedNames, ", "))
+	} else {
+		fmt.Printf("Failed: %d\n", s.Failed)
+	}
 	if s.WebServer != "" {
 		fmt.Printf("Web: %s (%s)\n", s.WebServer, s.WebStatus)
 	}
@@ -190,15 +225,25 @@ func printStorage(s checks.Storage) {
 func printDatabase(d checks.Database) {
 	fmt.Println("--- 5. DATABASES ---")
 	if d.PostgreSQL.Available {
-		fmt.Printf("PostgreSQL: %d databases, %s total\n",
-			d.PostgreSQL.Databases, d.PostgreSQL.TotalSize)
+		if len(d.PostgreSQL.DatabaseNames) > 0 {
+			fmt.Printf("PostgreSQL: %d databases (%s), %s total\n",
+				d.PostgreSQL.Databases, strings.Join(d.PostgreSQL.DatabaseNames, ", "), d.PostgreSQL.TotalSize)
+		} else {
+			fmt.Printf("PostgreSQL: %d databases, %s total\n",
+				d.PostgreSQL.Databases, d.PostgreSQL.TotalSize)
+		}
 		if d.PostgreSQL.Connections > 0 {
 			fmt.Printf("  Connections: %d/%d\n", d.PostgreSQL.Connections, d.PostgreSQL.ConnLimit)
 		}
 	}
 	if d.MySQL.Available {
-		fmt.Printf("MySQL: %d databases, %s total\n",
-			d.MySQL.Databases, d.MySQL.TotalSize)
+		if len(d.MySQL.DatabaseNames) > 0 {
+			fmt.Printf("MySQL: %d databases (%s), %s total\n",
+				d.MySQL.Databases, strings.Join(d.MySQL.DatabaseNames, ", "), d.MySQL.TotalSize)
+		} else {
+			fmt.Printf("MySQL: %d databases, %s total\n",
+				d.MySQL.Databases, d.MySQL.TotalSize)
+		}
 	}
 	if d.Redis.Available {
 		fmt.Printf("Redis: %s memory, %d clients\n", d.Redis.Memory, d.Redis.Clients)

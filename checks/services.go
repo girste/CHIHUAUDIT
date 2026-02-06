@@ -11,7 +11,7 @@ func CheckServices() Services {
 	s := Services{}
 
 	if detect.DetectInitSystem() == "systemd" {
-		s.TotalRunning, s.Failed, s.AutoRestart = getSystemdStats()
+		s.TotalRunning, s.Failed, s.FailedNames, s.AutoRestart = getSystemdStats()
 	}
 
 	s.WebServer, s.WebStatus = checkWebServer()
@@ -24,7 +24,7 @@ func CheckServices() Services {
 	return s
 }
 
-func getSystemdStats() (running, failed, autoRestart int) {
+func getSystemdStats() (running, failed int, failedNames []string, autoRestart int) {
 	if !detect.CommandExists("systemctl") {
 		return
 	}
@@ -35,12 +35,21 @@ func getSystemdStats() (running, failed, autoRestart int) {
 		running = len(strings.Split(strings.TrimSpace(string(out)), "\n"))
 	}
 
-	// Count failed services
+	// Count failed services and get names
 	out, err = exec.Command("systemctl", "list-units", "--type=service", "--state=failed", "--no-pager", "--no-legend").Output()
 	if err == nil {
 		result := strings.TrimSpace(string(out))
 		if result != "" {
-			failed = len(strings.Split(result, "\n"))
+			lines := strings.Split(result, "\n")
+			failed = len(lines)
+			for _, line := range lines {
+				fields := strings.Fields(line)
+				if len(fields) > 0 {
+					// Service name is first field, strip .service suffix
+					name := strings.TrimSuffix(fields[0], ".service")
+					failedNames = append(failedNames, name)
+				}
+			}
 		}
 	}
 

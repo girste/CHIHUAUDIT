@@ -13,10 +13,12 @@ type Security struct {
 	SSHConfigReadable   bool // Track if we could read the config
 	Fail2banStatus      string
 	Fail2banJails       int
+	Fail2banJailNames   []string
 	Fail2banBanned      int
 	SSLCerts            int
 	SSLExpires          string
 	SSLExpiringSoon     int
+	SSLDomains          []string
 	RootUsers           int
 	ShellUsers          []string
 	FailedLogins        int
@@ -24,17 +26,27 @@ type Security struct {
 	ExternalPorts       []int
 	LocalOnlyPorts      []int
 	UnusualPorts        []int
+	ExternalPortDetails []PortDetail
+	LocalPortDetails    []PortDetail
 	SUIDCount           int
+	SUIDPaths           []string
 	WorldWritable       int
 	RecentEtcMods       int
 	ExternalConns       int
 	TopIPs              []IPConnection
 }
 
+type PortDetail struct {
+	Port    int
+	Process string
+	Bind    string
+}
+
 // Services check results
 type Services struct {
 	TotalRunning int
 	Failed       int
+	FailedNames  []string
 	AutoRestart  int
 	WebServer    string
 	WebStatus    string
@@ -103,19 +115,21 @@ type Database struct {
 }
 
 type PostgreSQLInfo struct {
-	Available   bool
-	Databases   int
-	TotalSize   string
-	Connections int
-	SlowQueries int
-	ConnLimit   int
+	Available     bool
+	Databases     int
+	DatabaseNames []string
+	TotalSize     string
+	Connections   int
+	SlowQueries   int
+	ConnLimit     int
 }
 
 type MySQLInfo struct {
-	Available   bool
-	Databases   int
-	TotalSize   string
-	Connections int
+	Available     bool
+	Databases     int
+	DatabaseNames []string
+	TotalSize     string
+	Connections   int
 }
 
 type RedisInfo struct {

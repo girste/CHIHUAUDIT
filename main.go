@@ -3,7 +3,9 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"time"
 
@@ -20,6 +22,9 @@ func main() {
 
 	monitorCmd := flag.NewFlagSet("monitor", flag.ExitOnError)
 	monitorInterval := monitorCmd.String("interval", "5m", "Monitoring interval (e.g., 5m, 10m, 1h)")
+
+	installCmd := flag.NewFlagSet("install", flag.ExitOnError)
+	installInterval := installCmd.String("interval", "5m", "Monitoring interval for the service (e.g., 5m, 10m, 1h)")
 
 	if len(os.Args) < 2 {
 		printUsage()
@@ -40,6 +45,10 @@ func main() {
 		}
 		runMonitor(interval)
 
+	case "install":
+		_ = installCmd.Parse(os.Args[2:])
+		installService(*installInterval)
+
 	case "init-config":
 		initConfig()
 
@@ -55,6 +64,7 @@ func printUsage() {
 	fmt.Println("Usage:")
 	fmt.Println("  chihuaudit audit [--json]         Run single audit")
 	fmt.Println("  chihuaudit monitor [--interval]   Start monitoring mode")
+	fmt.Println("  chihuaudit install [--interval]   Install as systemd service")
 	fmt.Println("  chihuaudit init-config            Generate default config file")
 	fmt.Println()
 	fmt.Println("Examples:")
@@ -62,6 +72,8 @@ func printUsage() {
 	fmt.Println("  chihuaudit audit --json           Single audit, JSON output")
 	fmt.Println("  chihuaudit monitor                Monitor with 5m interval")
 	fmt.Println("  chihuaudit monitor --interval=10m Monitor with custom interval")
+	fmt.Println("  chihuaudit install                Install service with 5m interval")
+	fmt.Println("  chihuaudit install --interval=10m Install service with custom interval")
 	fmt.Println("  chihuaudit init-config            Create ~/.chihuaudit/config.json")
 }
 
@@ -127,6 +139,15 @@ func runAudit(jsonOutput bool) {
 	} else {
 		report.PrintText(results)
 	}
+
+	// Send audit summary to Discord if configured
+	cfg := config.Load()
+	if cfg.DiscordWebhook != "" {
+		notify.SendAuditSummary(cfg, results)
+		if !jsonOutput {
+			fmt.Println("→ Audit summary sent to Discord")
+		}
+	}
 }
 
 func runMonitor(interval time.Duration) {
@@ -179,4 +200,84 @@ func runMonitor(interval time.Duration) {
 		previous = current
 		fmt.Println()
 	}
+}
+
+func installService(interval string) {
+	// Verify running as root
+	if os.Getuid() != 0 {
+		fmt.Fprintln(os.Stderr, "Error: install must be run as root")
+		os.Exit(1)
+	}
+
+	// Validate interval
+	if _, err := time.ParseDuration(interval); err != nil {
+		fmt.Fprintf(os.Stderr, "Invalid interval: %v\n", err)
+		os.Exit(1)
+	}
+
+	binDest := "/usr/local/bin/chihuaudit"
+
+	// Copy binary to /usr/local/bin if not already there
+	self, err := os.Executable()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error finding executable: %v\n", err)
+		os.Exit(1)
+	}
+
+	if self != binDest {
+		src, err := os.Open(self)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error reading binary: %v\n", err)
+			os.Exit(1)
+		}
+		defer func() { _ = src.Close() }()
+
+		dst, err := os.OpenFile(binDest, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0755)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error writing to %s: %v\n", binDest, err)
+			os.Exit(1)
+		}
+		defer func() { _ = dst.Close() }()
+
+		if _, err := io.Copy(dst, src); err != nil {
+			fmt.Fprintf(os.Stderr, "Error copying binary: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Copied binary to %s\n", binDest)
+	}
+
+	// Write systemd unit file
+	unitPath := "/etc/systemd/system/chihuaudit.service"
+	unit := fmt.Sprintf(`[Unit]
+Description=Chihuaudit System Monitor
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=%s monitor --interval=%s
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+`, binDest, interval)
+
+	if err := os.WriteFile(unitPath, []byte(unit), 0644); err != nil {
+		fmt.Fprintf(os.Stderr, "Error writing unit file: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Printf("Created %s\n", unitPath)
+
+	// Reload and enable
+	if err := exec.Command("systemctl", "daemon-reload").Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error reloading systemd: %v\n", err)
+		os.Exit(1)
+	}
+
+	if err := exec.Command("systemctl", "enable", "--now", "chihuaudit").Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error enabling service: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Println("Service chihuaudit enabled and started")
 }

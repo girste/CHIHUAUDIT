@@ -16,14 +16,14 @@ func CheckSecurity() Security {
 	s.Firewall = checkFirewall()
 	s.FirewallRules = countFirewallRules(s.Firewall)
 	s.SSHStatus, s.SSHPort, s.SSHPasswordAuth, s.SSHRootLogin, s.SSHProtocol, s.SSHAllowUsers, s.SSHConfigReadable = checkSSH()
-	s.Fail2banStatus, s.Fail2banJails, s.Fail2banBanned = checkFail2ban()
-	s.SSLCerts, s.SSLExpires, s.SSLExpiringSoon = checkSSLCerts()
+	s.Fail2banStatus, s.Fail2banJails, s.Fail2banJailNames, s.Fail2banBanned = checkFail2ban()
+	s.SSLCerts, s.SSLExpires, s.SSLExpiringSoon, s.SSLDomains = checkSSLCerts()
 	s.RootUsers = countRootUsers()
 	s.ShellUsers = getShellUsers()
 	s.FailedLogins = countFailedLogins()
-	s.OpenPorts, s.ExternalPorts, s.LocalOnlyPorts = getOpenPorts()
+	s.OpenPorts, s.ExternalPorts, s.LocalOnlyPorts, s.ExternalPortDetails, s.LocalPortDetails = getOpenPorts()
 	s.UnusualPorts = findUnusualPorts(s.ExternalPorts)
-	s.SUIDCount = countSUIDBinaries()
+	s.SUIDCount, s.SUIDPaths = countSUIDBinaries()
 	s.WorldWritable = countWorldWritable()
 	s.RecentEtcMods = countRecentEtcMods()
 	s.ExternalConns = countExternalConnections()
@@ -188,29 +188,39 @@ func checkSSH() (status string, port int, passwordAuth, rootLogin, protocol, all
 	return
 }
 
-func checkFail2ban() (status string, jails, banned int) {
+func checkFail2ban() (status string, jails int, jailNames []string, banned int) {
 	if !detect.CommandExists("fail2ban-client") {
-		return "not installed", 0, 0
+		return "not installed", 0, nil, 0
 	}
 
 	if detect.CommandExists("systemctl") {
 		if err := exec.Command("systemctl", "is-active", "fail2ban").Run(); err != nil {
-			return "inactive", 0, 0
+			return "inactive", 0, nil, 0
 		}
 	}
 
 	status = "active"
 
-	// Count jails
+	// Count jails and get names
 	out, err := exec.Command("fail2ban-client", "status").Output()
 	if err != nil {
-		return status, 0, 0
+		return status, 0, nil, 0
 	}
 
 	for _, line := range strings.Split(string(out), "\n") {
 		if strings.Contains(line, "Jail list:") {
-			jailList := strings.Split(line, ":")[1]
-			jails = len(strings.Split(strings.TrimSpace(jailList), ","))
+			parts := strings.SplitN(line, ":", 2)
+			if len(parts) < 2 {
+				continue
+			}
+			jailList := strings.TrimSpace(parts[1])
+			for _, name := range strings.Split(jailList, ",") {
+				name = strings.TrimSpace(name)
+				if name != "" {
+					jailNames = append(jailNames, name)
+				}
+			}
+			jails = len(jailNames)
 		}
 	}
 
@@ -225,17 +235,25 @@ func checkFail2ban() (status string, jails, banned int) {
 	return
 }
 
-func checkSSLCerts() (count int, expires string, expiringSoon int) {
+func checkSSLCerts() (count int, expires string, expiringSoon int, domains []string) {
 	// Check common cert locations - only actual server certs
 	certPaths := []string{
 		"/etc/letsencrypt/live",
 		"/var/lib/caddy/.local/share/caddy/certificates",
 	}
 
+	seen := make(map[string]bool)
 	for _, path := range certPaths {
 		if detect.FileExists(path) {
 			// Count only cert.pem and *.crt files, not all entries
 			countCertsInPath(path, &count)
+			for _, d := range collectSSLDomains(path) {
+				if d == "local" || seen[d] {
+					continue
+				}
+				seen[d] = true
+				domains = append(domains, d)
+			}
 		}
 	}
 
@@ -251,6 +269,42 @@ func checkSSLCerts() (count int, expires string, expiringSoon int) {
 	}
 
 	return
+}
+
+func collectSSLDomains(basePath string) []string {
+	entries, err := os.ReadDir(basePath)
+	if err != nil {
+		return nil
+	}
+
+	var domains []string
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if name == "." || name == ".." || name == "README" {
+			continue
+		}
+
+		// Check if subdirectories contain actual domains (e.g. Caddy: provider/domain/cert)
+		subEntries, err := os.ReadDir(basePath + "/" + name)
+		if err != nil {
+			continue
+		}
+		hasDomainSubs := false
+		for _, sub := range subEntries {
+			if sub.IsDir() {
+				hasDomainSubs = true
+				domains = append(domains, sub.Name())
+			}
+		}
+		// If no subdirectories, this directory is itself a domain (e.g. Let's Encrypt)
+		if !hasDomainSubs {
+			domains = append(domains, name)
+		}
+	}
+	return domains
 }
 
 func countCertsInPath(basePath string, count *int) {
@@ -383,15 +437,15 @@ func countFailedLogins() int {
 	return count
 }
 
-func getOpenPorts() (allPorts, external, localOnly []int) {
-	// Try ss first, then netstat
+func getOpenPorts() (allPorts, external, localOnly []int, extDetails, localDetails []PortDetail) {
+	// Try ss first (with -p for process names), then netstat
 	var out []byte
 	var err error
 
 	if detect.CommandExists("ss") {
-		out, err = exec.Command("ss", "-tuln").Output()
+		out, err = exec.Command("ss", "-tulnp").Output()
 	} else if detect.CommandExists("netstat") {
-		out, err = exec.Command("netstat", "-tuln").Output()
+		out, err = exec.Command("netstat", "-tulnp").Output()
 	}
 
 	if err != nil {
@@ -420,37 +474,61 @@ func getOpenPorts() (allPorts, external, localOnly []int) {
 		seen[port] = true
 		allPorts = append(allPorts, port)
 
-		// Check if localhost-only (127.0.0.1 or ::1)
+		// Extract process name from users:(("name",...)) field
+		procName := parseProcessName(fields)
+
 		bindAddr := strings.Join(parts[:len(parts)-1], ":")
+
+		// Check if localhost-only (127.0.0.1 or ::1)
 		if strings.Contains(bindAddr, "127.0.0.1") || bindAddr == "::1" || bindAddr == "localhost" {
 			localOnly = append(localOnly, port)
+			localDetails = append(localDetails, PortDetail{Port: port, Process: procName, Bind: bindAddr})
 		} else {
 			external = append(external, port)
+			extDetails = append(extDetails, PortDetail{Port: port, Process: procName, Bind: bindAddr})
 		}
 	}
 
 	return
 }
 
-func countSUIDBinaries() int {
+func parseProcessName(fields []string) string {
+	// Look for users:(("process_name",...)) pattern in ss output
+	for _, field := range fields {
+		if strings.HasPrefix(field, "users:") {
+			// Extract name from users:(("name",pid=...,fd=...))
+			start := strings.Index(field, "((\"")
+			if start == -1 {
+				continue
+			}
+			end := strings.Index(field[start+3:], "\"")
+			if end == -1 {
+				continue
+			}
+			return field[start+3 : start+3+end]
+		}
+	}
+	return ""
+}
+
+func countSUIDBinaries() (int, []string) {
 	// Search only in standard binary locations, count only SUID (not SGID)
-	paths := []string{"/usr/bin", "/usr/sbin", "/bin", "/sbin"}
-	count := 0
-	
-	for _, basePath := range paths {
+	searchPaths := []string{"/usr/bin", "/usr/sbin", "/bin", "/sbin"}
+	var suidPaths []string
+
+	for _, basePath := range searchPaths {
 		out, err := exec.Command("find", basePath, "-perm", "-4000", "-type", "f").Output()
 		if err != nil {
 			continue
 		}
-		lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-		for _, line := range lines {
+		for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
 			if line != "" {
-				count++
+				suidPaths = append(suidPaths, line)
 			}
 		}
 	}
-	
-	return count
+
+	return len(suidPaths), suidPaths
 }
 
 func countWorldWritable() int {
