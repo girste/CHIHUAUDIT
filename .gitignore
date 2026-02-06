@@ -1,6 +1,12 @@
 # Binaries
 bin/chihuaudit
+bin/chihuaudit-cloud
 chihuaudit
+
+# SQLite
+*.db
+*.db-shm
+*.db-wal
 
 # State files
 *.state.json
@@ -21,6 +27,9 @@ config.json
 # Go
 vendor/
 go.sum
+
+# Claude
+CLAUDE.md
 
 # IDE
 .vscode/

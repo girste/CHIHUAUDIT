@@ -1,10 +1,13 @@
-.PHONY: build clean test install uninstall
+.PHONY: build build-cloud clean test install install-cloud uninstall
 
 build:
 	./build.sh
 
+build-cloud:
+	./build.sh cloud
+
 clean:
-	rm -rf bin/chihuaudit
+	rm -rf bin/chihuaudit bin/chihuaudit-cloud
 	@echo "Cleaned"
 
 test:
@@ -15,6 +18,10 @@ test:
 install:
 	sudo cp bin/chihuaudit /usr/local/bin/
 	@echo "Installed"
+
+install-cloud:
+	sudo cp bin/chihuaudit-cloud /usr/local/bin/
+	@echo "Installed chihuaudit-cloud"
 
 uninstall:
 	sudo rm -f /usr/local/bin/chihuaudit
