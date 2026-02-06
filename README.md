@@ -13,8 +13,6 @@
 [![SLSA](https://slsa.dev/images/gh-badge-level3.svg)](https://slsa.dev)
 [![Go Report Card](https://goreportcard.com/badge/github.com/girste/CHIHUAUDIT)](https://goreportcard.com/report/github.com/girste/CHIHUAUDIT)
 
-[![Mentioned in Awesome](https://awesome.re/mentioned-badge.svg)](https://github.com/punkpeye/awesome-mcp-servers)
-
 </div>
 
 ---
