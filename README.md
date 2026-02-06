@@ -60,9 +60,11 @@ Execute the same comprehensive system audit directly through Claude (Sonnet, Opu
 
 ---
 
-## Webhook Alerts
+<div align="center">
 
 ![Webhook Alerts](docs/chihualerts.png)
+
+</div>
 
 Chihuaudit supports **webhook notifications** for real-time monitoring alerts. While optimized for Discord, it works with **any webhook-compatible service** (Slack, Microsoft Teams, Mattermost, custom endpoints, etc.).
 
@@ -122,9 +124,11 @@ Changes are detected and only significant events trigger notifications, reducing
 
 ---
 
-## Self Hosted Dashboard
+<div align="center">
 
 ![Self Hosted Dashboard](docs/chihucloud.png)
+
+</div>
 
 **Chihuaudit Cloud** is a self-hosted web dashboard for collecting and visualizing audits from multiple hosts. Single binary, SQLite database, zero external dependencies.
 
