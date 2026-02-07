@@ -6,7 +6,7 @@ a:hover{text-decoration:underline}
 .container{max-width:960px;margin:0 auto;padding:1rem}
 
 /* Header */
-header{background:#161b22;border-bottom:1px solid #30363d;padding:.75rem 1.5rem;display:flex;justify-content:space-between;align-items:center}
+header{background:#161b22;border-bottom:1px solid #30363d;padding:.75rem 1.5rem;display:flex;justify-content:space-between;align-items:center;position:relative}
 header h1{font-size:1.1rem;font-weight:600;color:#f0f6fc}
 header .user-info{display:flex;align-items:center;gap:.75rem;font-size:.875rem;color:#8b949e}
 header button{background:transparent;border:1px solid #30363d;color:#c9d1d9;padding:.25rem .75rem;border-radius:6px;cursor:pointer;font-size:.8rem}
@@ -71,17 +71,22 @@ tr:hover td{background:rgba(255,255,255,.04)}
 
 /* Audit structured display */
 .audit-card{background:#161b22;border:1px solid #30363d;border-radius:8px;margin-bottom:.75rem;overflow:hidden}
-.audit-card-header{padding:.6rem 1rem;background:#1c2128;cursor:pointer;display:flex;justify-content:space-between;align-items:center;user-select:none;font-size:.85rem;font-weight:600;color:#c9d1d9}
+.audit-card-header{padding:.6rem 1rem;background:#1c2128;cursor:pointer;display:flex;align-items:center;gap:.4rem;user-select:none;font-size:.85rem;font-weight:600;color:#c9d1d9}
 .audit-card-header:hover{background:#22272e}
 .audit-card-body{padding:.75rem 1rem;display:none}
 .audit-card.open .audit-card-body{display:block}
 .audit-card-header .section-badge{margin-left:auto;margin-right:.5rem}
 
-.audit-item{display:flex;justify-content:space-between;align-items:center;padding:.3rem .75rem;font-size:.825rem;margin:0 -.75rem}
+.audit-item{display:flex;justify-content:space-between;align-items:center;padding:.55rem .75rem;font-size:.825rem;margin:0 -.75rem}
 .audit-item.row-alt{background:rgba(255,255,255,.02)}
 .audit-item-left{display:flex;align-items:center;gap:.4rem;min-width:0}
 .audit-item-key{color:#8b949e;white-space:nowrap}
-.audit-item-value{color:#c9d1d9;font-family:monospace;font-size:.8rem;text-align:right;max-width:60%;word-break:break-word}
+.audit-item-value{color:#c9d1d9;font-family:monospace;font-size:.8rem;word-break:break-word}
+
+/* System info bar */
+.system-info-bar{display:flex;flex-wrap:wrap;gap:.5rem 1.25rem;padding:.5rem .75rem;background:#161b22;border:1px solid #30363d;border-radius:8px;margin-bottom:.75rem;font-size:.8rem}
+.system-info-bar span{color:#8b949e}
+.system-info-bar strong{color:#c9d1d9;font-weight:500;margin-left:.25rem}
 .audit-item-value.changed{color:#f0883e;font-weight:600}
 .ignore-tick{width:13px;height:13px;accent-color:#238636;cursor:pointer;flex-shrink:0;opacity:.5}
 .ignore-tick:checked{opacity:1}

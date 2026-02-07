@@ -176,6 +176,9 @@ func HandleUpdateHostConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Trigger cleanup immediately to enforce new retention
+	go models.CleanupOldAudits()
+
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(`{"ok":true}`))
 }

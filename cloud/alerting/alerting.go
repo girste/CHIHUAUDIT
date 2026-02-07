@@ -182,6 +182,104 @@ func Compare(prevRaw, currRaw json.RawMessage, cfg *Config) []Change {
 		}
 	}
 
+	// fail2ban status
+	if !cfg.shouldIgnore("fail2ban") {
+		oldF2B := getString(prev, "security", "fail2ban_status")
+		newF2B := getString(curr, "security", "fail2ban_status")
+		if oldF2B != "" && newF2B != "" && oldF2B != newF2B {
+			changes = append(changes, Change{
+				Key:         "fail2ban",
+				Description: fmt.Sprintf("Fail2ban status changed: %s → %s", oldF2B, newF2B),
+				OldValue:    oldF2B,
+				NewValue:    newF2B,
+			})
+		}
+	}
+
+	// SSH port changed
+	if !cfg.shouldIgnore("ssh_port") {
+		oldPort := getFloat(prev, "security", "ssh_port")
+		newPort := getFloat(curr, "security", "ssh_port")
+		if oldPort > 0 && newPort > 0 && oldPort != newPort {
+			changes = append(changes, Change{
+				Key:         "ssh_port",
+				Description: fmt.Sprintf("SSH port changed: %.0f → %.0f", oldPort, newPort),
+				OldValue:    oldPort,
+				NewValue:    newPort,
+			})
+		}
+	}
+
+	// SSH password auth
+	if !cfg.shouldIgnore("ssh_password_auth") {
+		oldAuth := getString(prev, "security", "ssh_password_auth")
+		newAuth := getString(curr, "security", "ssh_password_auth")
+		if oldAuth != "" && newAuth != "" && oldAuth != newAuth {
+			changes = append(changes, Change{
+				Key:         "ssh_password_auth",
+				Description: fmt.Sprintf("SSH password auth changed: %s → %s", oldAuth, newAuth),
+				OldValue:    oldAuth,
+				NewValue:    newAuth,
+			})
+		}
+	}
+
+	// SSH root login
+	if !cfg.shouldIgnore("ssh_root_login") {
+		oldRoot := getString(prev, "security", "ssh_root_login")
+		newRoot := getString(curr, "security", "ssh_root_login")
+		if oldRoot != "" && newRoot != "" && oldRoot != newRoot {
+			changes = append(changes, Change{
+				Key:         "ssh_root_login",
+				Description: fmt.Sprintf("SSH root login changed: %s → %s", oldRoot, newRoot),
+				OldValue:    oldRoot,
+				NewValue:    newRoot,
+			})
+		}
+	}
+
+	// SUID binaries increased
+	if !cfg.shouldIgnore("suid_binaries") {
+		oldSUID := getFloat(prev, "security", "suid_count")
+		newSUID := getFloat(curr, "security", "suid_count")
+		if newSUID > oldSUID && oldSUID > 0 {
+			changes = append(changes, Change{
+				Key:         "suid_binaries",
+				Description: fmt.Sprintf("SUID binaries increased: %.0f → %.0f", oldSUID, newSUID),
+				OldValue:    oldSUID,
+				NewValue:    newSUID,
+			})
+		}
+	}
+
+	// SSL certificates expiring
+	if !cfg.shouldIgnore("ssl_expiring") {
+		oldExpiring := getFloat(prev, "security", "ssl_expiring_soon")
+		newExpiring := getFloat(curr, "security", "ssl_expiring_soon")
+		if newExpiring > 0 && newExpiring != oldExpiring {
+			changes = append(changes, Change{
+				Key:         "ssl_expiring",
+				Description: fmt.Sprintf("SSL certificates expiring soon: %.0f", newExpiring),
+				OldValue:    oldExpiring,
+				NewValue:    newExpiring,
+			})
+		}
+	}
+
+	// Security updates
+	if !cfg.shouldIgnore("security_updates") {
+		oldUpdates := getFloat(prev, "system", "security_updates")
+		newUpdates := getFloat(curr, "system", "security_updates")
+		if newUpdates > oldUpdates && oldUpdates >= 0 {
+			changes = append(changes, Change{
+				Key:         "security_updates",
+				Description: fmt.Sprintf("Security updates available: %.0f → %.0f", oldUpdates, newUpdates),
+				OldValue:    oldUpdates,
+				NewValue:    newUpdates,
+			})
+		}
+	}
+
 	return changes
 }
 

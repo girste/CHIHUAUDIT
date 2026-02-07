@@ -154,7 +154,7 @@ type HostConfig struct {
 	MemoryThreshold float64  `json:"memory_threshold"`
 	DiskThreshold   float64  `json:"disk_threshold"`
 	IgnoreChanges   []string `json:"ignore_changes"`
-	RetentionDays   int      `json:"retention_days"`
+	RetentionCount  int      `json:"retention_count"`
 }
 
 func GetHostConfig(hostID int) (*HostConfig, error) {
@@ -163,15 +163,23 @@ func GetHostConfig(hostID int) (*HostConfig, error) {
 		CPUThreshold:    60,
 		MemoryThreshold: 60,
 		DiskThreshold:   80,
-		RetentionDays:   90,
-		IgnoreChanges:   []string{"uptime", "active_connections", "process_list", "network_rx_tx"},
+		RetentionCount:  1000,
+		IgnoreChanges: []string{
+			// Always ignore
+			"uptime", "active_connections", "process_list", "network_rx_tx",
+			"timestamp", "last_seen", "last_backup",
+			// Ignore by default - user can enable if needed
+			"resources.cpu_percent", "resources.mem_percent", "resources.load_average",
+			"system.pending_updates", "logs.syslog_errors", "network.latency",
+			"storage.disk_io", "docker.running", "database.active_connections",
+		},
 	}
 
-	var ignoreJSON sql.NullString
+	var ignoreJSON, webhookURL sql.NullString
 	err := DB.QueryRow(
-		`SELECT webhook_url, cpu_threshold, memory_threshold, disk_threshold, ignore_changes, COALESCE(retention_days, 90)
+		`SELECT webhook_url, cpu_threshold, memory_threshold, disk_threshold, ignore_changes, COALESCE(retention_count, 1000)
 		 FROM host_config WHERE host_id = ?`, hostID,
-	).Scan(&cfg.WebhookURL, &cfg.CPUThreshold, &cfg.MemoryThreshold, &cfg.DiskThreshold, &ignoreJSON, &cfg.RetentionDays)
+	).Scan(&webhookURL, &cfg.CPUThreshold, &cfg.MemoryThreshold, &cfg.DiskThreshold, &ignoreJSON, &cfg.RetentionCount)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return cfg, nil
@@ -179,6 +187,9 @@ func GetHostConfig(hostID int) (*HostConfig, error) {
 		return nil, err
 	}
 
+	if webhookURL.Valid {
+		cfg.WebhookURL = webhookURL.String
+	}
 	if ignoreJSON.Valid && ignoreJSON.String != "" {
 		cfg.IgnoreChanges = parseJSONArray(ignoreJSON.String)
 	}
@@ -187,11 +198,11 @@ func GetHostConfig(hostID int) (*HostConfig, error) {
 
 func UpdateHostConfig(cfg *HostConfig) error {
 	ignoreJSON, _ := json.Marshal(cfg.IgnoreChanges)
-	if cfg.RetentionDays <= 0 {
-		cfg.RetentionDays = 90
+	if cfg.RetentionCount <= 0 {
+		cfg.RetentionCount = 1000
 	}
 	_, err := DB.Exec(`
-		INSERT INTO host_config (host_id, webhook_url, cpu_threshold, memory_threshold, disk_threshold, ignore_changes, retention_days, updated_at)
+		INSERT INTO host_config (host_id, webhook_url, cpu_threshold, memory_threshold, disk_threshold, ignore_changes, retention_count, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
 		ON CONFLICT (host_id) DO UPDATE SET
 			webhook_url = excluded.webhook_url,
@@ -199,9 +210,9 @@ func UpdateHostConfig(cfg *HostConfig) error {
 			memory_threshold = excluded.memory_threshold,
 			disk_threshold = excluded.disk_threshold,
 			ignore_changes = excluded.ignore_changes,
-			retention_days = excluded.retention_days,
+			retention_count = excluded.retention_count,
 			updated_at = datetime('now')`,
-		cfg.HostID, cfg.WebhookURL, cfg.CPUThreshold, cfg.MemoryThreshold, cfg.DiskThreshold, string(ignoreJSON), cfg.RetentionDays,
+		cfg.HostID, cfg.WebhookURL, cfg.CPUThreshold, cfg.MemoryThreshold, cfg.DiskThreshold, string(ignoreJSON), cfg.RetentionCount,
 	)
 	return err
 }
@@ -250,21 +261,50 @@ func RotateHostAPIKey(hostID int, newHash string) error {
 }
 
 func CleanupOldAudits() {
-	result, err := DB.Exec(`
-		DELETE FROM audits WHERE id IN (
-			SELECT a.id FROM audits a
-			JOIN hosts h ON a.host_id = h.id
-			LEFT JOIN host_config c ON c.host_id = h.id
-			WHERE a.created_at < datetime('now', '-' || COALESCE(c.retention_days, 90) || ' days')
-		)
-	`)
+	// For each host, keep only the most recent retention_count audits
+	rows, err := DB.Query("SELECT id FROM hosts")
 	if err != nil {
-		log.Printf("cleanup old audits error: %v", err)
+		log.Printf("cleanup: get hosts error: %v", err)
 		return
 	}
-	rows, _ := result.RowsAffected()
-	if rows > 0 {
-		log.Printf("cleanup: deleted %d old audits", rows)
+	defer rows.Close()
+
+	totalDeleted := 0
+	for rows.Next() {
+		var hostID int
+		if err := rows.Scan(&hostID); err != nil {
+			continue
+		}
+
+		// Get retention count for this host
+		var retentionCount int
+		err := DB.QueryRow("SELECT COALESCE(retention_count, 1000) FROM host_config WHERE host_id = ?", hostID).Scan(&retentionCount)
+		if err != nil {
+			retentionCount = 1000 // default
+		}
+
+		// Delete old audits for this host
+		result, err := DB.Exec(`
+			DELETE FROM audits 
+			WHERE host_id = ? 
+			AND id NOT IN (
+				SELECT id FROM audits 
+				WHERE host_id = ? 
+				ORDER BY created_at DESC 
+				LIMIT ?
+			)`, hostID, hostID, retentionCount)
+		
+		if err != nil {
+			log.Printf("cleanup: delete for host %d error: %v", hostID, err)
+			continue
+		}
+		
+		deleted, _ := result.RowsAffected()
+		totalDeleted += int(deleted)
+	}
+
+	if totalDeleted > 0 {
+		log.Printf("cleanup: deleted %d old audits", totalDeleted)
 	}
 }
 
@@ -352,24 +392,46 @@ type RecentAlert struct {
 	HostID         int       `json:"host_id"`
 	HostName       string    `json:"host_name"`
 	Metric         string    `json:"metric"`
-	ThresholdValue float64   `json:"threshold_value"`
-	CurrentValue   float64   `json:"current_value"`
+	ThresholdValue float64   `json:"threshold_value,omitempty"`
+	CurrentValue   float64   `json:"current_value,omitempty"`
 	FirstExceeded  time.Time `json:"first_exceeded_at"`
 	LastSeen       time.Time `json:"last_seen_at"`
+	// For security alerts
+	Key         string `json:"key,omitempty"`
+	Description string `json:"description,omitempty"`
+	OldValue    string `json:"old_value,omitempty"`
+	NewValue    string `json:"new_value,omitempty"`
+	Severity    string `json:"severity,omitempty"`
+	Type        string `json:"type"` // "threshold" or "security"
 }
 
 func GetRecentAlerts(limit int) ([]RecentAlert, error) {
 	if limit <= 0 {
 		limit = 20
 	}
-	rows, err := DB.Query(`
-		SELECT tb.id, tb.host_id, h.name, tb.metric, tb.threshold_value, tb.current_value,
+	
+	// Query both threshold breaches and security alerts
+	query := `
+		SELECT 'threshold' as type, tb.id, tb.host_id, h.name, tb.metric, 
+		       tb.threshold_value, tb.current_value, '', '', '', '', '',
 		       tb.first_exceeded_at, tb.last_seen_at
 		FROM threshold_breaches tb
 		JOIN hosts h ON h.id = tb.host_id
 		WHERE tb.resolved_at IS NULL
-		ORDER BY tb.last_seen_at DESC
-		LIMIT ?`, limit)
+		
+		UNION ALL
+		
+		SELECT 'security' as type, a.id, a.host_id, h.name, '',
+		       0, 0, a.key, a.description, a.old_value, a.new_value, a.severity,
+		       a.created_at, a.created_at
+		FROM alerts a
+		JOIN hosts h ON h.id = a.host_id
+		WHERE a.resolved_at IS NULL
+		
+		ORDER BY last_seen_at DESC
+		LIMIT ?`
+	
+	rows, err := DB.Query(query, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -379,7 +441,9 @@ func GetRecentAlerts(limit int) ([]RecentAlert, error) {
 	for rows.Next() {
 		var a RecentAlert
 		var first, last string
-		err := rows.Scan(&a.ID, &a.HostID, &a.HostName, &a.Metric, &a.ThresholdValue, &a.CurrentValue, &first, &last)
+		err := rows.Scan(&a.Type, &a.ID, &a.HostID, &a.HostName, &a.Metric, 
+			&a.ThresholdValue, &a.CurrentValue, &a.Key, &a.Description, 
+			&a.OldValue, &a.NewValue, &a.Severity, &first, &last)
 		if err != nil {
 			return nil, err
 		}
@@ -392,13 +456,26 @@ func GetRecentAlerts(limit int) ([]RecentAlert, error) {
 
 // GetHostAlerts returns unresolved alerts for a specific host.
 func GetHostAlerts(hostID int) ([]RecentAlert, error) {
-	rows, err := DB.Query(`
-		SELECT tb.id, tb.host_id, h.name, tb.metric, tb.threshold_value, tb.current_value,
+	query := `
+		SELECT 'threshold' as type, tb.id, tb.host_id, h.name, tb.metric, 
+		       tb.threshold_value, tb.current_value, '', '', '', '', '',
 		       tb.first_exceeded_at, tb.last_seen_at
 		FROM threshold_breaches tb
 		JOIN hosts h ON h.id = tb.host_id
 		WHERE tb.resolved_at IS NULL AND tb.host_id = ?
-		ORDER BY tb.last_seen_at DESC`, hostID)
+		
+		UNION ALL
+		
+		SELECT 'security' as type, a.id, a.host_id, h.name, '',
+		       0, 0, a.key, a.description, a.old_value, a.new_value, a.severity,
+		       a.created_at, a.created_at
+		FROM alerts a
+		JOIN hosts h ON h.id = a.host_id
+		WHERE a.resolved_at IS NULL AND a.host_id = ?
+		
+		ORDER BY last_seen_at DESC`
+	
+	rows, err := DB.Query(query, hostID, hostID)
 	if err != nil {
 		return nil, err
 	}
@@ -408,7 +485,9 @@ func GetHostAlerts(hostID int) ([]RecentAlert, error) {
 	for rows.Next() {
 		var a RecentAlert
 		var first, last string
-		err := rows.Scan(&a.ID, &a.HostID, &a.HostName, &a.Metric, &a.ThresholdValue, &a.CurrentValue, &first, &last)
+		err := rows.Scan(&a.Type, &a.ID, &a.HostID, &a.HostName, &a.Metric, 
+			&a.ThresholdValue, &a.CurrentValue, &a.Key, &a.Description, 
+			&a.OldValue, &a.NewValue, &a.Severity, &first, &last)
 		if err != nil {
 			return nil, err
 		}
@@ -426,4 +505,44 @@ func DeleteHost(id int) (int64, error) {
 		return 0, err
 	}
 	return result.RowsAffected()
+}
+
+// SaveAlert saves a security/configuration change alert
+// Only creates alert if one doesn't already exist (deduplication)
+func SaveAlert(hostID int, key, description, oldValue, newValue, severity string) error {
+	if severity == "" {
+		severity = "warning"
+	}
+	
+	// Check if alert already exists (unresolved)
+	var existingID int
+	err := DB.QueryRow(`
+		SELECT id FROM alerts 
+		WHERE host_id = ? AND key = ? AND resolved_at IS NULL
+		LIMIT 1`,
+		hostID, key,
+	).Scan(&existingID)
+	
+	if err == nil {
+		// Alert already exists, don't create duplicate
+		return nil
+	}
+	
+	// Create new alert
+	_, err = DB.Exec(`
+		INSERT INTO alerts (host_id, key, description, old_value, new_value, severity)
+		VALUES (?, ?, ?, ?, ?, ?)`,
+		hostID, key, description, oldValue, newValue, severity,
+	)
+	return err
+}
+
+// ResolveAlert marks an alert as resolved
+func ResolveAlert(hostID int, key string) error {
+	_, err := DB.Exec(`
+		UPDATE alerts SET resolved_at = datetime('now')
+		WHERE host_id = ? AND key = ? AND resolved_at IS NULL`,
+		hostID, key,
+	)
+	return err
 }

@@ -4,6 +4,7 @@
   var currentHostId = null;
   var _ignoredKeys = {};    // current host's ignored keys set
   var _currentConfig = null; // current host's config for saving
+  var _allAudits = [];       // store all audits for filtering
 
   // --- API helpers ---
   async function api(path, opts) {
@@ -67,7 +68,7 @@
     if (currentHostId) {
       if (state.configOpen) {
         document.getElementById('host-config-wrapper').style.display = 'block';
-        document.getElementById('config-toggle-icon').innerHTML = '&#9660;';
+        /* config restored */
       }
       if (state.rotatedKeyVisible) {
         document.getElementById('rotated-key-result').style.display = 'block';
@@ -155,51 +156,42 @@
         document.getElementById('rotated-key-result').style.display = 'none';
       }
 
-      // Host alerts banner
-      renderHostAlertsBanner(hostAlerts);
-
-      // Performance charts
-      renderHostCharts(metrics, cfg);
+      // Render active alerts
+      renderHostAlerts(hostAlerts);
 
       // Load config values (don't reset visibility on refresh)
       document.getElementById('cfg-webhook').value = cfg.webhook_url || '';
       document.getElementById('cfg-cpu').value = cfg.cpu_threshold || 60;
       document.getElementById('cfg-mem').value = cfg.memory_threshold || 60;
       document.getElementById('cfg-disk').value = cfg.disk_threshold || 80;
-      document.getElementById('cfg-retention').value = cfg.retention_days || 90;
+      document.getElementById('cfg-retention').value = cfg.retention_count || 1000;
 
       if (!preserveState) {
         document.getElementById('config-status').style.display = 'none';
         document.getElementById('webhook-status').style.display = 'none';
         document.getElementById('host-config-wrapper').style.display = 'none';
-        document.getElementById('config-toggle-icon').innerHTML = '&#9654;';
+        /* config hidden */
       }
 
       // Latest audit - structured rendering
       var latestDiv = document.getElementById('latest-audit');
       if (audits.length > 0) {
         var prevResults = audits.length > 1 ? audits[1].results : null;
+        var checksLabel = countChecks(audits[0].results);
+        document.getElementById('latest-audit-label').textContent = 'Latest Audit (' + checksLabel + ')';
         latestDiv.innerHTML = renderAuditResults(audits[0].results, prevResults, true);
       } else {
         latestDiv.innerHTML = '<div class="audit-results"><pre>No audits yet</pre></div>';
       }
 
       // Audit history table
+      _allAudits = audits; // Save for filtering
       var tbody = document.getElementById('audits-table');
       if (!audits.length) {
         tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#8b949e">No audits</td></tr>';
       } else {
         window._auditCache = {};
-        tbody.innerHTML = audits.map(function(a) {
-          window._auditCache[a.id] = a.results;
-          var date = new Date(a.created_at).toLocaleString();
-          var checks = countChecks(a.results);
-          return '<tr>' +
-            '<td>' + date + '</td>' +
-            '<td>' + checks + '</td>' +
-            '<td><a href="#" onclick="showAuditDetail(' + a.id + '); return false" class="btn btn-sm">View</a></td>' +
-          '</tr>';
-        }).join('');
+        renderAuditsTable(audits);
       }
 
       // Restore UI state after DOM rebuild
@@ -244,7 +236,7 @@
           memory_threshold: parseFloat(document.getElementById('cfg-mem').value) || 60,
           disk_threshold: parseFloat(document.getElementById('cfg-disk').value) || 80,
           ignore_changes: ignoreArr,
-          retention_days: parseInt(document.getElementById('cfg-retention').value) || 90
+          retention_count: parseInt(document.getElementById('cfg-retention').value) || 1000
         })
       });
       var statusEl = document.getElementById('config-status');
@@ -273,14 +265,7 @@
   // --- Toggle Host Config ---
   window.toggleHostConfig = function() {
     var wrapper = document.getElementById('host-config-wrapper');
-    var icon = document.getElementById('config-toggle-icon');
-    if (wrapper.style.display === 'none') {
-      wrapper.style.display = 'block';
-      icon.innerHTML = '&#9660;';
-    } else {
-      wrapper.style.display = 'none';
-      icon.innerHTML = '&#9654;';
-    }
+    wrapper.style.display = wrapper.style.display === 'none' ? 'block' : 'none';
   };
 
   // --- Add Host Modal ---
@@ -348,17 +333,17 @@
 
   // --- Structured Audit Rendering ---
   var SECTION_ORDER = [
-    {key: 'security',  label: 'Security',  icon: '&#128274;'},
-    {key: 'services',  label: 'Services',  icon: '&#9881;'},
-    {key: 'resources', label: 'Resources', icon: '&#128200;'},
-    {key: 'storage',   label: 'Storage',   icon: '&#128190;'},
-    {key: 'database',  label: 'Database',  icon: '&#128451;'},
-    {key: 'docker',    label: 'Docker',    icon: '&#128051;'},
-    {key: 'network',   label: 'Network',   icon: '&#127760;'},
-    {key: 'logs',      label: 'Logs',      icon: '&#128196;'},
-    {key: 'backups',   label: 'Backups',   icon: '&#128229;'},
-    {key: 'tuning',    label: 'Tuning',    icon: '&#128295;'},
-    {key: 'system',    label: 'System',    icon: '&#128187;'}
+    {key: 'security',  label: 'Security'},
+    {key: 'services',  label: 'Services'},
+    {key: 'resources', label: 'Resources'},
+    {key: 'storage',   label: 'Storage'},
+    {key: 'database',  label: 'Database'},
+    {key: 'docker',    label: 'Docker'},
+    {key: 'network',   label: 'Network'},
+    {key: 'logs',      label: 'Logs'},
+    {key: 'backups',   label: 'Backups'},
+    {key: 'tuning',    label: 'Tuning'},
+    {key: 'system',    label: 'System'}
   ];
 
   var STATUS_KEYS = ['firewall', 'web_status', 'db_status', 'disk_health', 'status', 'available'];
@@ -371,17 +356,16 @@
     var html = '';
     var prev = prevResults && typeof prevResults === 'object' ? prevResults : {};
 
-    // Top-level info (hostname, os, kernel, etc.)
+    // Top-level info as compact bar
     var topKeys = ['hostname', 'os', 'kernel', 'uptime', 'timestamp', 'total_checks'];
-    var topCounter = {n: 0};
-    var topHtml = '';
+    var topItems = [];
     for (var i = 0; i < topKeys.length; i++) {
       if (results[topKeys[i]] !== undefined) {
-        topHtml += renderItem(topKeys[i], results[topKeys[i]], null, '', topCounter, false);
+        topItems.push('<span>' + esc(formatKey(topKeys[i])) + '<strong>' + esc(String(results[topKeys[i]])) + '</strong></span>');
       }
     }
-    if (topHtml) {
-      html += '<div class="audit-card open"><div class="audit-card-header" onclick="this.parentElement.classList.toggle(\'open\')">&#128187; System Info <span class="toggle-icon">&#9660;</span></div><div class="audit-card-body">' + topHtml + '</div></div>';
+    if (topItems.length) {
+      html += '<div class="system-info-bar">' + topItems.join('') + '</div>';
     }
 
     // Known sections
@@ -393,13 +377,12 @@
       var badge = getSectionBadge(sectionData);
       var counter = {n: 0};
       var bodyHtml = renderObject(sectionData, prevSection, sec.key, counter, showTicks);
-      var selectAll = showTicks ? ' <label style="font-size:.7rem;font-weight:400;color:#8b949e;margin-left:auto;margin-right:.5rem;cursor:pointer" onclick="event.stopPropagation();selectAllSection(\'' + esc(sec.key) + '\',this)"><input type="checkbox" style="accent-color:#238636;vertical-align:middle;cursor:pointer;margin-right:.2rem">all</label>' : '';
+      var selectAll = showTicks ? '<input type="checkbox" class="ignore-tick" onclick="event.stopPropagation();selectAllSection(\'' + esc(sec.key) + '\',this)">' : '';
 
       html += '<div class="audit-card">' +
         '<div class="audit-card-header" onclick="this.parentElement.classList.toggle(\'open\')">' +
-          sec.icon + ' ' + sec.label + selectAll +
-          (badge ? ' <span class="section-badge">' + badge + '</span>' : '') +
-          ' <span class="toggle-icon">&#9660;</span>' +
+          selectAll + sec.label +
+          (badge ? '<span class="section-badge">' + badge + '</span>' : '') +
         '</div>' +
         '<div class="audit-card-body">' + bodyHtml + '</div></div>';
     }
@@ -419,16 +402,16 @@
       if (val && typeof val === 'object' && !Array.isArray(val)) {
         var prevExtra = prev[ek] && typeof prev[ek] === 'object' ? prev[ek] : null;
         var ekCounter = {n: 0};
-        var ekSelectAll = showTicks ? ' <label style="font-size:.7rem;font-weight:400;color:#8b949e;margin-left:auto;margin-right:.5rem;cursor:pointer" onclick="event.stopPropagation();selectAllSection(\'' + esc(ek) + '\',this)"><input type="checkbox" style="accent-color:#238636;vertical-align:middle;cursor:pointer;margin-right:.2rem">all</label>' : '';
+        var ekSelectAll = showTicks ? '<input type="checkbox" class="ignore-tick" onclick="event.stopPropagation();selectAllSection(\'' + esc(ek) + '\',this)">' : '';
         html += '<div class="audit-card">' +
-          '<div class="audit-card-header" onclick="this.parentElement.classList.toggle(\'open\')">' + esc(formatKey(ek)) + ekSelectAll + ' <span class="toggle-icon">&#9660;</span></div>' +
+          '<div class="audit-card-header" onclick="this.parentElement.classList.toggle(\'open\')">' + ekSelectAll + esc(formatKey(ek)) + '</div>' +
           '<div class="audit-card-body">' + renderObject(val, prevExtra, ek, ekCounter, showTicks) + '</div></div>';
       }
     }
 
     // Notes
     if (results.notes && results.notes.length) {
-      html += '<div class="audit-card"><div class="audit-card-header" onclick="this.parentElement.classList.toggle(\'open\')">&#128221; Notes <span class="toggle-icon">&#9660;</span></div><div class="audit-card-body">';
+      html += '<div class="audit-card"><div class="audit-card-header" onclick="this.parentElement.classList.toggle(\'open\')">Notes</div><div class="audit-card-body">';
       for (var n = 0; n < results.notes.length; n++) {
         html += '<div class="audit-item' + (n % 2 ? ' row-alt' : '') + '"><span class="audit-item-value">' + esc(String(results.notes[n])) + '</span></div>';
       }
@@ -436,7 +419,7 @@
     }
     // Skipped
     if (results.skipped && results.skipped.length) {
-      html += '<div class="audit-card"><div class="audit-card-header" onclick="this.parentElement.classList.toggle(\'open\')">&#9888; Skipped <span class="toggle-icon">&#9660;</span></div><div class="audit-card-body">';
+      html += '<div class="audit-card"><div class="audit-card-header" onclick="this.parentElement.classList.toggle(\'open\')">Skipped</div><div class="audit-card-body">';
       for (var sk = 0; sk < results.skipped.length; sk++) {
         html += '<div class="audit-item' + (sk % 2 ? ' row-alt' : '') + '"><span class="audit-item-value">' + esc(String(results.skipped[sk])) + '</span></div>';
       }
@@ -448,8 +431,7 @@
 
   // Select/deselect all ticks in a section
   window.selectAllSection = function(sectionKey, labelEl) {
-    var cb = labelEl.querySelector('input[type="checkbox"]');
-    var checked = cb.checked;
+    var checked = labelEl.checked;
     var card = labelEl.closest('.audit-card');
     if (!card) return;
     var ticks = card.querySelectorAll('.ignore-tick');
@@ -478,7 +460,7 @@
         memory_threshold: _currentConfig ? _currentConfig.memory_threshold : 60,
         disk_threshold: _currentConfig ? _currentConfig.disk_threshold : 80,
         ignore_changes: ignoreArr,
-        retention_days: _currentConfig ? _currentConfig.retention_days : 90
+        retention_count: _currentConfig ? _currentConfig.retention_count : 1000
       })
     }).catch(function(e) { console.error('Failed to save ignore config:', e); });
   }
@@ -539,8 +521,19 @@
         var prevItem = null;
         if (Array.isArray(prevArr)) {
           for (var j = 0; j < prevArr.length; j++) {
-            if (prevArr[j] && (prevArr[j].path === item.path || prevArr[j].name === item.name)) {
-              prevItem = prevArr[j]; break;
+            if (prevArr[j]) {
+              // Match by multiple possible keys (path, name, bind+port, device, user, etc.)
+              var match = false;
+              if (item.path && prevArr[j].path === item.path) match = true;
+              else if (item.name && prevArr[j].name === item.name) match = true;
+              else if (item.bind && item.port && prevArr[j].bind === item.bind && prevArr[j].port === item.port) match = true;
+              else if (item.device && prevArr[j].device === item.device) match = true;
+              else if (item.user && prevArr[j].user === item.user) match = true;
+              
+              if (match) {
+                prevItem = prevArr[j];
+                break;
+              }
             }
           }
         }
@@ -642,70 +635,63 @@
   }
 
   // --- Host Alerts Banner ---
-  function renderHostAlertsBanner(alerts) {
-    var el = document.getElementById('host-alerts-banner');
+  // --- Render Host Alerts (expanded list) ---
+  function renderHostAlerts(alerts) {
+    var countEl = document.getElementById('alert-count');
+    var listEl = document.getElementById('host-alerts-list');
+    
     if (!alerts || !alerts.length) {
-      el.innerHTML = '';
+      countEl.textContent = '0';
+      listEl.innerHTML = '<div style="color:#8b949e;font-size:.875rem;padding:1rem">No active alerts</div>';
       return;
     }
-    var html = '';
+    
+    countEl.textContent = alerts.length;
+    
+    var html = '<div style="display:flex;flex-direction:column;gap:.75rem">';
     for (var i = 0; i < alerts.length; i++) {
       var a = alerts[i];
-      var severity = a.current_value >= a.threshold_value * 1.2 ? '' : ' warn';
-      html += '<div class="host-alert-banner' + severity + '">' +
-        '&#9888; <strong>' + esc(formatKey(a.metric)) + '</strong>: ' +
-        a.current_value.toFixed(1) + '% (threshold: ' + a.threshold_value.toFixed(0) + '%) &mdash; since ' +
-        timeAgo(new Date(a.first_exceeded_at)) + '</div>';
+      
+      var severityColor = '#f0883e'; // warning
+      var severityIcon = '⚠️';
+      
+      if (a.type === 'security') {
+        if (a.severity === 'critical') {
+          severityColor = '#f85149';
+          severityIcon = '🔴';
+        } else if (a.severity === 'info') {
+          severityColor = '#58a6ff';
+          severityIcon = 'ℹ️';
+        }
+        
+        html += '<div style="padding:1rem;background:#161b22;border:1px solid ' + severityColor + ';border-radius:6px">' +
+          '<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem">' +
+            '<span>' + severityIcon + '</span>' +
+            '<strong style="color:' + severityColor + '">' + esc(a.key) + '</strong>' +
+            '<span style="margin-left:auto;font-size:.75rem;color:#8b949e">' + timeAgo(new Date(a.first_exceeded_at)) + '</span>' +
+          '</div>' +
+          '<div style="color:#c9d1d9;font-size:.875rem">' + esc(a.description) + '</div>' +
+        '</div>';
+      } else {
+        // Threshold breach
+        severityColor = a.current_value >= a.threshold_value * 1.2 ? '#f85149' : '#f0883e';
+        severityIcon = a.current_value >= a.threshold_value * 1.2 ? '🔴' : '⚠️';
+        
+        html += '<div style="padding:1rem;background:#161b22;border:1px solid ' + severityColor + ';border-radius:6px">' +
+          '<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem">' +
+            '<span>' + severityIcon + '</span>' +
+            '<strong style="color:' + severityColor + '">' + esc(formatKey(a.metric)) + '</strong>' +
+            '<span style="margin-left:auto;font-size:.75rem;color:#8b949e">' + timeAgo(new Date(a.first_exceeded_at)) + '</span>' +
+          '</div>' +
+          '<div style="color:#c9d1d9;font-size:.875rem">' + 
+            'Current: ' + a.current_value.toFixed(1) + '% (threshold: ' + a.threshold_value.toFixed(0) + '%)' +
+          '</div>' +
+        '</div>';
+      }
     }
-    el.innerHTML = html;
-  }
-
-  // --- Performance Charts (SVG) ---
-  function renderHostCharts(metrics, cfg) {
-    var el = document.getElementById('host-charts');
-    if (!metrics || metrics.length < 2) {
-      el.innerHTML = '';
-      return;
-    }
-    var cpuThreshold = cfg.cpu_threshold || 60;
-    var memThreshold = cfg.memory_threshold || 60;
-    var diskThreshold = cfg.disk_threshold || 80;
-
-    el.innerHTML = '<div class="charts-grid">' +
-      renderMiniChart('CPU', metrics.map(function(m) { return m.cpu_percent; }), cpuThreshold, '#58a6ff') +
-      renderMiniChart('Memory', metrics.map(function(m) { return m.mem_percent; }), memThreshold, '#a371f7') +
-      renderMiniChart('Disk', metrics.map(function(m) { return m.disk_percent; }), diskThreshold, '#f0883e') +
-    '</div>';
-  }
-
-  function renderMiniChart(label, values, threshold, color) {
-    var latest = values.length > 0 ? values[values.length - 1] : 0;
-    var w = 200, h = 60;
-    var maxVal = Math.max(100, Math.max.apply(null, values));
-    var n = values.length;
-    if (n < 2) return '<div class="chart-card"><h4>' + esc(label) + '</h4><div class="chart-value">' + latest.toFixed(1) + '%</div><div style="color:#8b949e;font-size:.75rem">Not enough data</div></div>';
-
-    var points = [];
-    for (var i = 0; i < n; i++) {
-      var x = (i / (n - 1)) * w;
-      var y = h - (values[i] / maxVal) * h;
-      points.push(x.toFixed(1) + ',' + y.toFixed(1));
-    }
-    var polyline = points.join(' ');
-    var areaPoints = '0,' + h + ' ' + polyline + ' ' + w + ',' + h;
-    var thresholdY = (h - (threshold / maxVal) * h).toFixed(1);
-
-    var latestColor = latest >= threshold ? '#f85149' : color;
-
-    return '<div class="chart-card">' +
-      '<h4>' + esc(label) + '</h4>' +
-      '<div class="chart-value" style="color:' + latestColor + '">' + latest.toFixed(1) + '%</div>' +
-      '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none">' +
-        '<polygon points="' + areaPoints + '" fill="' + color + '" opacity="0.15"/>' +
-        '<polyline points="' + polyline + '" fill="none" stroke="' + color + '" stroke-width="1.5"/>' +
-        '<line x1="0" y1="' + thresholdY + '" x2="' + w + '" y2="' + thresholdY + '" stroke="#f85149" stroke-width="1" stroke-dasharray="4,3" opacity="0.6"/>' +
-      '</svg>' +
-    '</div>';
+    html += '</div>';
+    
+    listEl.innerHTML = html;
   }
 
   // --- Dashboard Alerts Section ---
@@ -772,6 +758,43 @@
       }
     }
   });
+
+  // --- Audit filtering and rendering ---
+  function renderAuditsTable(audits) {
+    var tbody = document.getElementById('audits-table');
+    window._auditCache = {};
+    tbody.innerHTML = audits.map(function(a) {
+      window._auditCache[a.id] = a.results;
+      var date = new Date(a.created_at).toLocaleString();
+      var checks = countChecks(a.results);
+      return '<tr>' +
+        '<td>' + date + '</td>' +
+        '<td>' + checks + '</td>' +
+        '<td><a href="#" onclick="showAuditDetail(' + a.id + '); return false" class="btn btn-sm">View</a></td>' +
+      '</tr>';
+    }).join('');
+  }
+
+  window.filterAudits = function(query) {
+    if (!query || query.trim() === '') {
+      renderAuditsTable(_allAudits);
+      return;
+    }
+
+    query = query.toLowerCase();
+    var filtered = _allAudits.filter(function(audit) {
+      // Search in audit results (deep search in JSON)
+      var jsonStr = JSON.stringify(audit.results).toLowerCase();
+      return jsonStr.indexOf(query) !== -1;
+    });
+
+    if (filtered.length === 0) {
+      document.getElementById('audits-table').innerHTML = 
+        '<tr><td colspan="3" style="text-align:center;color:#8b949e">No audits match "' + query + '"</td></tr>';
+    } else {
+      renderAuditsTable(filtered);
+    }
+  };
 
   // --- Auto-refresh (preserves state) ---
   setInterval(function() {

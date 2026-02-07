@@ -7,6 +7,8 @@ import (
 )
 
 type Config struct {
+	CloudURL            string              `json:"cloud_url,omitempty"`
+	APIKey              string              `json:"api_key,omitempty"`
 	DiscordWebhook      string              `json:"discord_webhook"`
 	NotificationFilters NotificationFilters `json:"notification_whitelist"`
 }

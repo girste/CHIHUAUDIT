@@ -273,18 +273,49 @@ func runAlerting(hostID int, hostName string, currentResults json.RawMessage) {
 		return
 	}
 
-	changes := alerting.Compare(prevResults, currentResults, cfg)
+	changes := alerting.CompareGeneric(prevResults, currentResults, cfg)
 	if len(changes) == 0 {
 		return
 	}
 
 	log.Printf("alerting: %d changes detected for host %q", len(changes), hostName)
 
+	// Save each change as an alert in the database
+	for _, change := range changes {
+		severity := determineSeverity(change.Key)
+		oldVal := fmt.Sprintf("%v", change.OldValue)
+		newVal := fmt.Sprintf("%v", change.NewValue)
+		if err := models.SaveAlert(hostID, change.Key, change.Description, oldVal, newVal, severity); err != nil {
+			log.Printf("alerting: save alert error: %v", err)
+		}
+	}
+
 	if cfg.WebhookURL != "" {
 		if err := alerting.SendWebhook(cfg.WebhookURL, hostName, changes); err != nil {
 			log.Printf("alerting: webhook error for host %q: %v", hostName, err)
+		} else {
+			log.Printf("webhook sent for host %q: %d changes", hostName, len(changes))
 		}
 	}
+}
+
+func determineSeverity(key string) string {
+	// Critical keys - security and system failures
+	if strings.Contains(key, "firewall") || 
+	   strings.Contains(key, "ssh_root_login") || 
+	   strings.Contains(key, "fail2ban") || 
+	   strings.Contains(key, "failed_services") ||
+	   strings.Contains(key, "security.") {
+		return "critical"
+	}
+	// Warning keys - configuration changes
+	if strings.Contains(key, "ssh") || 
+	   strings.Contains(key, "suid") || 
+	   strings.Contains(key, "ssl") ||
+	   strings.Contains(key, "update") {
+		return "warning"
+	}
+	return "info"
 }
 
 func HandleListAudits(w http.ResponseWriter, r *http.Request) {

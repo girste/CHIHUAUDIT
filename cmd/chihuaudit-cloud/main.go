@@ -48,6 +48,7 @@ func main() {
 		"migrations/002_host_config.sql",
 		"migrations/003_security_and_alerts.sql",
 		"migrations/004_fix_audits_cascade.sql",
+		"migrations/005_alerts_table.sql",
 	} {
 		migrationSQL, err := migrationsFS.ReadFile(mf)
 		if err != nil {

@@ -77,6 +77,17 @@ func Compare(previous, current *checks.AuditResults, cfg *config.Config) []Chang
 		})
 	}
 
+	// fail2ban status
+	if previous.Security.Fail2banStatus != current.Security.Fail2banStatus {
+		changes = append(changes, Change{
+			Key:          "fail2ban",
+			Description:  fmt.Sprintf("Fail2ban status: %s → %s", previous.Security.Fail2banStatus, current.Security.Fail2banStatus),
+			OldValue:     previous.Security.Fail2banStatus,
+			NewValue:     current.Security.Fail2banStatus,
+			ShouldNotify: !cfg.ShouldIgnore("fail2ban"),
+		})
+	}
+
 	if previous.Services.WebStatus != current.Services.WebStatus {
 		changes = append(changes, Change{
 			Key:          "web_server",
@@ -119,6 +130,87 @@ func Compare(previous, current *checks.AuditResults, cfg *config.Config) []Chang
 				OldValue:     previous.Storage.DiskHealth,
 				NewValue:     current.Storage.DiskHealth,
 				ShouldNotify: !cfg.ShouldIgnore("disk_health"),
+			})
+		}
+	}
+
+	// SSH critical changes
+	if previous.Security.SSHPort != current.Security.SSHPort {
+		changes = append(changes, Change{
+			Key:          "ssh_port",
+			Description:  fmt.Sprintf("SSH port changed: %d → %d", previous.Security.SSHPort, current.Security.SSHPort),
+			OldValue:     previous.Security.SSHPort,
+			NewValue:     current.Security.SSHPort,
+			ShouldNotify: !cfg.ShouldIgnore("ssh_port"),
+		})
+	}
+
+	if previous.Security.SSHPasswordAuth != current.Security.SSHPasswordAuth {
+		changes = append(changes, Change{
+			Key:          "ssh_password_auth",
+			Description:  fmt.Sprintf("SSH password auth changed: %s → %s", previous.Security.SSHPasswordAuth, current.Security.SSHPasswordAuth),
+			OldValue:     previous.Security.SSHPasswordAuth,
+			NewValue:     current.Security.SSHPasswordAuth,
+			ShouldNotify: !cfg.ShouldIgnore("ssh_password_auth"),
+		})
+	}
+
+	if previous.Security.SSHRootLogin != current.Security.SSHRootLogin {
+		changes = append(changes, Change{
+			Key:          "ssh_root_login",
+			Description:  fmt.Sprintf("SSH root login changed: %s → %s", previous.Security.SSHRootLogin, current.Security.SSHRootLogin),
+			OldValue:     previous.Security.SSHRootLogin,
+			NewValue:     current.Security.SSHRootLogin,
+			ShouldNotify: !cfg.ShouldIgnore("ssh_root_login"),
+		})
+	}
+
+	// SUID binaries
+	if previous.Security.SUIDCount != current.Security.SUIDCount {
+		if current.Security.SUIDCount > previous.Security.SUIDCount {
+			changes = append(changes, Change{
+				Key:          "suid_binaries",
+				Description:  fmt.Sprintf("SUID binaries increased: %d → %d", previous.Security.SUIDCount, current.Security.SUIDCount),
+				OldValue:     previous.Security.SUIDCount,
+				NewValue:     current.Security.SUIDCount,
+				ShouldNotify: !cfg.ShouldIgnore("suid_binaries"),
+			})
+		}
+	}
+
+	// SSL certificates expiring
+	if previous.Security.SSLExpiringSoon != current.Security.SSLExpiringSoon {
+		if current.Security.SSLExpiringSoon > 0 {
+			changes = append(changes, Change{
+				Key:          "ssl_expiring",
+				Description:  fmt.Sprintf("SSL certificates expiring soon: %d", current.Security.SSLExpiringSoon),
+				OldValue:     previous.Security.SSLExpiringSoon,
+				NewValue:     current.Security.SSLExpiringSoon,
+				ShouldNotify: !cfg.ShouldIgnore("ssl_expiring"),
+			})
+		}
+	}
+
+	// Unusual ports
+	if len(previous.Security.UnusualPorts) != len(current.Security.UnusualPorts) {
+		changes = append(changes, Change{
+			Key:          "unusual_ports",
+			Description:  fmt.Sprintf("Unusual ports changed: %d → %d ports", len(previous.Security.UnusualPorts), len(current.Security.UnusualPorts)),
+			OldValue:     previous.Security.UnusualPorts,
+			NewValue:     current.Security.UnusualPorts,
+			ShouldNotify: !cfg.ShouldIgnore("unusual_ports"),
+		})
+	}
+
+	// Pending security updates
+	if previous.System.SecurityUpdates != current.System.SecurityUpdates {
+		if current.System.SecurityUpdates > previous.System.SecurityUpdates {
+			changes = append(changes, Change{
+				Key:          "security_updates",
+				Description:  fmt.Sprintf("Security updates available: %d → %d", previous.System.SecurityUpdates, current.System.SecurityUpdates),
+				OldValue:     previous.System.SecurityUpdates,
+				NewValue:     current.System.SecurityUpdates,
+				ShouldNotify: !cfg.ShouldIgnore("security_updates"),
 			})
 		}
 	}

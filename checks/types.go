@@ -61,19 +61,19 @@ type Services struct {
 
 // Resources check results
 type Resources struct {
-	CPULoad1     float64
-	CPULoad5     float64
-	CPULoad15    float64
-	CPUPercent   float64
-	MemTotal     uint64
-	MemUsed      uint64
-	MemPercent   float64
-	SwapTotal    uint64
-	SwapUsed     uint64
-	SwapPercent  float64
-	DiskMounts   []DiskMount
-	TopProcesses []Process
-	LargeLogs    []LogFile
+	CPULoad1     float64     `json:"cpuload1"`
+	CPULoad5     float64     `json:"cpuload5"`
+	CPULoad15    float64     `json:"cpuload15"`
+	CPUPercent   float64     `json:"cpu_percent"`
+	MemTotal     uint64      `json:"mem_total"`
+	MemUsed      uint64      `json:"mem_used"`
+	MemPercent   float64     `json:"mem_percent"`
+	SwapTotal    uint64      `json:"swap_total"`
+	SwapUsed     uint64      `json:"swap_used"`
+	SwapPercent  float64     `json:"swap_percent"`
+	DiskMounts   []DiskMount `json:"disk_mounts"`
+	TopProcesses []Process   `json:"top_processes"`
+	LargeLogs    []LogFile   `json:"large_logs"`
 }
 
 type DiskMount struct {

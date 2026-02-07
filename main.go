@@ -1,12 +1,17 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
+	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"chihuaudit/checks"
@@ -140,8 +145,17 @@ func runAudit(jsonOutput bool) {
 		report.PrintText(results)
 	}
 
-	// Send audit summary to Discord if configured
+	// Send to cloud if configured
 	cfg := config.Load()
+	if cfg.CloudURL != "" && cfg.APIKey != "" {
+		go func() {
+			if err := sendToCloud(cfg.CloudURL, cfg.APIKey, results); err != nil {
+				log.Printf("Cloud upload failed: %v", err)
+			}
+		}()
+	}
+
+	// Send audit summary to Discord if configured
 	if cfg.DiscordWebhook != "" {
 		notify.SendAuditSummary(cfg, results)
 		if !jsonOutput {
@@ -168,8 +182,27 @@ func runMonitor(interval time.Duration) {
 		previous = checks.RunAll()
 		report.PrintText(previous)
 		_ = state.Save(previous)
+		
+		// Send initial audit to cloud if configured
+		if cfg.CloudURL != "" && cfg.APIKey != "" {
+			go func(results *checks.AuditResults) {
+				if err := sendToCloud(cfg.CloudURL, cfg.APIKey, results); err != nil {
+					log.Printf("Cloud upload failed: %v", err)
+				}
+			}(previous)
+		}
 	} else {
 		fmt.Printf("[%s] Loaded previous state from %s\n", time.Now().Format("15:04:05"), previous.Timestamp.Format("2006-01-02 15:04:05"))
+		
+		// Send current state to cloud on startup (important for monitoring resume)
+		if cfg.CloudURL != "" && cfg.APIKey != "" {
+			go func() {
+				current := checks.RunAll()
+				if err := sendToCloud(cfg.CloudURL, cfg.APIKey, current); err != nil {
+					log.Printf("Cloud upload failed: %v", err)
+				}
+			}()
+		}
 	}
 
 	ticker := time.NewTicker(interval)
@@ -194,6 +227,15 @@ func runMonitor(interval time.Duration) {
 					fmt.Println("    → Discord notification sent")
 				}
 			}
+		}
+
+		// Send to cloud if configured
+		if cfg.CloudURL != "" && cfg.APIKey != "" {
+			go func(results *checks.AuditResults) {
+				if err := sendToCloud(cfg.CloudURL, cfg.APIKey, results); err != nil {
+					log.Printf("Cloud upload failed: %v", err)
+				}
+			}(current)
 		}
 
 		_ = state.Save(current)
@@ -280,4 +322,39 @@ WantedBy=multi-user.target
 	}
 
 	fmt.Println("Service chihuaudit enabled and started")
+}
+
+func sendToCloud(cloudURL, apiKey string, results any) error {
+	if cloudURL == "" || apiKey == "" {
+		return nil
+	}
+
+	cloudURL = strings.TrimRight(cloudURL, "/")
+	endpoint := cloudURL + "/api/audits"
+
+	data, err := json.Marshal(results)
+	if err != nil {
+		return fmt.Errorf("marshal audit: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, endpoint, bytes.NewBuffer(data))
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-API-Key", apiKey)
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		return fmt.Errorf("unexpected status: %d", resp.StatusCode)
+	}
+
+	return nil
 }
