@@ -2,6 +2,8 @@
   'use strict';
 
   var currentHostId = null;
+  var _ignoredKeys = {};    // current host's ignored keys set
+  var _currentConfig = null; // current host's config for saving
 
   // --- API helpers ---
   async function api(path, opts) {
@@ -12,7 +14,7 @@
     }
     if (!res.ok) {
       var data = await res.json().catch(function() { return {}; });
-      throw new Error(data.error || 'Request failed');
+      throw new Error(data.error || 'Request failed (HTTP ' + res.status + ')');
     }
     return res.json();
   }
@@ -23,21 +25,70 @@
     window.location.href = '/login.html';
   };
 
+  // Load username into header
+  async function loadUsername() {
+    try {
+      var me = await api('/api/me');
+      document.getElementById('username-display').textContent = me.username;
+    } catch (e) { /* ignore */ }
+  }
+
+  // --- State preservation helpers ---
+  function saveAccordionState(containerId) {
+    var cards = document.querySelectorAll('#' + containerId + ' .audit-card');
+    var state = [];
+    for (var i = 0; i < cards.length; i++) {
+      state.push(cards[i].classList.contains('open'));
+    }
+    return state;
+  }
+
+  function restoreAccordionState(containerId, state) {
+    if (!state || !state.length) return;
+    var cards = document.querySelectorAll('#' + containerId + ' .audit-card');
+    for (var i = 0; i < cards.length && i < state.length; i++) {
+      if (state[i]) cards[i].classList.add('open');
+      else cards[i].classList.remove('open');
+    }
+  }
+
+  function saveUIState() {
+    return {
+      scrollY: window.scrollY,
+      accordions: currentHostId ? saveAccordionState('latest-audit') : null,
+      configOpen: currentHostId ? document.getElementById('host-config-wrapper').style.display !== 'none' : false,
+      rotatedKeyVisible: currentHostId ? document.getElementById('rotated-key-result').style.display !== 'none' : false
+    };
+  }
+
+  function restoreUIState(state) {
+    if (!state) return;
+    if (state.accordions) restoreAccordionState('latest-audit', state.accordions);
+    if (currentHostId) {
+      if (state.configOpen) {
+        document.getElementById('host-config-wrapper').style.display = 'block';
+        document.getElementById('config-toggle-icon').innerHTML = '&#9660;';
+      }
+      if (state.rotatedKeyVisible) {
+        document.getElementById('rotated-key-result').style.display = 'block';
+      }
+    }
+    window.scrollTo(0, state.scrollY);
+  }
+
   // --- Dashboard ---
   async function loadDashboard() {
     try {
       var results = await Promise.all([
-        api('/api/dashboard'),
-        api('/api/hosts')
+        api('/api/hosts'),
+        api('/api/alerts/recent').catch(function() { return []; })
       ]);
-      var stats = results[0];
-      var hosts = results[1];
+      var hosts = results[0];
+      var alerts = results[1];
 
-      document.getElementById('stat-hosts').textContent = stats.total_hosts;
-      document.getElementById('stat-online').textContent = stats.online_hosts;
-      document.getElementById('stat-audits').textContent = stats.total_audits;
-
+      document.getElementById('host-count').textContent = '(' + hosts.length + ')';
       renderHostsTable(hosts);
+      renderAlertsSection(alerts);
     } catch (e) {
       if (e.message !== 'unauthorized') console.error('Dashboard load error:', e);
     }
@@ -46,62 +97,89 @@
   function renderHostsTable(hosts) {
     var tbody = document.getElementById('hosts-table');
     if (!hosts.length) {
-      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#8b949e">No hosts yet</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#8b949e">No hosts yet</td></tr>';
       return;
     }
     tbody.innerHTML = hosts.map(function(h) {
       var lastSeen = h.last_seen ? timeAgo(new Date(h.last_seen)) : 'Never';
       var online = h.last_seen && (Date.now() - new Date(h.last_seen).getTime()) < 86400000;
-      var statusBadge = online
-        ? '<span class="badge badge-green">Online</span>'
-        : '<span class="badge badge-gray">Offline</span>';
+      var dot = online
+        ? '<span class="status-dot online"></span>'
+        : '<span class="status-dot offline"></span>';
       return '<tr>' +
-        '<td><a href="#" onclick="showHost(' + h.id + '); return false">' + esc(h.name) + '</a></td>' +
+        '<td>' + dot + '<a href="#" onclick="showHost(' + h.id + '); return false">' + esc(h.name) + '</a></td>' +
         '<td>' + lastSeen + '</td>' +
         '<td>' + h.audit_count + '</td>' +
-        '<td>' + statusBadge + '</td>' +
         '<td><a href="#" onclick="showHost(' + h.id + '); return false" class="btn btn-sm">View</a></td>' +
       '</tr>';
     }).join('');
   }
 
   // --- Host Detail ---
-  window.showHost = async function(id) {
+  window.showHost = async function(id, preserveState) {
+    var uiState = preserveState ? saveUIState() : null;
     currentHostId = id;
     document.getElementById('view-dashboard').style.display = 'none';
     document.getElementById('view-host').style.display = 'block';
+    document.getElementById('view-guide').style.display = 'none';
+
+    // Only show loading on first load, not refresh
+    if (!preserveState) {
+      document.getElementById('latest-audit').innerHTML = '<div style="text-align:center;padding:2rem;color:#8b949e">Loading...</div>';
+    }
 
     try {
       var results = await Promise.all([
         api('/api/hosts/' + id),
         api('/api/hosts/' + id + '/audits'),
-        api('/api/hosts/' + id + '/config')
+        api('/api/hosts/' + id + '/config'),
+        api('/api/hosts/' + id + '/metrics').catch(function() { return []; }),
+        api('/api/hosts/' + id + '/alerts').catch(function() { return []; })
       ]);
       var host = results[0];
       var audits = results[1];
       var cfg = results[2];
+      var metrics = results[3];
+      var hostAlerts = results[4];
+
+      _currentConfig = cfg;
+      _ignoredKeys = {};
+      var ignArr = cfg.ignore_changes || [];
+      for (var ig = 0; ig < ignArr.length; ig++) _ignoredKeys[ignArr[ig]] = true;
 
       document.getElementById('host-name').textContent = host.name;
       document.getElementById('delete-host-btn').onclick = function() { deleteHost(id); };
 
-      // Hide rotated key from previous rotation
-      document.getElementById('rotated-key-result').style.display = 'none';
+      // Only reset these on first load
+      if (!preserveState) {
+        document.getElementById('rotated-key-result').style.display = 'none';
+      }
 
-      // Load config
+      // Host alerts banner
+      renderHostAlertsBanner(hostAlerts);
+
+      // Performance charts
+      renderHostCharts(metrics, cfg);
+
+      // Load config values (don't reset visibility on refresh)
       document.getElementById('cfg-webhook').value = cfg.webhook_url || '';
       document.getElementById('cfg-cpu').value = cfg.cpu_threshold || 60;
       document.getElementById('cfg-mem').value = cfg.memory_threshold || 60;
       document.getElementById('cfg-disk').value = cfg.disk_threshold || 80;
-      document.getElementById('cfg-ignore').value = (cfg.ignore_changes || []).join(', ');
       document.getElementById('cfg-retention').value = cfg.retention_days || 90;
-      document.getElementById('config-status').style.display = 'none';
-      document.getElementById('webhook-status').style.display = 'none';
+
+      if (!preserveState) {
+        document.getElementById('config-status').style.display = 'none';
+        document.getElementById('webhook-status').style.display = 'none';
+        document.getElementById('host-config-wrapper').style.display = 'none';
+        document.getElementById('config-toggle-icon').innerHTML = '&#9654;';
+      }
 
       // Latest audit - structured rendering
       var latestDiv = document.getElementById('latest-audit');
       if (audits.length > 0) {
         var prevResults = audits.length > 1 ? audits[1].results : null;
-        latestDiv.innerHTML = renderAuditResults(audits[0].results, prevResults);
+        latestDiv.innerHTML = renderAuditResults(audits[0].results, prevResults, true);
       } else {
         latestDiv.innerHTML = '<div class="audit-results"><pre>No audits yet</pre></div>';
       }
@@ -110,17 +188,24 @@
       var tbody = document.getElementById('audits-table');
       if (!audits.length) {
         tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#8b949e">No audits</td></tr>';
-        return;
+      } else {
+        window._auditCache = {};
+        tbody.innerHTML = audits.map(function(a) {
+          window._auditCache[a.id] = a.results;
+          var date = new Date(a.created_at).toLocaleString();
+          var checks = countChecks(a.results);
+          return '<tr>' +
+            '<td>' + date + '</td>' +
+            '<td>' + checks + '</td>' +
+            '<td><a href="#" onclick="showAuditDetail(' + a.id + '); return false" class="btn btn-sm">View</a></td>' +
+          '</tr>';
+        }).join('');
       }
-      tbody.innerHTML = audits.map(function(a) {
-        var date = new Date(a.created_at).toLocaleString();
-        var checks = countChecks(a.results);
-        return '<tr>' +
-          '<td>' + date + '</td>' +
-          '<td>' + checks + '</td>' +
-          '<td><a href="#" onclick="showAuditDetail(' + a.id + ', ' + esc(JSON.stringify(JSON.stringify(a.results))) + '); return false" class="btn btn-sm">View</a></td>' +
-        '</tr>';
-      }).join('');
+
+      // Restore UI state after DOM rebuild
+      if (preserveState && uiState) {
+        restoreUIState(uiState);
+      }
     } catch (e) {
       if (e.message !== 'unauthorized') console.error('Host load error:', e);
     }
@@ -130,6 +215,7 @@
     currentHostId = null;
     document.getElementById('view-dashboard').style.display = 'block';
     document.getElementById('view-host').style.display = 'none';
+    document.getElementById('view-guide').style.display = 'none';
     loadDashboard();
   };
 
@@ -146,8 +232,7 @@
   // --- Host Config ---
   window.saveHostConfig = async function() {
     if (!currentHostId) return;
-    var ignoreStr = document.getElementById('cfg-ignore').value;
-    var ignoreArr = ignoreStr.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+    var ignoreArr = Object.keys(_ignoredKeys).filter(function(k) { return _ignoredKeys[k]; });
 
     try {
       await api('/api/hosts/' + currentHostId + '/config', {
@@ -170,17 +255,63 @@
     }
   };
 
-  window.toggleSection = function(id) {
-    var el = document.getElementById(id);
-    if (el) el.classList.toggle('collapsed');
+  // --- Toggle Ignore for a section key ---
+  window.toggleIgnore = async function(key, event) {
+    if (event) event.stopPropagation();
+    if (!currentHostId) return;
+
+    _ignoredKeys[key] = !_ignoredKeys[key];
+    if (!_ignoredKeys[key]) delete _ignoredKeys[key];
+
+    // Update UI immediately
+    var btn = document.querySelector('[data-ignore-key="' + key + '"]');
+    if (btn) {
+      btn.classList.toggle('ignored', !!_ignoredKeys[key]);
+      btn.title = _ignoredKeys[key] ? 'Ignored (click to track)' : 'Click to ignore changes';
+    }
+    var card = btn ? btn.closest('.audit-card') : null;
+    if (card) card.classList.toggle('ignored-section', !!_ignoredKeys[key]);
+
+    // Save to server
+    var ignoreArr = Object.keys(_ignoredKeys).filter(function(k) { return _ignoredKeys[k]; });
+    try {
+      await api('/api/hosts/' + currentHostId + '/config', {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          webhook_url: _currentConfig ? _currentConfig.webhook_url : '',
+          cpu_threshold: _currentConfig ? _currentConfig.cpu_threshold : 60,
+          memory_threshold: _currentConfig ? _currentConfig.memory_threshold : 60,
+          disk_threshold: _currentConfig ? _currentConfig.disk_threshold : 80,
+          ignore_changes: ignoreArr,
+          retention_days: _currentConfig ? _currentConfig.retention_days : 90
+        })
+      });
+    } catch (e) {
+      console.error('Failed to save ignore config:', e);
+    }
+  };
+
+  // --- Toggle Host Config ---
+  window.toggleHostConfig = function() {
+    var wrapper = document.getElementById('host-config-wrapper');
+    var icon = document.getElementById('config-toggle-icon');
+    if (wrapper.style.display === 'none') {
+      wrapper.style.display = 'block';
+      icon.innerHTML = '&#9660;';
+    } else {
+      wrapper.style.display = 'none';
+      icon.innerHTML = '&#9654;';
+    }
   };
 
   // --- Add Host Modal ---
   window.showAddHostModal = function() {
     document.getElementById('host-name-input').value = '';
-    document.getElementById('api-key-result').style.display = 'none';
-    document.getElementById('create-host-btn').style.display = '';
+    document.getElementById('add-host-step1').style.display = '';
+    document.getElementById('add-host-step2').style.display = 'none';
     document.getElementById('add-host-modal').classList.add('active');
+    document.getElementById('host-name-input').focus();
   };
 
   window.closeAddHostModal = function() {
@@ -197,23 +328,44 @@
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({name: name})
       });
-      document.getElementById('api-key-value').textContent = host.api_key;
-      document.getElementById('api-key-result').style.display = 'block';
-      document.getElementById('create-host-btn').style.display = 'none';
+      var key = host.api_key;
+      var cloudUrl = window.location.origin;
+      document.getElementById('api-key-value').textContent = key;
+      var configJSON = JSON.stringify({cloud_url: cloudUrl, api_key: key}, null, 2);
+      document.getElementById('step2-config').textContent = configJSON;
+      document.getElementById('add-host-step1').style.display = 'none';
+      document.getElementById('add-host-step2').style.display = '';
     } catch (e) {
       alert('Error: ' + e.message);
     }
   };
 
   // --- Audit Detail Modal ---
-  window.showAuditDetail = function(id, resultsStr) {
-    var results = JSON.parse(resultsStr);
-    document.getElementById('audit-detail-content').innerHTML = renderAuditResults(results, null);
+  window.showAuditDetail = function(id) {
+    var results = window._auditCache ? window._auditCache[id] : null;
+    if (!results) return;
+    document.getElementById('audit-detail-content').innerHTML = renderAuditResults(results, null, false);
     document.getElementById('audit-detail-modal').classList.add('active');
   };
 
   window.closeAuditDetail = function() {
     document.getElementById('audit-detail-modal').classList.remove('active');
+  };
+
+  // --- Guide ---
+  window.showGuide = function() {
+    document.getElementById('view-dashboard').style.display = 'none';
+    document.getElementById('view-host').style.display = 'none';
+    document.getElementById('view-guide').style.display = 'block';
+  };
+
+  window.hideGuide = function() {
+    if (currentHostId) {
+      document.getElementById('view-host').style.display = 'block';
+    } else {
+      document.getElementById('view-dashboard').style.display = 'block';
+    }
+    document.getElementById('view-guide').style.display = 'none';
   };
 
   // --- Structured Audit Rendering ---
@@ -233,7 +385,7 @@
 
   var STATUS_KEYS = ['firewall', 'web_status', 'db_status', 'disk_health', 'status', 'available'];
 
-  function renderAuditResults(results, prevResults) {
+  function renderAuditResults(results, prevResults, showIgnoreToggles) {
     if (!results || typeof results !== 'object' || Array.isArray(results)) {
       return '<div class="audit-results"><pre>' + esc(JSON.stringify(results, null, 2)) + '</pre></div>';
     }
@@ -261,10 +413,13 @@
       var prevSection = prev[sec.key] && typeof prev[sec.key] === 'object' ? prev[sec.key] : null;
       var badge = getSectionBadge(sectionData);
       var bodyHtml = renderObject(sectionData, prevSection);
+      var isIgnored = _ignoredKeys[sec.key];
+      var ignoredClass = isIgnored ? ' ignored-section' : '';
+      var ignoreBtn = showIgnoreToggles ? renderIgnoreButton(sec.key, isIgnored) : '';
 
-      html += '<div class="audit-card">' +
+      html += '<div class="audit-card' + ignoredClass + '">' +
         '<div class="audit-card-header" onclick="this.parentElement.classList.toggle(\'open\')">' +
-          sec.icon + ' ' + sec.label +
+          sec.icon + ' ' + sec.label + ignoreBtn +
           (badge ? ' <span class="section-badge">' + badge + '</span>' : '') +
           ' <span class="toggle-icon">&#9660;</span>' +
         '</div>' +
@@ -285,8 +440,11 @@
       var val = results[ek];
       if (val && typeof val === 'object' && !Array.isArray(val)) {
         var prevExtra = prev[ek] && typeof prev[ek] === 'object' ? prev[ek] : null;
-        html += '<div class="audit-card">' +
-          '<div class="audit-card-header" onclick="this.parentElement.classList.toggle(\'open\')">' + esc(formatKey(ek)) + ' <span class="toggle-icon">&#9660;</span></div>' +
+        var ekIgnored = _ignoredKeys[ek];
+        var ekIgnoredClass = ekIgnored ? ' ignored-section' : '';
+        var ekIgnoreBtn = showIgnoreToggles ? renderIgnoreButton(ek, ekIgnored) : '';
+        html += '<div class="audit-card' + ekIgnoredClass + '">' +
+          '<div class="audit-card-header" onclick="this.parentElement.classList.toggle(\'open\')">' + esc(formatKey(ek)) + ekIgnoreBtn + ' <span class="toggle-icon">&#9660;</span></div>' +
           '<div class="audit-card-body">' + renderObject(val, prevExtra) + '</div></div>';
       }
     }
@@ -309,6 +467,13 @@
     }
 
     return html || '<div class="audit-results"><pre>' + esc(JSON.stringify(results, null, 2)) + '</pre></div>';
+  }
+
+  function renderIgnoreButton(key, isIgnored) {
+    var cls = isIgnored ? ' ignored' : '';
+    var title = isIgnored ? 'Ignored (click to track)' : 'Click to ignore changes';
+    var icon = isIgnored ? '&#128065;&#8288;&#8725;' : '&#128065;';
+    return ' <button class="ignore-toggle' + cls + '" data-ignore-key="' + esc(key) + '" title="' + title + '" onclick="toggleIgnore(\'' + esc(key) + '\', event)">' + icon + '</button>';
   }
 
   function renderObject(obj, prevObj) {
@@ -456,6 +621,96 @@
     return '-';
   }
 
+  // --- Host Alerts Banner ---
+  function renderHostAlertsBanner(alerts) {
+    var el = document.getElementById('host-alerts-banner');
+    if (!alerts || !alerts.length) {
+      el.innerHTML = '';
+      return;
+    }
+    var html = '';
+    for (var i = 0; i < alerts.length; i++) {
+      var a = alerts[i];
+      var severity = a.current_value >= a.threshold_value * 1.2 ? '' : ' warn';
+      html += '<div class="host-alert-banner' + severity + '">' +
+        '&#9888; <strong>' + esc(formatKey(a.metric)) + '</strong>: ' +
+        a.current_value.toFixed(1) + '% (threshold: ' + a.threshold_value.toFixed(0) + '%) &mdash; since ' +
+        timeAgo(new Date(a.first_exceeded_at)) + '</div>';
+    }
+    el.innerHTML = html;
+  }
+
+  // --- Performance Charts (SVG) ---
+  function renderHostCharts(metrics, cfg) {
+    var el = document.getElementById('host-charts');
+    if (!metrics || metrics.length < 2) {
+      el.innerHTML = '';
+      return;
+    }
+    var cpuThreshold = cfg.cpu_threshold || 60;
+    var memThreshold = cfg.memory_threshold || 60;
+    var diskThreshold = cfg.disk_threshold || 80;
+
+    el.innerHTML = '<div class="charts-grid">' +
+      renderMiniChart('CPU', metrics.map(function(m) { return m.cpu_percent; }), cpuThreshold, '#58a6ff') +
+      renderMiniChart('Memory', metrics.map(function(m) { return m.mem_percent; }), memThreshold, '#a371f7') +
+      renderMiniChart('Disk', metrics.map(function(m) { return m.disk_percent; }), diskThreshold, '#f0883e') +
+    '</div>';
+  }
+
+  function renderMiniChart(label, values, threshold, color) {
+    var latest = values.length > 0 ? values[values.length - 1] : 0;
+    var w = 200, h = 60;
+    var maxVal = Math.max(100, Math.max.apply(null, values));
+    var n = values.length;
+    if (n < 2) return '<div class="chart-card"><h4>' + esc(label) + '</h4><div class="chart-value">' + latest.toFixed(1) + '%</div><div style="color:#8b949e;font-size:.75rem">Not enough data</div></div>';
+
+    var points = [];
+    for (var i = 0; i < n; i++) {
+      var x = (i / (n - 1)) * w;
+      var y = h - (values[i] / maxVal) * h;
+      points.push(x.toFixed(1) + ',' + y.toFixed(1));
+    }
+    var polyline = points.join(' ');
+    var areaPoints = '0,' + h + ' ' + polyline + ' ' + w + ',' + h;
+    var thresholdY = (h - (threshold / maxVal) * h).toFixed(1);
+
+    var latestColor = latest >= threshold ? '#f85149' : color;
+
+    return '<div class="chart-card">' +
+      '<h4>' + esc(label) + '</h4>' +
+      '<div class="chart-value" style="color:' + latestColor + '">' + latest.toFixed(1) + '%</div>' +
+      '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none">' +
+        '<polygon points="' + areaPoints + '" fill="' + color + '" opacity="0.15"/>' +
+        '<polyline points="' + polyline + '" fill="none" stroke="' + color + '" stroke-width="1.5"/>' +
+        '<line x1="0" y1="' + thresholdY + '" x2="' + w + '" y2="' + thresholdY + '" stroke="#f85149" stroke-width="1" stroke-dasharray="4,3" opacity="0.6"/>' +
+      '</svg>' +
+    '</div>';
+  }
+
+  // --- Dashboard Alerts Section ---
+  function renderAlertsSection(alerts) {
+    var el = document.getElementById('alerts-section');
+    if (!alerts || !alerts.length) {
+      el.innerHTML = '';
+      return;
+    }
+    var html = '<div class="alerts-section"><h3 style="font-size:.9rem;color:#8b949e;margin-bottom:.5rem">Active Alerts</h3>';
+    for (var i = 0; i < alerts.length; i++) {
+      var a = alerts[i];
+      var severity = a.current_value >= a.threshold_value * 1.2 ? 'danger' : 'warning';
+      var duration = timeAgo(new Date(a.first_exceeded_at));
+      html += '<div class="alert-card ' + severity + '">' +
+        '<div><span class="alert-metric">' + esc(formatKey(a.metric)) + '</span> ' +
+        '<span class="alert-host">on ' + esc(a.host_name) + '</span></div>' +
+        '<div style="text-align:right"><span class="alert-value">' + a.current_value.toFixed(1) + '%</span> ' +
+        '<span style="color:#8b949e;font-size:.75rem">(threshold: ' + a.threshold_value.toFixed(0) + '%)</span>' +
+        '<div class="alert-duration">since ' + duration + '</div></div></div>';
+    }
+    html += '</div>';
+    el.innerHTML = html;
+  }
+
   // --- Test Webhook ---
   window.testWebhook = async function() {
     if (!currentHostId) return;
@@ -477,7 +732,7 @@
   // --- Rotate API Key ---
   window.rotateAPIKey = async function() {
     if (!currentHostId) return;
-    if (!confirm('Rotate API key? The old key will stop working immediately.')) return;
+    if (!confirm('Rotate API key?\n\nThe old key will stop working immediately. The agent on this host will fail to push audits until you update its config.json with the new key.')) return;
     try {
       var result = await api('/api/hosts/' + currentHostId + '/rotate-key', {method: 'POST'});
       document.getElementById('rotated-key-value').textContent = result.api_key;
@@ -487,15 +742,31 @@
     }
   };
 
-  // --- Auto-refresh ---
+  // --- ESC key closes modals ---
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      if (document.getElementById('audit-detail-modal').classList.contains('active')) {
+        closeAuditDetail();
+      } else if (document.getElementById('add-host-modal').classList.contains('active')) {
+        closeAddHostModal();
+      }
+    }
+  });
+
+  // --- Auto-refresh (preserves state) ---
   setInterval(function() {
+    // Don't refresh if a modal is open
+    if (document.getElementById('audit-detail-modal').classList.contains('active')) return;
+    if (document.getElementById('add-host-modal').classList.contains('active')) return;
+
     if (currentHostId) {
-      showHost(currentHostId);
-    } else {
+      showHost(currentHostId, true);
+    } else if (document.getElementById('view-dashboard').style.display !== 'none') {
       loadDashboard();
     }
   }, 30000);
 
   // --- Init ---
+  loadUsername();
   loadDashboard();
 })();

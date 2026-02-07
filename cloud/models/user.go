@@ -21,8 +21,14 @@ func GetUserByUsername(username string) (*User, error) {
 	if err != nil {
 		return nil, err
 	}
-	u.CreatedAt, _ = time.Parse(time.DateTime, createdAt)
+	u.CreatedAt = scanTimeValue(createdAt)
 	return u, nil
+}
+
+func UserCount() (int, error) {
+	var count int
+	err := DB.QueryRow("SELECT COUNT(*) FROM users").Scan(&count)
+	return count, err
 }
 
 func CreateUser(username, passwordHash string) (*User, error) {
@@ -33,7 +39,10 @@ func CreateUser(username, passwordHash string) (*User, error) {
 	if err != nil {
 		return nil, err
 	}
-	id, _ := result.LastInsertId()
+	id, err := result.LastInsertId()
+	if err != nil {
+		return nil, err
+	}
 	u := &User{
 		ID:        int(id),
 		Username:  username,

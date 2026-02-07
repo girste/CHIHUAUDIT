@@ -115,6 +115,88 @@ func HandleCreateUser(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(user)
 }
 
+func HandleSetup(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		count, err := models.UserCount()
+		if err != nil {
+			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]bool{"needs_setup": count == 0})
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+
+	count, err := models.UserCount()
+	if err != nil {
+		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+		return
+	}
+	if count > 0 {
+		http.Error(w, `{"error":"setup already completed"}`, http.StatusForbidden)
+		return
+	}
+
+	var req loginRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"invalid request"}`, http.StatusBadRequest)
+		return
+	}
+
+	if len(req.Username) < 3 {
+		http.Error(w, `{"error":"username must be at least 3 characters"}`, http.StatusBadRequest)
+		return
+	}
+	if len(req.Password) < 6 {
+		http.Error(w, `{"error":"password must be at least 6 characters"}`, http.StatusBadRequest)
+		return
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+		return
+	}
+
+	user, err := models.CreateUser(req.Username, string(hash))
+	if err != nil {
+		log.Printf("setup create user error: %v", err)
+		http.Error(w, `{"error":"could not create user"}`, http.StatusInternalServerError)
+		return
+	}
+
+	token, err := middleware.GenerateJWT(user.ID, user.Username)
+	if err != nil {
+		log.Printf("setup jwt error: %v", err)
+		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+		return
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "token",
+		Value:    token,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
+		MaxAge:   86400,
+	})
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(loginResponse{Token: token, Username: user.Username})
+}
+
+func HandleMe(w http.ResponseWriter, r *http.Request) {
+	username, _ := r.Context().Value(middleware.UsernameKey).(string)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"username": username})
+}
+
 func GenerateAPIKey() string {
 	b := make([]byte, 32)
 	rand.Read(b)

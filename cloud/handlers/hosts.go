@@ -11,6 +11,12 @@ import (
 	"strings"
 )
 
+func writeJSONError(w http.ResponseWriter, msg string, code int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	json.NewEncoder(w).Encode(map[string]string{"error": msg})
+}
+
 type createHostRequest struct {
 	Name string `json:"name"`
 }
@@ -141,6 +147,29 @@ func HandleUpdateHostConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	cfg.HostID = id
 
+	// Validate webhook URL scheme
+	if cfg.WebhookURL != "" && !strings.HasPrefix(cfg.WebhookURL, "https://") && !strings.HasPrefix(cfg.WebhookURL, "http://") {
+		http.Error(w, `{"error":"webhook URL must start with http:// or https://"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Clamp thresholds to valid range
+	if cfg.CPUThreshold < 0 {
+		cfg.CPUThreshold = 0
+	} else if cfg.CPUThreshold > 100 {
+		cfg.CPUThreshold = 100
+	}
+	if cfg.MemoryThreshold < 0 {
+		cfg.MemoryThreshold = 0
+	} else if cfg.MemoryThreshold > 100 {
+		cfg.MemoryThreshold = 100
+	}
+	if cfg.DiskThreshold < 0 {
+		cfg.DiskThreshold = 0
+	} else if cfg.DiskThreshold > 100 {
+		cfg.DiskThreshold = 100
+	}
+
 	if err := models.UpdateHostConfig(&cfg); err != nil {
 		log.Printf("update host config error: %v", err)
 		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
@@ -217,7 +246,7 @@ func HandleTestWebhook(w http.ResponseWriter, r *http.Request) {
 
 	if err := alerting.SendTestWebhook(cfg.WebhookURL, host.Name); err != nil {
 		log.Printf("test webhook error: %v", err)
-		http.Error(w, `{"error":"webhook failed: `+err.Error()+`"}`, http.StatusBadGateway)
+		writeJSONError(w, "webhook failed", http.StatusBadGateway)
 		return
 	}
 

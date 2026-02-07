@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"time"
 
 	_ "modernc.org/sqlite"
 )
@@ -25,6 +26,10 @@ func InitDB(dbPath string) error {
 			return fmt.Errorf("%s: %w", pragma, err)
 		}
 	}
+	DB.SetMaxOpenConns(25)
+	DB.SetMaxIdleConns(5)
+	DB.SetConnMaxLifetime(5 * time.Minute)
+
 	if err = DB.Ping(); err != nil {
 		return fmt.Errorf("ping db: %w", err)
 	}

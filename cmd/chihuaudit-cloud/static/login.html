@@ -3,49 +3,102 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Login — Chihuaudit Cloud</title>
+<title>Chihuaudit Cloud</title>
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-<div class="login-box">
-  <h2>Chihuaudit Cloud</h2>
+<div class="login-box" id="login-box" style="display:none">
+  <div style="text-align:center;margin-bottom:1.5rem">
+    <div style="font-size:2rem;margin-bottom:.25rem">&#128021;</div>
+    <h2 id="login-title" style="margin:0">Chihuaudit Cloud</h2>
+    <p id="login-subtitle" style="color:#8b949e;font-size:.8rem;margin-top:.5rem"></p>
+  </div>
   <div class="error" id="error"></div>
   <form id="login-form">
     <div class="form-group">
       <label for="username">Username</label>
-      <input type="text" id="username" name="username" autocomplete="username" required>
+      <input type="text" id="username" name="username" autocomplete="username" required autofocus>
     </div>
     <div class="form-group">
       <label for="password">Password</label>
       <input type="password" id="password" name="password" autocomplete="current-password" required>
     </div>
-    <button type="submit" class="btn btn-primary" style="width:100%;margin-top:.5rem">Login</button>
+    <div class="form-group" id="confirm-group" style="display:none">
+      <label for="password-confirm">Confirm Password</label>
+      <input type="password" id="password-confirm" name="password-confirm" autocomplete="new-password">
+    </div>
+    <button type="submit" id="submit-btn" class="btn btn-primary" style="width:100%;margin-top:.5rem;padding:.6rem">Login</button>
   </form>
 </div>
 <script>
-document.getElementById('login-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const errEl = document.getElementById('error');
-  errEl.style.display = 'none';
-  try {
-    const res = await fetch('/api/login', {
+(function() {
+  var needsSetup = false;
+  var box = document.getElementById('login-box');
+
+  fetch('/api/setup').then(function(r) { return r.json(); }).then(function(data) {
+    if (data.needs_setup) {
+      needsSetup = true;
+      document.getElementById('login-title').textContent = 'Welcome to Chihuaudit';
+      document.getElementById('login-subtitle').textContent = 'Create your admin account to get started.';
+      document.getElementById('submit-btn').textContent = 'Create Account';
+      document.getElementById('confirm-group').style.display = 'block';
+      document.getElementById('password-confirm').required = true;
+      document.getElementById('password').autocomplete = 'new-password';
+      document.title = 'Setup \u2014 Chihuaudit Cloud';
+    } else {
+      document.getElementById('login-subtitle').textContent = 'Sign in to your dashboard.';
+    }
+    box.style.display = '';
+  }).catch(function() {
+    document.getElementById('login-subtitle').textContent = 'Sign in to your dashboard.';
+    box.style.display = '';
+  });
+
+  document.getElementById('login-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    var errEl = document.getElementById('error');
+    errEl.style.display = 'none';
+    var btn = document.getElementById('submit-btn');
+    var username = document.getElementById('username').value.trim();
+    var password = document.getElementById('password').value;
+
+    if (needsSetup) {
+      if (username.length < 3) {
+        errEl.textContent = 'Username must be at least 3 characters.';
+        errEl.style.display = 'block';
+        return;
+      }
+      if (password.length < 6) {
+        errEl.textContent = 'Password must be at least 6 characters.';
+        errEl.style.display = 'block';
+        return;
+      }
+      if (password !== document.getElementById('password-confirm').value) {
+        errEl.textContent = 'Passwords do not match.';
+        errEl.style.display = 'block';
+        return;
+      }
+    }
+
+    btn.disabled = true;
+    btn.textContent = needsSetup ? 'Creating...' : 'Signing in...';
+
+    var endpoint = needsSetup ? '/api/setup' : '/api/login';
+    fetch(endpoint, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        username: document.getElementById('username').value,
-        password: document.getElementById('password').value
-      })
+      body: JSON.stringify({username: username, password: password})
+    }).then(function(res) {
+      if (!res.ok) return res.json().then(function(d) { throw new Error(d.error || 'Request failed'); });
+      window.location.href = '/';
+    }).catch(function(err) {
+      errEl.textContent = err.message;
+      errEl.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = needsSetup ? 'Create Account' : 'Login';
     });
-    if (!res.ok) {
-      const data = await res.json();
-      throw new Error(data.error || 'Login failed');
-    }
-    window.location.href = '/';
-  } catch (err) {
-    errEl.textContent = err.message;
-    errEl.style.display = 'block';
-  }
-});
+  });
+})();
 </script>
 </body>
 </html>

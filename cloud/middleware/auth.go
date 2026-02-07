@@ -63,6 +63,19 @@ func ValidateJWT(tokenStr string) (*JWTClaims, error) {
 		return nil, fmt.Errorf("invalid token format")
 	}
 
+	// Verify header has correct algorithm
+	headerJSON, err := base64.RawURLEncoding.DecodeString(parts[0])
+	if err != nil {
+		return nil, fmt.Errorf("decode header: %w", err)
+	}
+	var header jwtHeader
+	if err := json.Unmarshal(headerJSON, &header); err != nil {
+		return nil, fmt.Errorf("unmarshal header: %w", err)
+	}
+	if header.Alg != "HS256" || header.Typ != "JWT" {
+		return nil, fmt.Errorf("unsupported token type")
+	}
+
 	signingInput := parts[0] + "." + parts[1]
 	mac := hmac.New(sha256.New, jwtSecret)
 	mac.Write([]byte(signingInput))
@@ -87,6 +100,17 @@ func ValidateJWT(tokenStr string) (*JWTClaims, error) {
 	}
 
 	return &claims, nil
+}
+
+// SecurityHeaders wraps an http.Handler with standard security headers.
+func SecurityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'")
+		next.ServeHTTP(w, r)
+	})
 }
 
 func RequireJWT(next http.HandlerFunc) http.HandlerFunc {

@@ -11,6 +11,7 @@
   <h1>Chihuaudit Cloud</h1>
   <div class="user-info">
     <span id="username-display"></span>
+    <button onclick="showGuide()">Guide</button>
     <button onclick="logout()">Logout</button>
   </div>
 </header>
@@ -18,18 +19,14 @@
 <div class="container">
   <!-- Dashboard view -->
   <div id="view-dashboard">
-    <div class="stats">
-      <div class="stat-card"><div class="value" id="stat-hosts">-</div><div class="label">Total Hosts</div></div>
-      <div class="stat-card"><div class="value" id="stat-online">-</div><div class="label">Online (24h)</div></div>
-      <div class="stat-card"><div class="value" id="stat-audits">-</div><div class="label">Total Audits</div></div>
-    </div>
-
     <div style="display:flex;justify-content:space-between;align-items:center;margin:1.5rem 0 .5rem">
-      <h2 style="font-size:1.1rem">Hosts</h2>
+      <h2 style="font-size:1.1rem">Hosts <span id="host-count" style="color:#8b949e;font-weight:400"></span></h2>
       <button class="btn btn-primary btn-sm" onclick="showAddHostModal()">+ Add Host</button>
     </div>
+
+    <div id="alerts-section"></div>
     <table>
-      <thead><tr><th>Name</th><th>Last Seen</th><th>Audits</th><th>Status</th><th></th></tr></thead>
+      <thead><tr><th>Name</th><th>Last Seen</th><th>Audits</th><th></th></tr></thead>
       <tbody id="hosts-table"></tbody>
     </table>
   </div>
@@ -44,15 +41,25 @@
         <button class="btn btn-danger btn-sm" id="delete-host-btn">Delete Host</button>
       </div>
     </div>
+
     <!-- Rotated API key display (shown once) -->
     <div id="rotated-key-result" style="display:none" class="config-section">
       <div class="api-key-warning">Save this new API key now. It will not be shown again. The old key is now invalid.</div>
       <div class="api-key-display" id="rotated-key-value"></div>
     </div>
-    <!-- Host Config -->
-    <div class="config-section">
-      <h3 class="section-header" onclick="toggleSection('host-config-body')">Alerting Config <span class="toggle-icon">&#9660;</span></h3>
-      <div id="host-config-body" class="section-body">
+
+    <!-- Host alerts banner -->
+    <div id="host-alerts-banner"></div>
+
+    <!-- Performance Charts -->
+    <div id="host-charts"></div>
+
+    <!-- Collapsible Config -->
+    <div class="config-toggle" id="config-toggle-btn" onclick="toggleHostConfig()">
+      <span class="gear-icon">&#9881;</span> Alerting &amp; Config <span class="toggle-icon" id="config-toggle-icon">&#9654;</span>
+    </div>
+    <div id="host-config-wrapper" style="display:none">
+      <div class="config-section">
         <div class="form-row">
           <div class="form-group">
             <label for="cfg-webhook">Webhook URL</label>
@@ -74,11 +81,7 @@
           </div>
         </div>
         <div class="form-row">
-          <div class="form-group" style="flex:3">
-            <label for="cfg-ignore">Ignore Changes (comma-separated)</label>
-            <input type="text" id="cfg-ignore" placeholder="uptime,active_connections,process_list,network_rx_tx">
-          </div>
-          <div class="form-group" style="flex:1">
+          <div class="form-group">
             <label for="cfg-retention">Retention (days)</label>
             <input type="number" id="cfg-retention" min="1" max="3650" step="1" value="90">
           </div>
@@ -92,38 +95,117 @@
       </div>
     </div>
 
-    <h3 style="font-size:.9rem;color:#8b949e;margin-bottom:.5rem">Latest Audit</h3>
+    <h3 style="font-size:.9rem;color:#8b949e;margin-bottom:.5rem">Latest Audit <span style="font-size:.75rem;color:#58a6ff;cursor:pointer" onclick="document.querySelectorAll('#latest-audit .audit-card').forEach(function(c){c.classList.toggle('open')})">(toggle all)</span></h3>
     <div id="latest-audit"></div>
+
     <h3 style="font-size:.9rem;color:#8b949e;margin:1.5rem 0 .5rem">Audit History</h3>
     <table>
       <thead><tr><th>Date</th><th>Checks</th><th></th></tr></thead>
       <tbody id="audits-table"></tbody>
     </table>
+
+    <!-- AI Feedback Placeholder -->
+    <div class="ai-placeholder">
+      <div class="ai-icon">&#129302;</div>
+      <h4>AI-powered Insights</h4>
+      <p>Automated security recommendations and anomaly detection &mdash; Coming soon</p>
+    </div>
+  </div>
+
+  <!-- Guide view -->
+  <div id="view-guide" style="display:none">
+    <a href="#" class="back-link" onclick="hideGuide(); return false">&larr; Back to dashboard</a>
+    <h2 style="font-size:1.2rem;margin-bottom:1rem">Chihuaudit Guide</h2>
+
+    <div class="guide-section">
+      <h3>What is Chihuaudit?</h3>
+      <p>Chihuaudit is an open-source server auditing tool. A lightweight agent runs on your servers, performs security and performance checks, and optionally pushes results to this cloud dashboard for centralized monitoring.</p>
+    </div>
+
+    <div class="guide-section">
+      <h3>Quick Start</h3>
+      <div class="setup-step"><span class="step-num">1</span><div class="step-text"><strong>Download the agent</strong> on your target server<div class="step-code">curl -fsSL https://github.com/girste/CHIHUAUDIT/releases/latest/download/chihuaudit -o /usr/local/bin/chihuaudit &amp;&amp; chmod +x /usr/local/bin/chihuaudit</div></div></div>
+      <div class="setup-step"><span class="step-num">2</span><div class="step-text"><strong>Generate config</strong><div class="step-code">chihuaudit init-config</div><div style="font-size:.8rem;color:#8b949e;margin-top:.3rem">Then edit <code style="color:#f0883e">~/.chihuaudit/config.json</code> and add your <code style="color:#f0883e">cloud_url</code> and <code style="color:#f0883e">api_key</code> (get the API key by adding a host in the dashboard).</div></div></div>
+      <div class="setup-step"><span class="step-num">3</span><div class="step-text"><strong>Install as a systemd service</strong> (runs every 5 minutes)<div class="step-code">sudo chihuaudit install</div></div></div>
+    </div>
+
+    <div class="guide-section">
+      <h3>Agent Commands</h3>
+      <table>
+        <thead><tr><th>Command</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>chihuaudit audit</code></td><td>Run a single audit and print results</td></tr>
+          <tr><td><code>chihuaudit audit --json</code></td><td>Run audit with JSON output</td></tr>
+          <tr><td><code>chihuaudit init-config</code></td><td>Generate default config file</td></tr>
+          <tr><td><code>sudo chihuaudit install</code></td><td>Install as systemd service + timer</td></tr>
+          <tr><td><code>sudo chihuaudit uninstall</code></td><td>Remove systemd service + timer</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="guide-section">
+      <h3>Cloud Dashboard Features</h3>
+      <ul style="color:#c9d1d9;font-size:.875rem;padding-left:1.5rem">
+        <li>Centralized view of all your hosts</li>
+        <li>Alerting with configurable thresholds (CPU, memory, disk)</li>
+        <li>Webhook notifications (Discord, Slack, etc.)</li>
+        <li>Audit history with change detection</li>
+        <li>Performance charts over time</li>
+        <li>Per-section ignore rules for noisy metrics</li>
+      </ul>
+    </div>
+
+    <div class="guide-section">
+      <h3>Ignore Changes</h3>
+      <p>In the host detail view, each audit section has an <strong>eye icon</strong> next to it. Click it to ignore that section from change detection. Ignored sections won't trigger alerts when their values change between audits.</p>
+    </div>
+
+    <div class="guide-section" style="background:#0d3d1f;border-color:#238636">
+      <h3 style="color:#3fb950">Contribute</h3>
+      <p>Chihuaudit is fully open source. Found a bug? Have an idea?</p>
+      <p style="margin-top:.5rem">
+        <a href="https://github.com/girste/CHIHUAUDIT" target="_blank" rel="noopener" class="btn btn-primary btn-sm" style="margin-right:.5rem">GitHub Repository</a>
+        <a href="https://github.com/girste/CHIHUAUDIT/issues" target="_blank" rel="noopener" class="btn btn-sm">Open an Issue</a>
+      </p>
+      <p style="margin-top:.5rem;font-size:.8rem;color:#8b949e">Pull requests are welcome! If you find interesting solutions or improvements, feel free to contribute.</p>
+    </div>
   </div>
 </div>
 
 <!-- Add Host Modal -->
-<div class="modal-overlay" id="add-host-modal">
-  <div class="modal">
+<div class="modal-overlay" id="add-host-modal" onclick="if(event.target===this)closeAddHostModal()">
+  <div class="modal" style="max-width:540px">
     <h3>Add Host</h3>
-    <div class="form-group">
-      <label for="host-name-input">Host Name</label>
-      <input type="text" id="host-name-input" placeholder="e.g. web-server-01">
+    <div id="add-host-step1">
+      <div class="form-group">
+        <label for="host-name-input">Host Name</label>
+        <input type="text" id="host-name-input" placeholder="e.g. web-server-01">
+      </div>
+      <div class="modal-actions">
+        <button class="btn" onclick="closeAddHostModal()">Cancel</button>
+        <button class="btn btn-primary" id="create-host-btn" onclick="createHost()">Create</button>
+      </div>
     </div>
-    <div id="api-key-result" style="display:none">
+    <div id="add-host-step2" style="display:none">
       <div class="api-key-warning">Save this API key now. It will not be shown again.</div>
       <div class="api-key-display" id="api-key-value"></div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn" onclick="closeAddHostModal()">Close</button>
-      <button class="btn btn-primary" id="create-host-btn" onclick="createHost()">Create</button>
+      <div class="setup-guide">
+        <h4>Quick Setup</h4>
+        <div class="setup-step"><span class="step-num">1</span><div class="step-text">Download the agent<div class="step-code">curl -fsSL https://github.com/girste/CHIHUAUDIT/releases/latest/download/chihuaudit -o /usr/local/bin/chihuaudit &amp;&amp; chmod +x /usr/local/bin/chihuaudit</div></div></div>
+        <div class="setup-step"><span class="step-num">2</span><div class="step-text">Generate config, then edit with your cloud details<div class="step-code">chihuaudit init-config</div><div style="font-size:.75rem;color:#8b949e;margin-top:.4rem">Then edit <code style="color:#f0883e">~/.chihuaudit/config.json</code> and set:</div><div class="step-code" id="step2-config"></div></div></div>
+        <div class="setup-step"><span class="step-num">3</span><div class="step-text">Install as a systemd service (runs every 5 min)<div class="step-code">sudo chihuaudit install</div></div></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" onclick="closeAddHostModal()">Done</button>
+      </div>
     </div>
   </div>
 </div>
 
 <!-- Audit Detail Modal -->
-<div class="modal-overlay" id="audit-detail-modal">
-  <div class="modal" style="max-width:700px">
+<div class="modal-overlay" id="audit-detail-modal" onclick="if(event.target===this)closeAuditDetail()">
+  <div class="modal" style="max-width:800px;max-height:85vh;overflow-y:auto">
+    <button class="modal-close" onclick="closeAuditDetail()" title="Close">&times;</button>
     <h3>Audit Detail</h3>
     <div class="audit-results" id="audit-detail-content"><pre></pre></div>
     <div class="modal-actions">

@@ -47,6 +47,7 @@ func main() {
 		"migrations/001_init.sql",
 		"migrations/002_host_config.sql",
 		"migrations/003_security_and_alerts.sql",
+		"migrations/004_fix_audits_cascade.sql",
 	} {
 		migrationSQL, err := migrationsFS.ReadFile(mf)
 		if err != nil {
@@ -64,11 +65,13 @@ func main() {
 	mux := http.NewServeMux()
 
 	// API routes
+	mux.HandleFunc("/api/setup", handlers.HandleSetup)
 	mux.HandleFunc("/api/login", handlers.HandleLogin)
 	mux.HandleFunc("/api/logout", handlers.HandleLogout)
 	mux.HandleFunc("/api/audits", handlers.HandlePushAudit)
 	mux.HandleFunc("/api/dashboard", middleware.RequireJWT(handlers.HandleDashboard))
 	mux.HandleFunc("/api/users", middleware.RequireJWT(handlers.HandleCreateUser))
+	mux.HandleFunc("/api/me", middleware.RequireJWT(handlers.HandleMe))
 
 	// Host routes
 	mux.HandleFunc("/api/hosts", middleware.RequireJWT(func(w http.ResponseWriter, r *http.Request) {
@@ -78,6 +81,7 @@ func main() {
 			handlers.HandleListHosts(w, r)
 		}
 	}))
+	mux.HandleFunc("/api/alerts/recent", middleware.RequireJWT(handlers.HandleRecentAlerts))
 	mux.HandleFunc("/api/hosts/", middleware.RequireJWT(func(w http.ResponseWriter, r *http.Request) {
 		path := strings.TrimPrefix(r.URL.Path, "/api/hosts/")
 		switch {
@@ -93,6 +97,12 @@ func main() {
 			handlers.HandleRotateAPIKey(w, r)
 		case strings.HasSuffix(path, "/test-webhook"):
 			handlers.HandleTestWebhook(w, r)
+		case strings.HasSuffix(path, "/metrics"):
+			handlers.HandleHostMetrics(w, r)
+		case strings.HasSuffix(path, "/alerts"):
+			handlers.HandleHostAlerts(w, r)
+		case strings.HasSuffix(path, "/audit-keys"):
+			handlers.HandleHostAuditKeys(w, r)
 		case r.Method == http.MethodDelete:
 			handlers.HandleDeleteHost(w, r)
 		default:
@@ -109,7 +119,7 @@ func main() {
 	mux.Handle("/", fileServer)
 
 	log.Printf("Listening on %s", listenAddr)
-	if err := http.ListenAndServe(listenAddr, mux); err != nil {
+	if err := http.ListenAndServe(listenAddr, middleware.SecurityHeaders(mux)); err != nil {
 		log.Fatalf("server: %v", err)
 	}
 }

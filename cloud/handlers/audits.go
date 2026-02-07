@@ -55,6 +55,23 @@ func getRateBucket(keyHash string) *rateBucket {
 	return b
 }
 
+func init() {
+	go func() {
+		for range time.Tick(5 * time.Minute) {
+			rateMu.Lock()
+			now := time.Now()
+			for k, b := range rateBuckets {
+				b.mu.Lock()
+				if len(b.times) == 0 || now.Sub(b.times[len(b.times)-1]) > 2*time.Minute {
+					delete(rateBuckets, k)
+				}
+				b.mu.Unlock()
+			}
+			rateMu.Unlock()
+		}
+	}()
+}
+
 // --- Validation ---
 
 var knownSections = map[string]bool{
@@ -80,11 +97,61 @@ func validateAuditBody(data json.RawMessage) error {
 		return fmt.Errorf("empty JSON object")
 	}
 	for k := range obj {
-		if knownSections[k] {
+		if knownSections[strings.ToLower(k)] {
 			return nil
 		}
 	}
 	return fmt.Errorf("no recognized audit sections")
+}
+
+// normalizeJSONKeys recursively lowercases and converts PascalCase/camelCase keys to snake_case.
+func normalizeJSONKeys(data json.RawMessage) json.RawMessage {
+	var raw any
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return data
+	}
+	normalized := normalizeValue(raw)
+	out, err := json.Marshal(normalized)
+	if err != nil {
+		return data
+	}
+	return out
+}
+
+func normalizeValue(v any) any {
+	switch val := v.(type) {
+	case map[string]any:
+		m := make(map[string]any, len(val))
+		for k, v := range val {
+			m[toSnakeCase(k)] = normalizeValue(v)
+		}
+		return m
+	case []any:
+		for i, item := range val {
+			val[i] = normalizeValue(item)
+		}
+		return val
+	default:
+		return v
+	}
+}
+
+func toSnakeCase(s string) string {
+	var result []byte
+	for i, c := range s {
+		if c >= 'A' && c <= 'Z' {
+			if i > 0 {
+				prev := s[i-1]
+				if prev >= 'a' && prev <= 'z' || prev >= '0' && prev <= '9' {
+					result = append(result, '_')
+				}
+			}
+			result = append(result, byte(c)+32) // toLower
+		} else {
+			result = append(result, byte(c))
+		}
+	}
+	return string(result)
 }
 
 func HandlePushAudit(w http.ResponseWriter, r *http.Request) {
@@ -129,8 +196,13 @@ func HandlePushAudit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Normalize keys to lowercase (agent sends PascalCase)
+	results = normalizeJSONKeys(results)
+
 	if err := validateAuditBody(results); err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusBadRequest)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
 	}
 

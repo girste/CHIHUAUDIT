@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"log"
 	"time"
 )
@@ -23,17 +24,37 @@ type HostWithLastAudit struct {
 	AuditCount       int             `json:"audit_count"`
 }
 
+var timeFormats = []string{
+	time.DateTime,
+	"2006-01-02T15:04:05Z",
+	"2006-01-02T15:04:05",
+	time.RFC3339,
+}
+
+func parseTime(s string) (time.Time, bool) {
+	for _, f := range timeFormats {
+		if t, err := time.Parse(f, s); err == nil {
+			return t, true
+		}
+	}
+	return time.Time{}, false
+}
+
 func scanTime(s sql.NullString) *time.Time {
 	if !s.Valid || s.String == "" {
 		return nil
 	}
-	t, _ := time.Parse(time.DateTime, s.String)
-	return &t
+	if t, ok := parseTime(s.String); ok {
+		return &t
+	}
+	return nil
 }
 
 func scanTimeValue(s string) time.Time {
-	t, _ := time.Parse(time.DateTime, s)
-	return t
+	if t, ok := parseTime(s); ok {
+		return t
+	}
+	return time.Time{}
 }
 
 func ListHosts() ([]HostWithLastAudit, error) {
@@ -109,7 +130,10 @@ func CreateHost(name, apiKey string) (*Host, error) {
 	if err != nil {
 		return nil, err
 	}
-	id, _ := result.LastInsertId()
+	id, err := result.LastInsertId()
+	if err != nil {
+		return nil, fmt.Errorf("last insert id: %w", err)
+	}
 	h := &Host{
 		ID:        int(id),
 		Name:      name,
@@ -215,7 +239,10 @@ func RotateHostAPIKey(hostID int, newHash string) error {
 	if err != nil {
 		return err
 	}
-	rows, _ := result.RowsAffected()
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
 	if rows == 0 {
 		return sql.ErrNoRows
 	}
@@ -307,8 +334,8 @@ func GetPendingPersistentAlerts(minDuration time.Duration) ([]PendingPersistentA
 		if err != nil {
 			return nil, err
 		}
-		a.FirstExceededAt, _ = time.Parse(time.DateTime, firstExceeded)
-		a.LastSeenAt, _ = time.Parse(time.DateTime, lastSeen)
+		a.FirstExceededAt = scanTimeValue(firstExceeded)
+		a.LastSeenAt = scanTimeValue(lastSeen)
 		alerts = append(alerts, a)
 	}
 	return alerts, rows.Err()
@@ -319,13 +346,81 @@ func MarkPersistentAlerted(breachID int) error {
 	return err
 }
 
-// DeleteHost deletes a host and its related data (audits cascade via FK, config+breaches cascade).
-func DeleteHost(id int) (int64, error) {
-	// Delete audits first (no cascade on that FK in schema)
-	_, err := DB.Exec("DELETE FROM audits WHERE host_id = ?", id)
-	if err != nil {
-		return 0, err
+// RecentAlerts returns unresolved threshold breaches with host names.
+type RecentAlert struct {
+	ID             int       `json:"id"`
+	HostID         int       `json:"host_id"`
+	HostName       string    `json:"host_name"`
+	Metric         string    `json:"metric"`
+	ThresholdValue float64   `json:"threshold_value"`
+	CurrentValue   float64   `json:"current_value"`
+	FirstExceeded  time.Time `json:"first_exceeded_at"`
+	LastSeen       time.Time `json:"last_seen_at"`
+}
+
+func GetRecentAlerts(limit int) ([]RecentAlert, error) {
+	if limit <= 0 {
+		limit = 20
 	}
+	rows, err := DB.Query(`
+		SELECT tb.id, tb.host_id, h.name, tb.metric, tb.threshold_value, tb.current_value,
+		       tb.first_exceeded_at, tb.last_seen_at
+		FROM threshold_breaches tb
+		JOIN hosts h ON h.id = tb.host_id
+		WHERE tb.resolved_at IS NULL
+		ORDER BY tb.last_seen_at DESC
+		LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var alerts []RecentAlert
+	for rows.Next() {
+		var a RecentAlert
+		var first, last string
+		err := rows.Scan(&a.ID, &a.HostID, &a.HostName, &a.Metric, &a.ThresholdValue, &a.CurrentValue, &first, &last)
+		if err != nil {
+			return nil, err
+		}
+		a.FirstExceeded = scanTimeValue(first)
+		a.LastSeen = scanTimeValue(last)
+		alerts = append(alerts, a)
+	}
+	return alerts, rows.Err()
+}
+
+// GetHostAlerts returns unresolved alerts for a specific host.
+func GetHostAlerts(hostID int) ([]RecentAlert, error) {
+	rows, err := DB.Query(`
+		SELECT tb.id, tb.host_id, h.name, tb.metric, tb.threshold_value, tb.current_value,
+		       tb.first_exceeded_at, tb.last_seen_at
+		FROM threshold_breaches tb
+		JOIN hosts h ON h.id = tb.host_id
+		WHERE tb.resolved_at IS NULL AND tb.host_id = ?
+		ORDER BY tb.last_seen_at DESC`, hostID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var alerts []RecentAlert
+	for rows.Next() {
+		var a RecentAlert
+		var first, last string
+		err := rows.Scan(&a.ID, &a.HostID, &a.HostName, &a.Metric, &a.ThresholdValue, &a.CurrentValue, &first, &last)
+		if err != nil {
+			return nil, err
+		}
+		a.FirstExceeded = scanTimeValue(first)
+		a.LastSeen = scanTimeValue(last)
+		alerts = append(alerts, a)
+	}
+	return alerts, rows.Err()
+}
+
+// DeleteHost deletes a host and its related data (all FKs have ON DELETE CASCADE).
+func DeleteHost(id int) (int64, error) {
 	result, err := DB.Exec("DELETE FROM hosts WHERE id = ?", id)
 	if err != nil {
 		return 0, err
