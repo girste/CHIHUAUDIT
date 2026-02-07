@@ -255,41 +255,19 @@
     }
   };
 
-  // --- Toggle Ignore for a section key ---
-  window.toggleIgnore = async function(key, event) {
-    if (event) event.stopPropagation();
+  // --- Toggle Ignore for an individual item key ---
+  window.toggleIgnore = function(key, checkboxEl) {
     if (!currentHostId) return;
 
-    _ignoredKeys[key] = !_ignoredKeys[key];
-    if (!_ignoredKeys[key]) delete _ignoredKeys[key];
+    var isChecked = checkboxEl.checked;
+    if (isChecked) { _ignoredKeys[key] = true; } else { delete _ignoredKeys[key]; }
 
-    // Update UI immediately
-    var btn = document.querySelector('[data-ignore-key="' + key + '"]');
-    if (btn) {
-      btn.classList.toggle('ignored', !!_ignoredKeys[key]);
-      btn.title = _ignoredKeys[key] ? 'Ignored (click to track)' : 'Click to ignore changes';
-    }
-    var card = btn ? btn.closest('.audit-card') : null;
-    if (card) card.classList.toggle('ignored-section', !!_ignoredKeys[key]);
+    // Update row styling
+    var row = checkboxEl.closest('.audit-item');
+    if (row) row.classList.toggle('item-ignored', isChecked);
 
     // Save to server
-    var ignoreArr = Object.keys(_ignoredKeys).filter(function(k) { return _ignoredKeys[k]; });
-    try {
-      await api('/api/hosts/' + currentHostId + '/config', {
-        method: 'PUT',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          webhook_url: _currentConfig ? _currentConfig.webhook_url : '',
-          cpu_threshold: _currentConfig ? _currentConfig.cpu_threshold : 60,
-          memory_threshold: _currentConfig ? _currentConfig.memory_threshold : 60,
-          disk_threshold: _currentConfig ? _currentConfig.disk_threshold : 80,
-          ignore_changes: ignoreArr,
-          retention_days: _currentConfig ? _currentConfig.retention_days : 90
-        })
-      });
-    } catch (e) {
-      console.error('Failed to save ignore config:', e);
-    }
+    saveIgnoreKeys();
   };
 
   // --- Toggle Host Config ---
@@ -385,7 +363,7 @@
 
   var STATUS_KEYS = ['firewall', 'web_status', 'db_status', 'disk_health', 'status', 'available'];
 
-  function renderAuditResults(results, prevResults, showIgnoreToggles) {
+  function renderAuditResults(results, prevResults, showTicks) {
     if (!results || typeof results !== 'object' || Array.isArray(results)) {
       return '<div class="audit-results"><pre>' + esc(JSON.stringify(results, null, 2)) + '</pre></div>';
     }
@@ -395,10 +373,11 @@
 
     // Top-level info (hostname, os, kernel, etc.)
     var topKeys = ['hostname', 'os', 'kernel', 'uptime', 'timestamp', 'total_checks'];
+    var topCounter = {n: 0};
     var topHtml = '';
     for (var i = 0; i < topKeys.length; i++) {
       if (results[topKeys[i]] !== undefined) {
-        topHtml += renderItem(topKeys[i], results[topKeys[i]], null);
+        topHtml += renderItem(topKeys[i], results[topKeys[i]], null, '', topCounter, false);
       }
     }
     if (topHtml) {
@@ -412,14 +391,13 @@
       var sectionData = results[sec.key];
       var prevSection = prev[sec.key] && typeof prev[sec.key] === 'object' ? prev[sec.key] : null;
       var badge = getSectionBadge(sectionData);
-      var bodyHtml = renderObject(sectionData, prevSection);
-      var isIgnored = _ignoredKeys[sec.key];
-      var ignoredClass = isIgnored ? ' ignored-section' : '';
-      var ignoreBtn = showIgnoreToggles ? renderIgnoreButton(sec.key, isIgnored) : '';
+      var counter = {n: 0};
+      var bodyHtml = renderObject(sectionData, prevSection, sec.key, counter, showTicks);
+      var selectAll = showTicks ? ' <label style="font-size:.7rem;font-weight:400;color:#8b949e;margin-left:auto;margin-right:.5rem;cursor:pointer" onclick="event.stopPropagation();selectAllSection(\'' + esc(sec.key) + '\',this)"><input type="checkbox" style="accent-color:#238636;vertical-align:middle;cursor:pointer;margin-right:.2rem">all</label>' : '';
 
-      html += '<div class="audit-card' + ignoredClass + '">' +
+      html += '<div class="audit-card">' +
         '<div class="audit-card-header" onclick="this.parentElement.classList.toggle(\'open\')">' +
-          sec.icon + ' ' + sec.label + ignoreBtn +
+          sec.icon + ' ' + sec.label + selectAll +
           (badge ? ' <span class="section-badge">' + badge + '</span>' : '') +
           ' <span class="toggle-icon">&#9660;</span>' +
         '</div>' +
@@ -440,12 +418,11 @@
       var val = results[ek];
       if (val && typeof val === 'object' && !Array.isArray(val)) {
         var prevExtra = prev[ek] && typeof prev[ek] === 'object' ? prev[ek] : null;
-        var ekIgnored = _ignoredKeys[ek];
-        var ekIgnoredClass = ekIgnored ? ' ignored-section' : '';
-        var ekIgnoreBtn = showIgnoreToggles ? renderIgnoreButton(ek, ekIgnored) : '';
-        html += '<div class="audit-card' + ekIgnoredClass + '">' +
-          '<div class="audit-card-header" onclick="this.parentElement.classList.toggle(\'open\')">' + esc(formatKey(ek)) + ekIgnoreBtn + ' <span class="toggle-icon">&#9660;</span></div>' +
-          '<div class="audit-card-body">' + renderObject(val, prevExtra) + '</div></div>';
+        var ekCounter = {n: 0};
+        var ekSelectAll = showTicks ? ' <label style="font-size:.7rem;font-weight:400;color:#8b949e;margin-left:auto;margin-right:.5rem;cursor:pointer" onclick="event.stopPropagation();selectAllSection(\'' + esc(ek) + '\',this)"><input type="checkbox" style="accent-color:#238636;vertical-align:middle;cursor:pointer;margin-right:.2rem">all</label>' : '';
+        html += '<div class="audit-card">' +
+          '<div class="audit-card-header" onclick="this.parentElement.classList.toggle(\'open\')">' + esc(formatKey(ek)) + ekSelectAll + ' <span class="toggle-icon">&#9660;</span></div>' +
+          '<div class="audit-card-body">' + renderObject(val, prevExtra, ek, ekCounter, showTicks) + '</div></div>';
       }
     }
 
@@ -453,7 +430,7 @@
     if (results.notes && results.notes.length) {
       html += '<div class="audit-card"><div class="audit-card-header" onclick="this.parentElement.classList.toggle(\'open\')">&#128221; Notes <span class="toggle-icon">&#9660;</span></div><div class="audit-card-body">';
       for (var n = 0; n < results.notes.length; n++) {
-        html += '<div class="audit-item"><span class="audit-item-value">' + esc(String(results.notes[n])) + '</span></div>';
+        html += '<div class="audit-item' + (n % 2 ? ' row-alt' : '') + '"><span class="audit-item-value">' + esc(String(results.notes[n])) + '</span></div>';
       }
       html += '</div></div>';
     }
@@ -461,7 +438,7 @@
     if (results.skipped && results.skipped.length) {
       html += '<div class="audit-card"><div class="audit-card-header" onclick="this.parentElement.classList.toggle(\'open\')">&#9888; Skipped <span class="toggle-icon">&#9660;</span></div><div class="audit-card-body">';
       for (var sk = 0; sk < results.skipped.length; sk++) {
-        html += '<div class="audit-item"><span class="audit-item-value">' + esc(String(results.skipped[sk])) + '</span></div>';
+        html += '<div class="audit-item' + (sk % 2 ? ' row-alt' : '') + '"><span class="audit-item-value">' + esc(String(results.skipped[sk])) + '</span></div>';
       }
       html += '</div></div>';
     }
@@ -469,14 +446,44 @@
     return html || '<div class="audit-results"><pre>' + esc(JSON.stringify(results, null, 2)) + '</pre></div>';
   }
 
-  function renderIgnoreButton(key, isIgnored) {
-    var cls = isIgnored ? ' ignored' : '';
-    var title = isIgnored ? 'Ignored (click to track)' : 'Click to ignore changes';
-    var icon = isIgnored ? '&#128065;&#8288;&#8725;' : '&#128065;';
-    return ' <button class="ignore-toggle' + cls + '" data-ignore-key="' + esc(key) + '" title="' + title + '" onclick="toggleIgnore(\'' + esc(key) + '\', event)">' + icon + '</button>';
+  // Select/deselect all ticks in a section
+  window.selectAllSection = function(sectionKey, labelEl) {
+    var cb = labelEl.querySelector('input[type="checkbox"]');
+    var checked = cb.checked;
+    var card = labelEl.closest('.audit-card');
+    if (!card) return;
+    var ticks = card.querySelectorAll('.ignore-tick');
+    for (var i = 0; i < ticks.length; i++) {
+      if (ticks[i].checked !== checked) {
+        ticks[i].checked = checked;
+        var ignKey = ticks[i].getAttribute('data-ignore-key');
+        if (checked) { _ignoredKeys[ignKey] = true; } else { delete _ignoredKeys[ignKey]; }
+        var row = ticks[i].closest('.audit-item');
+        if (row) row.classList.toggle('item-ignored', checked);
+      }
+    }
+    // Save to server
+    saveIgnoreKeys();
+  };
+
+  function saveIgnoreKeys() {
+    if (!currentHostId) return;
+    var ignoreArr = Object.keys(_ignoredKeys).filter(function(k) { return _ignoredKeys[k]; });
+    api('/api/hosts/' + currentHostId + '/config', {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        webhook_url: _currentConfig ? _currentConfig.webhook_url : '',
+        cpu_threshold: _currentConfig ? _currentConfig.cpu_threshold : 60,
+        memory_threshold: _currentConfig ? _currentConfig.memory_threshold : 60,
+        disk_threshold: _currentConfig ? _currentConfig.disk_threshold : 80,
+        ignore_changes: ignoreArr,
+        retention_days: _currentConfig ? _currentConfig.retention_days : 90
+      })
+    }).catch(function(e) { console.error('Failed to save ignore config:', e); });
   }
 
-  function renderObject(obj, prevObj) {
+  function renderObject(obj, prevObj, sectionKey, counter, showTicks) {
     var html = '';
     var keys = Object.keys(obj);
     for (var i = 0; i < keys.length; i++) {
@@ -486,31 +493,44 @@
 
       if (v && typeof v === 'object' && !Array.isArray(v)) {
         html += '<div style="margin:.4rem 0 .2rem;font-size:.8rem;color:#58a6ff;font-weight:600">' + esc(formatKey(k)) + '</div>';
-        html += renderObject(v, pv && typeof pv === 'object' ? pv : null);
+        html += renderObject(v, pv && typeof pv === 'object' ? pv : null, sectionKey, counter, showTicks);
       } else if (Array.isArray(v)) {
-        html += renderArrayItems(k, v, pv);
+        html += renderArrayItems(k, v, pv, sectionKey, counter, showTicks);
       } else {
-        html += renderItem(k, v, pv);
+        html += renderItem(k, v, pv, sectionKey, counter, showTicks);
       }
     }
     return html;
   }
 
-  function renderItem(key, value, prevValue) {
+  function renderItem(key, value, prevValue, sectionKey, counter, showTick) {
     var changed = prevValue !== undefined && prevValue !== null && JSON.stringify(prevValue) !== JSON.stringify(value);
     var valStr = formatValue(key, value);
     var statusClass = getStatusClass(key, value);
     var changeClass = changed ? ' changed' : '';
+    var altClass = counter.n % 2 ? ' row-alt' : '';
+    counter.n++;
 
-    return '<div class="audit-item">' +
-      '<span class="audit-item-key">' + esc(formatKey(key)) + '</span>' +
+    var ignoreKey = sectionKey ? sectionKey + '.' + key : key;
+    var isIgnored = _ignoredKeys[ignoreKey];
+    var ignoredClass = isIgnored ? ' item-ignored' : '';
+    var tickHtml = '';
+    if (showTick) {
+      tickHtml = '<input type="checkbox" class="ignore-tick" data-ignore-key="' + esc(ignoreKey) + '" ' +
+        (isIgnored ? 'checked ' : '') +
+        'onclick="toggleIgnore(\'' + esc(ignoreKey) + '\', this)" title="Ignore this item in alerts">';
+    }
+
+    return '<div class="audit-item' + altClass + ignoredClass + '">' +
+      '<div class="audit-item-left">' + tickHtml +
+        '<span class="audit-item-key">' + esc(formatKey(key)) + '</span></div>' +
       '<span class="audit-item-value' + changeClass + ' ' + statusClass + '">' + valStr +
         (changed ? ' <span style="font-size:.7rem;color:#8b949e">(was: ' + esc(formatValueRaw(prevValue)) + ')</span>' : '') +
       '</span></div>';
   }
 
-  function renderArrayItems(key, arr, prevArr) {
-    if (!arr.length) return renderItem(key, 'none', prevArr);
+  function renderArrayItems(key, arr, prevArr, sectionKey, counter, showTicks) {
+    if (!arr.length) return renderItem(key, 'none', prevArr, sectionKey, counter, showTicks);
 
     if (arr[0] && typeof arr[0] === 'object') {
       var html = '<div style="margin:.4rem 0 .2rem;font-size:.8rem;color:#58a6ff;font-weight:600">' + esc(formatKey(key)) + ' (' + arr.length + ')</div>';
@@ -524,14 +544,14 @@
             }
           }
         }
-        html += renderObject(item, prevItem);
+        html += renderObject(item, prevItem, sectionKey, counter, showTicks);
         if (i < arr.length - 1) html += '<div style="border-bottom:1px solid #21262d;margin:.3rem 0"></div>';
       }
       return html;
     }
 
     var prevStr = Array.isArray(prevArr) ? prevArr.join(', ') : null;
-    return renderItem(key, arr.join(', '), prevStr);
+    return renderItem(key, arr.join(', '), prevStr, sectionKey, counter, showTicks);
   }
 
   function getSectionBadge(data) {
@@ -755,9 +775,10 @@
 
   // --- Auto-refresh (preserves state) ---
   setInterval(function() {
-    // Don't refresh if a modal is open
+    // Don't refresh if a modal is open or guide is visible
     if (document.getElementById('audit-detail-modal').classList.contains('active')) return;
     if (document.getElementById('add-host-modal').classList.contains('active')) return;
+    if (document.getElementById('view-guide').style.display !== 'none') return;
 
     if (currentHostId) {
       showHost(currentHostId, true);

@@ -18,8 +18,8 @@ th,td{padding:.6rem 1rem;text-align:left;border-bottom:1px solid #21262d}
 th{background:#1c2128;color:#8b949e;font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;font-weight:600}
 td{font-size:.875rem}
 tr:last-child td{border-bottom:none}
-tr:nth-child(even) td{background:#1c2128}
-tr:hover td{background:#22272e}
+tr:nth-child(even) td{background:rgba(255,255,255,.02)}
+tr:hover td{background:rgba(255,255,255,.04)}
 
 .badge{display:inline-block;padding:.15rem .5rem;border-radius:12px;font-size:.75rem;font-weight:600}
 .badge-green{background:#0d3d1f;color:#3fb950}
@@ -77,12 +77,16 @@ tr:hover td{background:#22272e}
 .audit-card.open .audit-card-body{display:block}
 .audit-card-header .section-badge{margin-left:auto;margin-right:.5rem}
 
-.audit-item{display:flex;justify-content:space-between;align-items:center;padding:.3rem 0;border-bottom:1px solid #21262d;font-size:.825rem}
-.audit-item:last-child{border-bottom:none}
-.audit-item:nth-child(even){background:#0d1117;margin:0 -.75rem;padding:.3rem .75rem}
-.audit-item-key{color:#8b949e}
+.audit-item{display:flex;justify-content:space-between;align-items:center;padding:.3rem .75rem;font-size:.825rem;margin:0 -.75rem}
+.audit-item.row-alt{background:rgba(255,255,255,.02)}
+.audit-item-left{display:flex;align-items:center;gap:.4rem;min-width:0}
+.audit-item-key{color:#8b949e;white-space:nowrap}
 .audit-item-value{color:#c9d1d9;font-family:monospace;font-size:.8rem;text-align:right;max-width:60%;word-break:break-word}
 .audit-item-value.changed{color:#f0883e;font-weight:600}
+.ignore-tick{width:13px;height:13px;accent-color:#238636;cursor:pointer;flex-shrink:0;opacity:.5}
+.ignore-tick:checked{opacity:1}
+.audit-item.item-ignored .audit-item-key{text-decoration:line-through;opacity:.5}
+.audit-item.item-ignored .audit-item-value{opacity:.5}
 
 .status-pass{color:#3fb950}
 .status-warn{color:#d29922}
@@ -138,12 +142,6 @@ tr:hover td{background:#22272e}
 .ai-placeholder h4{font-size:.9rem;color:#c9d1d9;margin-bottom:.25rem}
 .ai-placeholder p{font-size:.8rem;color:#8b949e}
 
-/* Ignore toggle in audit headers */
-.ignore-toggle{background:none;border:none;cursor:pointer;font-size:.85rem;padding:.1rem .3rem;border-radius:4px;opacity:.5;margin-left:.4rem}
-.ignore-toggle:hover{opacity:1;background:#21262d}
-.ignore-toggle.ignored{opacity:.9;color:#d29922}
-.audit-card.ignored-section{opacity:.6}
-.audit-card.ignored-section .audit-card-header{background:#1a1e24}
 
 /* Guide page */
 .guide-section{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:1.25rem;margin-bottom:1rem}
